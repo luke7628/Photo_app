@@ -70,6 +70,7 @@ const CameraScreen: React.FC<CameraScreenProps> = ({
   // 启动摄像头
   useEffect(() => {
     let timeoutId: number;
+    let cleanupListeners: Array<() => void> = [];
     
     const startCamera = async () => {
       try {
@@ -140,43 +141,94 @@ const CameraScreen: React.FC<CameraScreenProps> = ({
         setStream(newStream);
         
         if (videoRef.current) {
-          videoRef.current.srcObject = newStream;
+          videoRef.current.srcObject = null; // 清除之前的源
           
-          // 等待视频可以播放
-          videoRef.current.oncanplay = () => {
-            console.log('Video can play');
-            setIsCameraReady(true);
-          };
-          
-          videoRef.current.onerror = (err) => {
-            console.error('Video error:', err);
-            setCameraError('视频加载失败，请刷新重试');
+          // 定义事件监听器
+          const onLoadedMetadata = () => {
+            console.log('onloadedmetadata:', {
+              width: videoRef.current?.videoWidth,
+              height: videoRef.current?.videoHeight
+            });
+            // 确保尝试播放
+            if (videoRef.current) {
+              const playPromise = videoRef.current.play();
+              if (playPromise !== undefined) {
+                playPromise.catch(err => {
+                  console.warn('Auto play failed in onloadedmetadata:', err);
+                });
+              }
+            }
           };
 
-          // 尝试播放
+          const onCanPlay = () => {
+            console.log('oncanplay - camera ready');
+            if (videoRef.current && videoRef.current.videoWidth > 0) {
+              setIsCameraReady(true);
+            }
+          };
+
+          const onPlaying = () => {
+            console.log('onplaying - video is playing');
+            if (videoRef.current && videoRef.current.videoWidth > 0) {
+              setIsCameraReady(true);
+            }
+          };
+
+          const onLoadedData = () => {
+            console.log('onloadeddata');
+          };
+
+          const onError = (e: any) => {
+            console.error('Video element error:', e);
+            setCameraError('视频加载失败，请点击重试');
+          };
+
+          // 添加监听器并记录清理函数
+          videoRef.current.addEventListener('loadedmetadata', onLoadedMetadata);
+          videoRef.current.addEventListener('canplay', onCanPlay);
+          videoRef.current.addEventListener('playing', onPlaying);
+          videoRef.current.addEventListener('loadeddata', onLoadedData);
+          videoRef.current.addEventListener('error', onError);
+
+          cleanupListeners.push(() => {
+            if (videoRef.current) {
+              videoRef.current.removeEventListener('loadedmetadata', onLoadedMetadata);
+              videoRef.current.removeEventListener('canplay', onCanPlay);
+              videoRef.current.removeEventListener('playing', onPlaying);
+              videoRef.current.removeEventListener('loadeddata', onLoadedData);
+              videoRef.current.removeEventListener('error', onError);
+            }
+          });
+
+          // 设置srcObject
+          videoRef.current.srcObject = newStream;
+
+          // 确保视频有正确的属性
+          videoRef.current.autoplay = true;
+          videoRef.current.muted = true;
+          (videoRef.current as any).playsInline = true;
+
+          // 立即尝试播放
           const playPromise = videoRef.current.play();
           if (playPromise !== undefined) {
             playPromise
               .then(() => {
-                console.log('Video playing successfully');
+                console.log('Video play() resolved successfully');
               })
               .catch(err => {
-                console.error('Play error:', err);
-                // 不要立即设置错误，而是等待oncanplay
-                setCameraError('无法播放视频流，请刷新重试');
+                console.error('Video play() rejected:', err.name, err.message);
+                // 尝试使用用户交互方式（通过重试按钮）
+                console.warn('Video requires user interaction to play');
               });
           }
 
-          // 备用：500ms后如果videoWidth > 0则认为ready
+          // 备用定时器：1000ms后检查视频尺寸
           timeoutId = window.setTimeout(() => {
             if (videoRef.current && videoRef.current.videoWidth > 0 && !cameraError) {
-              console.log('Camera ready by timeout detection:', {
-                width: videoRef.current.videoWidth,
-                height: videoRef.current.videoHeight
-              });
+              console.log('Timeout backup: camera ready');
               setIsCameraReady(true);
             }
-          }, 800);
+          }, 1000);
         }
       } catch (err: any) {
         console.error("Camera Access Error:", err);
@@ -208,6 +260,7 @@ const CameraScreen: React.FC<CameraScreenProps> = ({
     // 清理函数
     return () => {
       if (timeoutId) clearTimeout(timeoutId);
+      cleanupListeners.forEach(cleanup => cleanup());
       if (streamRef.current) {
         const track = streamRef.current.getVideoTracks()[0];
         if (track) {
@@ -303,8 +356,10 @@ const CameraScreen: React.FC<CameraScreenProps> = ({
               <div className="flex flex-col gap-3 w-full">
                 <button
                   onClick={() => {
+                    console.log('Retry button clicked');
                     setCameraError(null);
-                    setRetryCount(retryCount + 1);
+                    setIsCameraReady(false);
+                    setRetryCount(prev => prev + 1);
                   }}
                   className="w-full px-4 py-2 bg-blue-500 text-white rounded-xl font-semibold hover:bg-blue-600 transition-colors"
                 >
@@ -348,12 +403,15 @@ const CameraScreen: React.FC<CameraScreenProps> = ({
         {/* 使用 object-contain 确保横版视频流完整显示且不变形 */}
         <video 
           ref={videoRef}
-          autoPlay={true}
-          playsInline={true}
-          muted={true}
+          autoPlay
+          playsInline
+          muted
           controls={false}
           className="w-full h-full object-contain bg-black"
-          style={{ WebkitPlaysinline: 'true' } as any}
+          style={{
+            WebkitPlaysinline: 'true',
+            display: 'block'
+          } as any}
         />
         
         {/* 快门闪烁反馈 */}
