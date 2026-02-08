@@ -321,8 +321,8 @@ const DetailsScreen: React.FC<DetailsScreenProps> = ({
         </div>
 
         <div className="px-5 py-4">
-
-        {renderContent()}
+          {renderContent()}
+        </div>
       </main>
 
       {capturedCount < 12 && (
