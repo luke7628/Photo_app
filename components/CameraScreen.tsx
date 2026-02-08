@@ -26,6 +26,8 @@ const CameraScreen: React.FC<CameraScreenProps> = ({
   const [stream, setStream] = useState<MediaStream | null>(null);
   const [isCameraReady, setIsCameraReady] = useState(false);
   const [uiRotation, setUiRotation] = useState<OrientationAngle>(0);
+  const [cameraError, setCameraError] = useState<string | null>(null);
+  const streamRef = useRef<MediaStream | null>(null);
 
   // 陀螺仪处理 UI 元素的旋转
   useEffect(() => {
@@ -45,8 +47,8 @@ const CameraScreen: React.FC<CameraScreenProps> = ({
   // 同步闪光灯状态到硬件
   useEffect(() => {
     const applyTorch = async () => {
-      if (!stream) return;
-      const track = stream.getVideoTracks()[0];
+      if (!streamRef.current) return;
+      const track = streamRef.current.getVideoTracks()[0];
       if (!track) return;
 
       try {
@@ -57,53 +59,100 @@ const CameraScreen: React.FC<CameraScreenProps> = ({
           } as any);
         }
       } catch (err) {
-        console.error("Hardware torch error:", err);
+        console.warn("Hardware torch not supported or error:", err);
       }
     };
 
     applyTorch();
-  }, [flash, stream]);
+  }, [flash]);
 
-  const startCamera = useCallback(async () => {
-    try {
-      if (stream) {
-        stream.getTracks().forEach(track => track.stop());
-      }
-
-      const constraints: MediaStreamConstraints = {
-        video: {
-          facingMode: { ideal: 'environment' },
-          width: { ideal: 1920 },
-          height: { ideal: 1080 },
-          aspectRatio: { ideal: 1.7777777778 } // 强制请求 16:9 横版比例
-        },
-        audio: false
-      };
-
-      const newStream = await navigator.mediaDevices.getUserMedia(constraints);
-      setStream(newStream);
-      
-      if (videoRef.current) {
-        videoRef.current.srcObject = newStream;
-        videoRef.current.onloadedmetadata = () => {
-          videoRef.current?.play();
-          setIsCameraReady(true);
-        };
-      }
-    } catch (err) {
-      console.error("Camera Access Error:", err);
-    }
-  }, [stream]);
-
+  // 启动摄像头
   useEffect(() => {
-    startCamera();
-    return () => {
-      if (stream) {
-        const track = stream.getVideoTracks()[0];
-        if (track) {
-          track.applyConstraints({ advanced: [{ torch: false }] } as any).catch(() => {});
+    let timeoutId: number;
+    
+    const startCamera = async () => {
+      try {
+        setCameraError(null);
+        setIsCameraReady(false);
+
+        // 停止之前的流
+        if (streamRef.current) {
+          streamRef.current.getTracks().forEach(track => track.stop());
         }
-        stream.getTracks().forEach(track => track.stop());
+
+        const constraints: MediaStreamConstraints = {
+          video: {
+            facingMode: { ideal: 'environment' },
+            width: { ideal: 1920 },
+            height: { ideal: 1080 },
+            aspectRatio: { ideal: 16 / 9 }
+          },
+          audio: false
+        };
+
+        console.log('Starting camera with constraints:', constraints);
+        const newStream = await navigator.mediaDevices.getUserMedia(constraints);
+        streamRef.current = newStream;
+        setStream(newStream);
+        
+        if (videoRef.current) {
+          videoRef.current.srcObject = newStream;
+          
+          // 确保视频加载完成
+          const playPromise = videoRef.current.play();
+          if (playPromise !== undefined) {
+            playPromise
+              .then(() => {
+                console.log('Video playing successfully');
+                // 给视频一些时间来加载元数据
+                timeoutId = window.setTimeout(() => {
+                  if (videoRef.current && videoRef.current.videoWidth > 0) {
+                    setIsCameraReady(true);
+                    console.log('Camera ready:', {
+                      width: videoRef.current.videoWidth,
+                      height: videoRef.current.videoHeight
+                    });
+                  }
+                }, 500);
+              })
+              .catch(err => {
+                console.error('Play error:', err);
+                setCameraError('无法播放视频流');
+              });
+          }
+        }
+      } catch (err: any) {
+        console.error("Camera Access Error:", err);
+        let errorMessage = '无法访问摄像头';
+        
+        if (err.name === 'NotAllowedError') {
+          errorMessage = '摄像头权限被拒绝';
+        } else if (err.name === 'NotFoundError') {
+          errorMessage = '未找到摄像头设备';
+        } else if (err.name === 'NotReadableError') {
+          errorMessage = '摄像头被其他应用占用';
+        }
+        
+        setCameraError(errorMessage);
+        console.error('Full error:', err);
+      }
+    };
+
+    startCamera();
+
+    // 清理函数
+    return () => {
+      if (timeoutId) clearTimeout(timeoutId);
+      if (streamRef.current) {
+        const track = streamRef.current.getVideoTracks()[0];
+        if (track) {
+          try {
+            track.applyConstraints({ advanced: [{ torch: false }] } as any).catch(() => {});
+          } catch (e) {
+            console.warn('Error disabling torch on cleanup:', e);
+          }
+        }
+        streamRef.current.getTracks().forEach(track => track.stop());
       }
     };
   }, []);
@@ -143,6 +192,33 @@ const CameraScreen: React.FC<CameraScreenProps> = ({
   return (
     <div className="absolute inset-0 z-50 bg-black flex flex-col overflow-hidden touch-none">
       <div className="relative flex-1 bg-black overflow-hidden flex items-center justify-center">
+        {/* 摄像头错误提示 */}
+        {cameraError && (
+          <div className="absolute inset-0 z-40 flex items-center justify-center bg-black/80 backdrop-blur-sm">
+            <div className="flex flex-col items-center gap-4 px-6 py-8 bg-black/90 rounded-3xl border border-red-500/50 max-w-xs">
+              <span className="material-symbols-outlined text-4xl text-red-500">error_outline</span>
+              <p className="text-white text-center font-semibold">{cameraError}</p>
+              <p className="text-gray-400 text-xs text-center">请检查摄像头权限和设备状态</p>
+              <button
+                onClick={onClose}
+                className="mt-2 px-6 py-2 bg-blue-500 text-white rounded-xl font-semibold"
+              >
+                返回
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* 摄像头加载状态 */}
+        {!isCameraReady && !cameraError && (
+          <div className="absolute inset-0 z-35 flex items-center justify-center bg-black/80 backdrop-blur-sm">
+            <div className="flex flex-col items-center gap-4">
+              <div className="w-12 h-12 border-4 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
+              <p className="text-white font-semibold">初始化摄像头...</p>
+            </div>
+          </div>
+        )}
+
         {/* 使用 object-contain 确保横版视频流完整显示且不变形 */}
         <video 
           ref={videoRef} 
@@ -180,7 +256,7 @@ const CameraScreen: React.FC<CameraScreenProps> = ({
             <button 
               onClick={() => setFlash(f => f === 'off' ? 'on' : 'off')}
               style={rotationStyle}
-              className={`size-10 flex items-center justify-center rounded-2xl border transition-all backdrop-blur-xl ${flash === 'on' ? 'bg-primary border-primary text-black shadow-[0_0_15px_rgba(60,230,25,0.4)]' : 'bg-black/40 border-white/10 text-white'}`}
+              className={`size-10 flex items-center justify-center rounded-2xl border transition-all backdrop-blur-xl ${flash === 'on' ? 'bg-primary border-primary text-black shadow-[0_0_15px_rgba(0,122,255,0.4)]' : 'bg-black/40 border-white/10 text-white'}`}
             >
               <span className="material-symbols-outlined text-lg font-bold">
                 {flash === 'on' ? 'flash_on' : 'flash_off'}
