@@ -168,36 +168,36 @@ const ReviewScreen: React.FC<ReviewScreenProps> = ({ imageUrl, data, isAnalyzing
         </div>
 
         {/* 强化后的序列号显示卡片 - 可点击编辑 - 增加 shaking 错误提示 */}
-        <div className={`bg-background-dark p-0.5 rounded-[2rem] shadow-xl overflow-hidden relative group transition-all duration-300 ${shakeError ? 'ring-4 ring-red-500/50 translate-x-[-2px]' : ''}`}>
+        <div className={`bg-background-dark p-0.5 rounded-2xl shadow-lg overflow-hidden relative group transition-all duration-300 ${shakeError ? 'ring-4 ring-red-500/50 translate-x-[-2px]' : ''}`}>
           <button 
             onClick={handleOpenEdit}
             disabled={isAnalyzing}
-            className={`w-full rounded-[1.8rem] p-5 flex flex-col items-center relative text-left transition-all active:bg-[#fff9c4] disabled:cursor-not-allowed ${
+            className={`w-full rounded-[1.4rem] px-4 py-3 flex flex-col items-center relative text-left transition-all active:bg-[#fff9c4] disabled:cursor-not-allowed ${
               hasValidData ? 'bg-[#fdfbe6]' : 'bg-red-50'
             }`}
           >
-            {shakeError && <div className="absolute inset-0 bg-red-500/10 animate-pulse rounded-[1.8rem]"></div>}
+            {shakeError && <div className="absolute inset-0 bg-red-500/10 animate-pulse rounded-[1.4rem]"></div>}
             
-            <div className="w-full flex justify-between items-start mb-1">
-               <div className="flex flex-col gap-1" style={rotationStyle}>
-                  <p className={`text-[10px] font-black uppercase tracking-[0.2em] leading-none ${hasValidData ? 'text-primary' : 'text-red-500'}`}>
+            <div className="w-full flex justify-between items-center mb-2">
+               <div className="flex flex-col" style={rotationStyle}>
+                  <p className={`text-[9px] font-bold uppercase tracking-[0.15em] leading-none ${hasValidData ? 'text-primary' : 'text-red-500'}`}>
                     {hasValidData ? 'Detected Serial' : 'Missing Info'}
                   </p>
                </div>
-               <div className="flex items-center gap-1 bg-white/60 px-2 py-0.5 rounded-md border border-gray-200" style={rotationStyle}>
-                  <span className="material-symbols-outlined text-[10px] font-black text-gray-400 uppercase leading-none">Model</span>
-                  <span className="text-[10px] font-black text-gray-900 leading-none uppercase">{data?.model || 'ZT411'}</span>
+               <div className="flex items-center gap-1 bg-white/60 px-2 py-1 rounded-lg border border-gray-200" style={rotationStyle}>
+                  <span className="material-symbols-outlined text-[10px] text-gray-400 leading-none">edit</span>
+                  <span className="text-[10px] font-bold text-gray-900 leading-none uppercase">{data?.model || 'ZT411'}</span>
                </div>
             </div>
             
-            <div className="w-full py-2 overflow-hidden flex flex-col items-center justify-center" style={rotationStyle}>
+            <div className="w-full py-1 overflow-hidden flex flex-col items-center justify-center" style={rotationStyle}>
               {isAnalyzing ? (
-                <div className="flex flex-col items-center gap-2 py-2">
-                   <div className="h-10 w-48 bg-gray-200/50 rounded-xl animate-pulse"></div>
-                   <p className="text-[9px] font-bold text-gray-400 uppercase tracking-[0.3em] animate-bounce">AI Analyzing...</p>
+                <div className="flex flex-col items-center gap-1.5 py-1">
+                   <div className="h-8 w-40 bg-gray-200/50 rounded-xl animate-pulse"></div>
+                   <p className="text-[8px] font-bold text-gray-400 uppercase tracking-[0.2em] animate-bounce">AI Analyzing...</p>
                 </div>
               ) : (
-                <p className={`text-4xl sm:text-5xl font-black tracking-tighter truncate uppercase leading-none ${hasValidData ? 'text-gray-900' : 'text-red-500/50'}`}>
+                <p className={`text-2xl sm:text-3xl font-black tracking-tight truncate uppercase leading-none ${hasValidData ? 'text-gray-900' : 'text-red-500/50'}`}>
                   {hasValidData ? data?.serialNumber : 'TAP TO ENTER'}
                 </p>
               )}
@@ -205,8 +205,8 @@ const ReviewScreen: React.FC<ReviewScreenProps> = ({ imageUrl, data, isAnalyzing
             
             <div className="w-full h-px bg-gray-200/50 my-2"></div>
             <div className={`flex items-center justify-center gap-1.5 transition-opacity ${hasValidData ? 'opacity-60 group-hover:opacity-100' : 'opacity-100 animate-pulse'}`}>
-               {!isAnalyzing && <span className={`material-symbols-outlined text-[12px] ${hasValidData ? 'text-gray-400' : 'text-red-400'}`}>edit</span>}
-               <p className={`text-[8px] font-bold uppercase tracking-widest leading-none ${hasValidData ? 'text-gray-400' : 'text-red-400'}`}>
+               {!isAnalyzing && <span className={`material-symbols-outlined text-[11px] ${hasValidData ? 'text-gray-400' : 'text-red-400'}`}>edit</span>}
+               <p className={`text-[7px] font-bold uppercase tracking-widest leading-none ${hasValidData ? 'text-gray-400' : 'text-red-400'}`}>
                  {isAnalyzing ? 'Processing image...' : (hasValidData ? 'Tap to edit manual entry' : 'Input required to proceed')}
                </p>
             </div>
