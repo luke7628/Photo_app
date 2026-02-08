@@ -1,0 +1,370 @@
+
+import React, { useState, useRef, useEffect } from 'react';
+import { PHOTO_LABELS } from '../types';
+
+interface ReviewScreenProps {
+  imageUrl: string;
+  data: { serialNumber: string; model: string } | null;
+  isAnalyzing: boolean;
+  sessionIndex: number;
+  isSingleRetake?: boolean;
+  onRetake: () => void;
+  onConfirm: () => void;
+  onUpdateData: (data: { serialNumber: string; model: string }) => void;
+}
+
+const ReviewScreen: React.FC<ReviewScreenProps> = ({ imageUrl, data, isAnalyzing, sessionIndex, isSingleRetake, onRetake, onConfirm, onUpdateData }) => {
+  const [crop, setCrop] = useState({ x: 0, y: 0, w: 100, h: 100 });
+  const containerRef = useRef<HTMLDivElement>(null);
+  const activeHandle = useRef<string | null>(null);
+  const startPos = useRef({ x: 0, y: 0, cropX: 0, cropY: 0, cropW: 0, cropH: 0 });
+  
+  const [uiRotation, setUiRotation] = useState(0);
+
+  // Edit Modal State
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [editSerial, setEditSerial] = useState('');
+  const [editModel, setEditModel] = useState('ZT411');
+
+  // Validation & Animation
+  const [shakeError, setShakeError] = useState(false);
+  const [modalError, setModalError] = useState(false);
+
+  useEffect(() => {
+    const handleOrientation = (e: DeviceOrientationEvent) => {
+      const { beta, gamma } = e;
+      if (beta === null || gamma === null) return;
+      if (Math.abs(gamma) > 40) {
+        setUiRotation(gamma > 0 ? -90 : 90);
+      } else {
+        setUiRotation(0);
+      }
+    };
+    window.addEventListener('deviceorientation', handleOrientation);
+    return () => window.removeEventListener('deviceorientation', handleOrientation);
+  }, []);
+
+  const hasValidData = !isAnalyzing && data?.serialNumber && data.serialNumber.trim().length > 0;
+
+  const handleOpenEdit = () => {
+    if (isAnalyzing) return;
+    setEditSerial(data?.serialNumber || '');
+    setEditModel(data?.model || 'ZT411');
+    setModalError(false);
+    setShowEditModal(true);
+  };
+
+  const handleSaveEdit = () => {
+    if (!editSerial || !editSerial.trim()) {
+      setModalError(true);
+      setTimeout(() => setModalError(false), 500);
+      return;
+    }
+    onUpdateData({ serialNumber: editSerial.toUpperCase(), model: editModel });
+    setShowEditModal(false);
+  };
+
+  const handleConfirm = () => {
+    if (!hasValidData) {
+      setShakeError(true);
+      setTimeout(() => setShakeError(false), 600);
+      // Optional: Auto open modal if they click main confirm and data is missing
+      // handleOpenEdit(); 
+      return;
+    }
+    onConfirm();
+  };
+
+  const handleTouchStart = (e: React.TouchEvent | React.MouseEvent, handle: string) => {
+    e.stopPropagation();
+    const clientX = 'touches' in e ? e.touches[0].clientX : (e as React.MouseEvent).clientX;
+    const clientY = 'touches' in e ? e.touches[0].clientY : (e as React.MouseEvent).clientY;
+    
+    activeHandle.current = handle;
+    startPos.current = {
+      x: clientX,
+      y: clientY,
+      cropX: crop.x,
+      cropY: crop.y,
+      cropW: crop.w,
+      cropH: crop.h
+    };
+  };
+
+  const handleTouchMove = (e: React.TouchEvent | React.MouseEvent) => {
+    if (!activeHandle.current || !containerRef.current) return;
+    
+    const clientX = 'touches' in e ? e.touches[0].clientX : (e as React.MouseEvent).clientX;
+    const clientY = 'touches' in e ? e.touches[0].clientY : (e as React.MouseEvent).clientY;
+    
+    const rect = containerRef.current.getBoundingClientRect();
+    const deltaX = ((clientX - startPos.current.x) / rect.width) * 100;
+    const deltaY = ((clientY - startPos.current.y) / rect.height) * 100;
+
+    setCrop(prev => {
+      let { cropX: x, cropY: y, cropW: w, cropH: h } = startPos.current;
+      const minSize = 10;
+
+      switch (activeHandle.current) {
+        case 'tl':
+          x = Math.max(0, Math.min(startPos.current.cropX + deltaX, startPos.current.cropX + startPos.current.cropW - minSize));
+          y = Math.max(0, Math.min(startPos.current.cropY + deltaY, startPos.current.cropY + startPos.current.cropH - minSize));
+          w = startPos.current.cropW - (x - startPos.current.cropX);
+          h = startPos.current.cropH - (y - startPos.current.cropY);
+          break;
+        case 'tr':
+          y = Math.max(0, Math.min(startPos.current.cropY + deltaY, startPos.current.cropY + startPos.current.cropH - minSize));
+          w = Math.max(minSize, Math.min(startPos.current.cropW + deltaX, 100 - x));
+          h = startPos.current.cropH - (y - startPos.current.cropY);
+          break;
+        case 'bl':
+          x = Math.max(0, Math.min(startPos.current.cropX + deltaX, startPos.current.cropX + startPos.current.cropW - minSize));
+          w = startPos.current.cropW - (x - startPos.current.cropX);
+          h = Math.max(minSize, Math.min(startPos.current.cropH + deltaY, 100 - y));
+          break;
+        case 'br':
+          w = Math.max(minSize, Math.min(startPos.current.cropW + deltaX, 100 - x));
+          h = Math.max(minSize, Math.min(startPos.current.cropH + deltaY, 100 - y));
+          break;
+        case 'move':
+          x = Math.max(0, Math.min(startPos.current.cropX + deltaX, 100 - w));
+          y = Math.max(0, Math.min(startPos.current.cropY + deltaY, 100 - h));
+          break;
+      }
+      return { x, y, w, h };
+    });
+  };
+
+  const handleTouchEnd = () => {
+    activeHandle.current = null;
+  };
+
+  const isLandscape = uiRotation !== 0;
+  const rotationStyle = {
+    transform: `rotate(${uiRotation}deg) scale(${isLandscape ? 0.8 : 1})`,
+    transition: 'transform 0.5s cubic-bezier(0.34, 1.56, 0.64, 1)'
+  };
+
+  return (
+    <div className="flex flex-col h-full w-full bg-[#f6f8f6] select-none touch-none" 
+         onMouseMove={handleTouchMove} 
+         onMouseUp={handleTouchEnd}
+         onTouchMove={handleTouchMove} 
+         onTouchEnd={handleTouchEnd}>
+      
+      <header className={`safe-pt bg-white rounded-b-[2.5rem] shadow-sm shrink-0 transition-all duration-500 ${isLandscape ? 'px-12 pb-3' : 'px-6 pb-6'}`}>
+        <div className={`flex items-center gap-3 transition-all ${isLandscape ? 'pt-3 mb-2' : 'pt-6 mb-4'}`}>
+           <div style={rotationStyle} className={`size-8 rounded-lg flex items-center justify-center ${isSingleRetake ? 'bg-amber-100' : 'bg-sage/10'}`}>
+             <span className={`material-symbols-outlined text-[18px] ${isSingleRetake ? 'text-amber-600' : 'text-sage'}`}>
+               {isSingleRetake ? 'published_with_changes' : 'image_search'}
+             </span>
+           </div>
+           <div className="flex flex-col" style={rotationStyle}>
+             <h1 className="text-lg font-black text-gray-900 tracking-tight leading-none uppercase">
+               {isSingleRetake ? 'Reviewing' : `Step ${sessionIndex + 1}`}
+             </h1>
+             <p className="text-[9px] font-bold text-sage uppercase tracking-widest mt-0.5 leading-none">{PHOTO_LABELS[sessionIndex]}</p>
+           </div>
+        </div>
+
+        {/* 强化后的序列号显示卡片 - 可点击编辑 - 增加 shaking 错误提示 */}
+        <div className={`bg-background-dark p-0.5 rounded-[2rem] shadow-xl overflow-hidden relative group transition-all duration-300 ${shakeError ? 'ring-4 ring-red-500/50 translate-x-[-2px]' : ''}`}>
+          <button 
+            onClick={handleOpenEdit}
+            disabled={isAnalyzing}
+            className={`w-full rounded-[1.8rem] p-5 flex flex-col items-center relative text-left transition-all active:bg-[#fff9c4] disabled:cursor-not-allowed ${
+              hasValidData ? 'bg-[#fdfbe6]' : 'bg-red-50'
+            }`}
+          >
+            {shakeError && <div className="absolute inset-0 bg-red-500/10 animate-pulse rounded-[1.8rem]"></div>}
+            
+            <div className="w-full flex justify-between items-start mb-1">
+               <div className="flex flex-col gap-1" style={rotationStyle}>
+                  <p className={`text-[10px] font-black uppercase tracking-[0.2em] leading-none ${hasValidData ? 'text-primary' : 'text-red-500'}`}>
+                    {hasValidData ? 'Detected Serial' : 'Missing Info'}
+                  </p>
+               </div>
+               <div className="flex items-center gap-1 bg-white/60 px-2 py-0.5 rounded-md border border-gray-200" style={rotationStyle}>
+                  <span className="material-symbols-outlined text-[10px] font-black text-gray-400 uppercase leading-none">Model</span>
+                  <span className="text-[10px] font-black text-gray-900 leading-none uppercase">{data?.model || 'ZT411'}</span>
+               </div>
+            </div>
+            
+            <div className="w-full py-2 overflow-hidden flex flex-col items-center justify-center" style={rotationStyle}>
+              {isAnalyzing ? (
+                <div className="flex flex-col items-center gap-2 py-2">
+                   <div className="h-10 w-48 bg-gray-200/50 rounded-xl animate-pulse"></div>
+                   <p className="text-[9px] font-bold text-gray-400 uppercase tracking-[0.3em] animate-bounce">AI Analyzing...</p>
+                </div>
+              ) : (
+                <p className={`text-4xl sm:text-5xl font-black tracking-tighter truncate uppercase leading-none ${hasValidData ? 'text-gray-900' : 'text-red-500/50'}`}>
+                  {hasValidData ? data?.serialNumber : 'TAP TO ENTER'}
+                </p>
+              )}
+            </div>
+            
+            <div className="w-full h-px bg-gray-200/50 my-2"></div>
+            <div className={`flex items-center justify-center gap-1.5 transition-opacity ${hasValidData ? 'opacity-60 group-hover:opacity-100' : 'opacity-100 animate-pulse'}`}>
+               {!isAnalyzing && <span className={`material-symbols-outlined text-[12px] ${hasValidData ? 'text-gray-400' : 'text-red-400'}`}>edit</span>}
+               <p className={`text-[8px] font-bold uppercase tracking-widest leading-none ${hasValidData ? 'text-gray-400' : 'text-red-400'}`}>
+                 {isAnalyzing ? 'Processing image...' : (hasValidData ? 'Tap to edit manual entry' : 'Input required to proceed')}
+               </p>
+            </div>
+          </button>
+        </div>
+      </header>
+
+      <main className="flex-1 flex items-center justify-center px-4 py-2 overflow-hidden relative transition-all">
+        <div 
+          ref={containerRef} 
+          className={`relative bg-black rounded-[2.5rem] overflow-hidden shadow-2xl border-2 border-white transition-all duration-700 ease-out ${isLandscape ? 'h-[90%] aspect-[3/2] max-h-lg' : 'w-full aspect-[4/3] max-w-sm'}`} 
+          style={{ transform: `rotate(${uiRotation}deg)` }}
+        >
+          <img 
+            alt="Review" 
+            className="w-full h-full object-contain pointer-events-none" 
+            src={imageUrl} 
+          />
+          
+          <div className="absolute inset-0 z-10 pointer-events-none">
+            <div className="absolute inset-0 bg-black/40" style={{
+              maskImage: `linear-gradient(to right, black ${crop.x}%, transparent ${crop.x}%, transparent ${crop.x + crop.w}%, black ${crop.x + crop.w}%)`,
+              WebkitMaskImage: `linear-gradient(to right, black ${crop.x}%, transparent ${crop.x}%, transparent ${crop.x + crop.w}%, black ${crop.x + crop.w}%)`,
+            }}></div>
+            <div className="absolute inset-0 bg-black/40" style={{
+              maskImage: `linear-gradient(to bottom, black ${crop.y}%, transparent ${crop.y}%, transparent ${crop.y + crop.h}%, black ${crop.y + crop.h}%)`,
+              WebkitMaskImage: `linear-gradient(to bottom, black ${crop.y}%, transparent ${crop.y}%, transparent ${crop.y + crop.h}%, black ${crop.y + crop.h}%)`,
+            }}></div>
+          </div>
+
+          <div 
+            style={{ left: `${crop.x}%`, top: `${crop.y}%`, width: `${crop.w}%`, height: `${crop.h}%` }}
+            className="absolute z-20 border border-primary rounded-xl shadow-[0_0_20px_rgba(60,230,25,0.4)] transition-[box-shadow]"
+            onMouseDown={(e) => handleTouchStart(e, 'move')}
+            onTouchStart={(e) => handleTouchStart(e, 'move')}
+          >
+            <div className="absolute -top-4 -left-4 size-10 flex items-center justify-center pointer-events-auto" onMouseDown={(e) => handleTouchStart(e, 'tl')} onTouchStart={(e) => handleTouchStart(e, 'tl')}>
+               <div className="size-6 border-t-4 border-l-4 border-primary rounded-tl-sm"></div>
+            </div>
+            <div className="absolute -top-4 -right-4 size-10 flex items-center justify-center pointer-events-auto" onMouseDown={(e) => handleTouchStart(e, 'tr')} onTouchStart={(e) => handleTouchStart(e, 'tr')}>
+               <div className="size-6 border-t-4 border-r-4 border-primary rounded-tr-sm"></div>
+            </div>
+            <div className="absolute -bottom-4 -left-4 size-10 flex items-center justify-center pointer-events-auto" onMouseDown={(e) => handleTouchStart(e, 'bl')} onTouchStart={(e) => handleTouchStart(e, 'bl')}>
+               <div className="size-6 border-b-4 border-l-4 border-primary rounded-bl-sm"></div>
+            </div>
+            <div className="absolute -bottom-4 -right-4 size-10 flex items-center justify-center pointer-events-auto" onMouseDown={(e) => handleTouchStart(e, 'br')} onTouchStart={(e) => handleTouchStart(e, 'br')}>
+               <div className="size-6 border-b-4 border-r-4 border-primary rounded-br-sm"></div>
+            </div>
+          </div>
+        </div>
+      </main>
+
+      <footer className={`safe-pb bg-white rounded-t-[2.5rem] shadow-[0_-15_50px_rgba(0,0,0,0.06)] shrink-0 z-20 transition-all duration-500 ${isLandscape ? 'pb-4 pt-3 px-12' : 'pb-10 pt-4 px-6'}`}>
+        <div className={`flex gap-4 ${isLandscape ? 'justify-center' : ''}`}>
+          <button 
+            onClick={onRetake}
+            style={rotationStyle}
+            className={`bg-slate-50 active:scale-95 rounded-2xl flex items-center justify-center gap-2 transition-all border border-slate-100 shadow-sm ${isLandscape ? 'px-8 h-12' : 'flex-1 h-14'}`}
+          >
+            <span className="material-symbols-outlined text-gray-500 text-lg font-bold">replay</span>
+            <span className="font-black text-gray-700 uppercase text-[10px] tracking-widest">Retake</span>
+          </button>
+          <button 
+            onClick={handleConfirm}
+            disabled={isAnalyzing}
+            style={rotationStyle}
+            className={`active:scale-95 rounded-2xl flex items-center justify-center gap-2 transition-all shadow-xl disabled:opacity-50 ${isLandscape ? 'px-12 h-12' : 'flex-[2] h-14'} ${
+              hasValidData 
+              ? (isSingleRetake ? 'bg-amber-500' : 'bg-sage') 
+              : 'bg-gray-200 text-gray-400 shadow-none'
+            }`}
+          >
+            {isAnalyzing ? (
+              <div className="flex items-center gap-2">
+                 <div className="size-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
+                 <span className="font-black text-white uppercase text-[10px] tracking-widest">Saving...</span>
+              </div>
+            ) : (
+              <>
+                <span className={`font-black uppercase text-[10px] tracking-widest ${hasValidData ? 'text-white' : 'text-gray-500'}`}>
+                  {hasValidData ? (isSingleRetake ? 'Update' : (sessionIndex < 11 ? 'Save & Next' : 'Finish')) : 'Identify Asset'}
+                </span>
+                <span className={`material-symbols-outlined font-black text-lg ${hasValidData ? 'text-white' : 'text-gray-500'}`}>
+                  {hasValidData ? (isSingleRetake ? 'done_all' : (sessionIndex < 11 ? 'arrow_forward' : 'check_circle')) : 'edit_square'}
+                </span>
+              </>
+            )}
+          </button>
+        </div>
+      </footer>
+
+      {/* Manual Entry Modal */}
+      {showEditModal && (
+        <div className="fixed inset-0 z-[100] bg-black/40 backdrop-blur-md flex items-center justify-center p-6 animate-in fade-in">
+           <div className="w-full max-w-[320px] bg-white rounded-[1.5rem] p-6 shadow-2xl animate-in zoom-in-95 duration-200">
+              <div className="mb-6">
+                <h3 className="text-lg font-black text-[#1a2332] uppercase tracking-tight leading-none">Manual Entry</h3>
+                <p className="text-[10px] font-bold text-gray-400 mt-1 uppercase tracking-[0.1em]">Correct Identification</p>
+              </div>
+              
+              <div className="space-y-4 mb-8">
+                <div>
+                  <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest block mb-2">Serial Number</label>
+                  <input 
+                    autoFocus
+                    value={editSerial}
+                    onChange={(e) => {
+                      setEditSerial(e.target.value.toUpperCase());
+                      setModalError(false);
+                    }}
+                    placeholder="N/A"
+                    className={`w-full h-12 px-4 bg-gray-100 rounded-lg border-2 text-base font-black uppercase tracking-widest placeholder:text-gray-400 focus:outline-none transition-all ${
+                      modalError 
+                      ? 'border-red-400 bg-red-50 text-red-500 animate-pulse' 
+                      : 'border-transparent focus:border-primary/50 text-gray-800'
+                    }`}
+                  />
+                </div>
+                
+                <div>
+                  <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest block mb-2">Model Type</label>
+                  <div className="flex bg-gray-100 p-1 rounded-lg">
+                    {(['ZT411', 'ZT421'] as const).map(m => (
+                      <button
+                        key={m}
+                        onClick={() => setEditModel(m)}
+                        className={`flex-1 h-9 rounded-md text-[10px] font-black uppercase tracking-widest transition-all ${
+                          editModel === m 
+                          ? 'bg-white text-gray-900 shadow-sm' 
+                          : 'text-gray-400 hover:text-gray-600'
+                        }`}
+                      >
+                        {m}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-3">
+                <button 
+                  onClick={() => setShowEditModal(false)} 
+                  className="flex-1 h-12 rounded-lg text-gray-400 font-black uppercase text-[10px] tracking-widest hover:bg-gray-50 transition-colors"
+                >
+                  Cancel
+                </button>
+                <button 
+                  onClick={handleSaveEdit}
+                  className={`flex-[1.5] h-12 bg-primary text-[#1a2332] rounded-lg font-black uppercase text-[10px] tracking-widest shadow-lg shadow-primary/20 transition-all active:scale-95 hover:brightness-105`}
+                >
+                  Confirm
+                </button>
+              </div>
+           </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
+export default ReviewScreen;

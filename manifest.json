@@ -1,0 +1,27 @@
+
+{
+  "short_name": "Dematic Photo",
+  "name": "Dematic Printer Photo Suite",
+  "icons": [
+    {
+      "src": "https://img.icons8.com/fluency/144/print.png",
+      "sizes": "144x144",
+      "type": "image/png"
+    },
+    {
+      "src": "https://img.icons8.com/fluency/192/print.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "https://img.icons8.com/fluency/512/print.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ],
+  "start_url": ".",
+  "display": "standalone",
+  "theme_color": "#ffffff",
+  "background_color": "#ffffff",
+  "orientation": "portrait"
+}
