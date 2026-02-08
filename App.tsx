@@ -141,8 +141,29 @@ const App: React.FC = () => {
       const savedUser = storageService.loadUser();
       const savedSettings = storageService.loadSettings();
       
-      setProjects(savedProjects || MOCK_PROJECTS);
-      setPrinters(savedPrinters || MOCK_PRINTERS);
+      // 合并MOCK数据，确保测试项目存在
+      let finalProjects = savedProjects || [];
+      let finalPrinters = savedPrinters || [];
+      
+      // 如果没有测试项目，添加它
+      const hasTestProject = finalProjects.some(p => p.id === 'proj-test');
+      if (!hasTestProject) {
+        const testProject = MOCK_PROJECTS.find(p => p.id === 'proj-test');
+        const testPrinters = MOCK_PRINTERS.filter(p => p.projectId === 'proj-test');
+        if (testProject) {
+          finalProjects = [testProject, ...finalProjects];
+          finalPrinters = [...testPrinters, ...finalPrinters];
+          storageService.saveProjects(finalProjects);
+          storageService.savePrinters(finalPrinters);
+        }
+      }
+      
+      // 如果完全没有数据，使用MOCK数据
+      if (finalProjects.length === 0) finalProjects = MOCK_PROJECTS;
+      if (finalPrinters.length === 0) finalPrinters = MOCK_PRINTERS;
+      
+      setProjects(finalProjects);
+      setPrinters(finalPrinters);
       if (savedUser) setUser(savedUser);
       if (savedSettings) setSettings(savedSettings);
 
