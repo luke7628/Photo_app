@@ -21,130 +21,159 @@ const ProjectListScreen: React.FC<ProjectListScreenProps> = ({
   const [activeMenuId, setActiveMenuId] = useState<string | null>(null);
 
   return (
-    <div className="flex flex-col h-full bg-bg-main p-4 sm:p-6 lg:p-8 overflow-hidden">
-      {/* 顶部应用 shell - 标准尺寸 */}
-      <div className="flex items-center justify-between mb-8 px-4 shrink-0">
-        <div className="flex flex-col">
-          <div className="mb-2">
-            <div className="size-12 flex items-center justify-center rounded-2xl bg-white shadow-sm border border-gray-100">
-              <span className="material-symbols-outlined text-[#8e99ac] text-3xl font-bold">apps</span>
+    <div className="flex flex-col h-full bg-gray-50 overflow-hidden">
+      {/* Top Header */}
+      <header className="safe-pt flex items-center justify-between px-4 sm:px-6 py-4 sm:py-5 bg-white border-b border-gray-200 shrink-0">
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-3 mb-1">
+            <div className="flex-shrink-0 w-10 h-10 sm:w-12 sm:h-12 flex items-center justify-center rounded-2xl bg-blue-50 border border-blue-100">
+              <span className="material-symbols-outlined text-lg sm:text-2xl text-blue-500">folder_open</span>
             </div>
+            <h1 className="text-xl sm:text-3xl font-bold text-gray-900 truncate">Project Hub</h1>
           </div>
-          <h1 className="text-3xl font-black text-[#1a2332] tracking-tight leading-none">Project Hub</h1>
-          <p className="text-xs font-black text-[#a6c9a0] uppercase tracking-[0.3em] mt-2">Asset Suite</p>
+          <p className="text-xs sm:text-sm font-medium text-gray-500">Asset Suite</p>
         </div>
 
-        <div className="flex items-center gap-4 self-start mt-2">
+        <div className="flex items-center gap-2 sm:gap-3 ml-4 flex-shrink-0">
           {user ? (
-            <button onClick={onLogout} className="flex items-center gap-2.5 bg-white px-4 py-2 rounded-full border border-gray-100 shadow-sm active:scale-95 transition-transform">
-              <img src={user.photoUrl} className="size-6 rounded-full" alt="User" />
-              <span className="text-xs font-bold text-gray-700 uppercase tracking-tight">{user.name.split(' ')[0]}</span>
+            <button 
+              onClick={onLogout} 
+              title={user.name}
+              className="flex items-center gap-2 bg-gray-100 hover:bg-gray-200 px-3 sm:px-4 py-2 rounded-lg transition-colors active:scale-95"
+            >
+              <img src={user.photoUrl} className="w-5 h-5 sm:w-6 sm:h-6 rounded-full object-cover" alt="User" />
+              <span className="hidden sm:inline text-xs font-semibold text-gray-700 truncate max-w-[80px]">{user.name.split(' ')[0]}</span>
             </button>
           ) : (
             <button 
               onClick={onLogin}
-              className="flex items-center gap-2 bg-white px-4 py-2.5 rounded-xl border border-gray-100 shadow-sm text-[#1a2332] active:scale-95 transition-transform"
+              className="flex items-center gap-1.5 sm:gap-2 bg-blue-500 hover:bg-blue-600 text-white px-3 sm:px-4 py-2 rounded-lg text-xs font-semibold transition-colors active:scale-95"
             >
-               <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" className="size-4" alt="G" />
-               <span className="text-xs font-bold uppercase tracking-wide">Sign In</span>
+               <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" className="w-4 h-4" alt="G" />
+               <span className="hidden sm:inline">Sign In</span>
             </button>
           )}
           <button 
             onClick={onOpenSettings}
-            className="size-12 flex items-center justify-center rounded-2xl bg-white border border-gray-100 shadow-sm text-[#8e99ac] active:scale-90 transition-transform"
+            className="w-10 h-10 sm:w-11 sm:h-11 flex items-center justify-center rounded-lg bg-gray-100 hover:bg-gray-200 text-gray-600 transition-colors active:scale-90"
+            title="Settings"
           >
-            <span className="material-symbols-outlined text-2xl">settings</span>
+            <span className="material-symbols-outlined text-xl sm:text-2xl">settings</span>
           </button>
         </div>
-      </div>
+      </header>
 
-      {/* 项目展示区 - 内含 Nano 超高密度网格 */}
-      <div className="flex-1 bg-white rounded-[3rem] border border-white shadow-sm overflow-hidden flex flex-col relative mx-2">
-        <div className="flex-1 overflow-y-auto p-6 sm:p-8 custom-scrollbar">
+      {/* Projects Grid */}
+      <main className="flex-1 overflow-y-auto px-4 sm:px-6 py-4 sm:py-6 custom-scrollbar">
+        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3 sm:gap-4">
           
-          <div className="grid grid-cols-4 sm:grid-cols-6 md:grid-cols-8 lg:grid-cols-10 xl:grid-cols-12 gap-2 pb-10">
-            
-            {/* 新建项目卡片：加号图标现在更大、更从容（淡定哥风格：稳稳填满） */}
-            <button 
-              onClick={() => setShowCreateModal(true)}
-              className="group relative flex flex-col items-center justify-center aspect-square bg-[#f0f9ef] border border-dashed border-[#d9ecd6] rounded-lg hover:bg-[#eef8eb] transition-all active:scale-95 overflow-hidden"
-            >
-              <div className="absolute inset-0 flex items-center justify-center">
-                <span className="material-symbols-outlined text-[48px] text-primary/30 group-hover:text-primary/50 group-hover:scale-110 transition-all font-light">add</span>
-              </div>
-              <span className="relative z-10 mt-auto mb-1 text-[7px] font-black text-[#a6c9a0] uppercase tracking-tighter opacity-80">Initialize</span>
-            </button>
+          {/* Create New Project Card */}
+          <button 
+            onClick={() => setShowCreateModal(true)}
+            className="aspect-square flex flex-col items-center justify-center gap-2 bg-blue-50 border-2 border-dashed border-blue-300 rounded-xl hover:bg-blue-100 active:scale-95 transition-all group"
+          >
+            <span className="material-symbols-outlined text-3xl sm:text-4xl text-blue-400 group-hover:text-blue-500 transition-colors">add</span>
+            <span className="text-xs font-bold text-blue-600 text-center">New Project</span>
+          </button>
 
-            {/* 高密度项目列表卡片 */}
-            {projects.map((project) => (
-              <div key={project.id} className="relative group">
-                <button 
-                  onClick={() => onSelectProject(project.id)}
-                  className="w-full aspect-square bg-white rounded-lg shadow-[0_1px_3px_rgba(0,0,0,0.04)] border border-gray-100 flex flex-col p-2 text-left hover:shadow-md hover:-translate-y-0.5 transition-all active:scale-95"
-                >
-                  <div className="size-6 rounded bg-[#f8f9f8] flex items-center justify-center mb-auto shrink-0">
-                    <span className="material-symbols-outlined text-[14px] text-[#a6c9a0]">folder</span>
-                  </div>
-                  <div className="overflow-hidden mt-1">
-                    <h3 className="text-[8px] font-black text-[#1a2332] uppercase tracking-tighter truncate leading-tight pr-3">{project.name}</h3>
-                    <p className="text-[6px] font-bold text-gray-300 uppercase tracking-tighter truncate opacity-80">
-                      {project.printerIds.length} Assets
-                    </p>
-                  </div>
-                </button>
-                
-                <button 
-                  onClick={(e) => { e.stopPropagation(); setActiveMenuId(activeMenuId === project.id ? null : project.id); }}
-                  className="absolute top-1 right-1 size-4 flex items-center justify-center rounded-full hover:bg-gray-100 text-[#8e99ac] transition-colors"
-                >
-                  <span className="material-symbols-outlined font-black text-[12px]">more_horiz</span>
-                </button>
+          {/* Project Cards */}
+          {projects.map((project) => (
+            <div key={project.id} className="relative group">
+              <button 
+                onClick={() => onSelectProject(project.id)}
+                className="w-full aspect-square bg-white rounded-xl shadow-sm border border-gray-200 hover:shadow-md hover:border-gray-300 active:scale-95 transition-all p-3 sm:p-4 flex flex-col text-left"
+              >
+                <div className="flex-shrink-0 w-6 h-6 sm:w-7 sm:h-7 mb-auto rounded-lg bg-blue-50 flex items-center justify-center">
+                  <span className="material-symbols-outlined text-sm text-blue-500">folder</span>
+                </div>
+                <div className="min-w-0 mt-2">
+                  <h3 className="text-xs sm:text-sm font-bold text-gray-900 truncate break-words line-clamp-2">{project.name}</h3>
+                  <p className="text-[9px] sm:text-xs font-medium text-gray-500 mt-1">
+                    {project.printerIds.length} Assets
+                  </p>
+                </div>
+              </button>
+              
+              {/* More Menu */}
+              <button 
+                onClick={(e) => { 
+                  e.stopPropagation(); 
+                  setActiveMenuId(activeMenuId === project.id ? null : project.id); 
+                }}
+                className="absolute top-2 right-2 w-7 h-7 flex items-center justify-center rounded-lg hover:bg-gray-100 text-gray-400 hover:text-gray-600 transition-colors"
+                title="More options"
+              >
+                <span className="material-symbols-outlined text-lg">more_vert</span>
+              </button>
 
-                {activeMenuId === project.id && (
-                  <div className="absolute top-6 right-1 w-24 bg-white shadow-xl rounded-lg border border-gray-100 overflow-hidden z-20 animate-in fade-in slide-in-from-top-1">
-                    <button onClick={() => { onDeleteProject(project.id); setActiveMenuId(null); }} className="w-full px-2 py-2 text-left text-[8px] font-black uppercase text-red-500 hover:bg-red-50 flex items-center gap-1.5">
-                      <span className="material-symbols-outlined text-[14px]">delete</span> Delete
-                    </button>
-                  </div>
-                )}
-              </div>
-            ))}
-          </div>
+              {activeMenuId === project.id && (
+                <div className="absolute top-10 right-0 w-32 bg-white shadow-lg rounded-lg border border-gray-200 overflow-hidden z-20 animate-fadeIn">
+                  <button 
+                    onClick={() => { onDeleteProject(project.id); setActiveMenuId(null); }} 
+                    className="w-full px-3 py-2 text-xs font-semibold text-red-600 hover:bg-red-50 flex items-center gap-2 transition-colors"
+                  >
+                    <span className="material-symbols-outlined text-sm">delete</span>
+                    <span>Delete</span>
+                  </button>
+                </div>
+              )}
+            </div>
+          ))}
         </div>
-      </div>
+        
+        {projects.length === 0 && (
+          <div className="flex flex-col items-center justify-center py-16 text-center">
+            <span className="material-symbols-outlined text-5xl sm:text-6xl text-gray-300 mb-4">inbox</span>
+            <p className="text-sm font-medium text-gray-500">No projects yet</p>
+            <p className="text-xs text-gray-400 mt-1">Click "New Project" to get started</p>
+          </div>
+        )}
+      </main>
 
-      <footer className="mt-6 flex justify-center opacity-20 shrink-0">
-        <p className="text-xs font-black tracking-[0.5em] text-gray-400 uppercase">Dematic Suite</p>
+      {/* Footer */}
+      <footer className="px-4 py-3 sm:py-4 text-center border-t border-gray-200 bg-white shrink-0 safe-pb">
+        <p className="text-xs font-medium text-gray-400">Photo Suite © 2026</p>
       </footer>
 
-      {/* 标准尺寸弹窗 */}
+      {/* Create Modal */}
       {showCreateModal && (
-        <div className="fixed inset-0 z-[100] bg-black/40 backdrop-blur-[2px] flex items-center justify-center p-6 animate-in fade-in">
-           <div className="w-full max-w-[320px] bg-white rounded-[2.5rem] p-10 shadow-2xl animate-in zoom-in-95 duration-200">
-              <h3 className="text-xl font-black text-[#1a2332] uppercase tracking-tight mb-2">New Site</h3>
-              <p className="text-[10px] font-bold text-gray-400 mb-8 uppercase tracking-[0.1em]">Project Identification</p>
+        <div className="fixed inset-0 z-[100] bg-black/40 backdrop-blur-sm flex items-center justify-center p-4 safe-pb">
+           <div className="w-full max-w-sm bg-white rounded-2xl p-6 sm:p-8 shadow-xl animate-slideUp">
+              <h2 className="text-2xl font-bold text-gray-900 mb-2">New Project</h2>
+              <p className="text-sm text-gray-500 mb-6">Create a new project to organize your assets</p>
               <input 
                 autoFocus
-                placeholder="Ex: Warehouse A"
-                className="w-full h-14 px-5 bg-[#f8f9f8] rounded-2xl border-none focus:ring-2 focus:ring-primary/40 text-sm font-bold uppercase tracking-widest mb-8"
+                placeholder="Project name..."
+                className="w-full h-12 px-4 bg-gray-100 rounded-lg border border-transparent focus:border-blue-500 focus:outline-none text-sm font-medium mb-6 placeholder-gray-500"
                 onKeyDown={(e) => {
                   if (e.key === 'Enter') {
-                    const val = (e.target as HTMLInputElement).value;
-                    if (val) onCreateProject(val);
-                    setShowCreateModal(false);
+                    const val = (e.target as HTMLInputElement).value.trim();
+                    if (val) {
+                      onCreateProject(val);
+                      setShowCreateModal(false);
+                    }
                   }
                 }}
               />
               <div className="flex gap-3">
-                <button onClick={() => setShowCreateModal(false)} className="flex-1 h-14 rounded-2xl text-gray-400 font-black uppercase text-xs tracking-widest">Cancel</button>
+                <button 
+                  onClick={() => setShowCreateModal(false)} 
+                  className="flex-1 h-11 rounded-lg text-gray-700 font-semibold hover:bg-gray-100 transition-colors active:scale-95"
+                >
+                  Cancel
+                </button>
                 <button 
                   onClick={() => { 
-                    const val = (document.querySelector('input') as any).value;
-                    if (val) onCreateProject(val);
-                    setShowCreateModal(false); 
+                    const val = (document.querySelector('input') as any)?.value?.trim();
+                    if (val) {
+                      onCreateProject(val);
+                      setShowCreateModal(false);
+                    }
                   }} 
-                  className="flex-[2] h-14 bg-primary text-background-dark rounded-2xl font-black uppercase text-xs tracking-widest shadow-lg shadow-primary/20"
-                >Initialize</button>
+                  className="flex-[2] h-11 bg-blue-500 hover:bg-blue-600 text-white rounded-lg font-semibold transition-colors active:scale-95"
+                >
+                  Create
+                </button>
               </div>
            </div>
         </div>

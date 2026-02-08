@@ -51,71 +51,75 @@ const SettingsScreen: React.FC<SettingsScreenProps> = ({ settings, onUpdate, act
   const displayPath = `Google Drive${settings.drivePath}${projectName}/${settings.useSubfoldersBySN ? 'SN_123456/' : ''}`;
 
   return (
-    <div className="flex flex-col h-full w-full bg-[#f6f8f6] relative">
-      {/* 全屏重启遮罩 - 增强真实感 */}
+    <div className="flex flex-col h-full w-full bg-gray-50 relative">
+      {/* Reboot Overlay */}
       {showRebootOverlay && (
-        <div className="fixed inset-0 z-[1000] bg-background-dark flex flex-col items-center justify-center animate-in fade-in duration-500">
+        <div className="fixed inset-0 z-[1000] bg-black flex flex-col items-center justify-center animate-fadeIn safe-pb">
           <div className="relative mb-8">
-            <div className="absolute -inset-8 bg-primary/20 blur-3xl rounded-full animate-pulse"></div>
-            <span className="material-symbols-outlined text-6xl text-primary font-extralight animate-spin [animation-duration:3s]">
+            <div className="absolute -inset-8 bg-blue-500/20 blur-3xl rounded-full animate-pulse"></div>
+            <span className="material-symbols-outlined text-5xl sm:text-6xl text-blue-500 animate-spin">
               sync
             </span>
           </div>
-          <h2 className="text-white text-xl font-black uppercase tracking-[0.3em] animate-pulse">Rebooting</h2>
-          <p className="text-primary/60 text-[10px] font-bold uppercase tracking-widest mt-4">Installing System Update v1.5.1</p>
+          <h2 className="text-white text-lg sm:text-2xl font-bold">Updating...</h2>
+          <p className="text-blue-400 text-xs sm:text-sm mt-4">Installing latest version</p>
         </div>
       )}
 
-      <header className="pt-14 pb-6 px-6 bg-white border-b border-gray-100 z-10 rounded-b-[2rem] shadow-sm">
-        <div className="flex items-center gap-4">
+      {/* Header */}
+      <header className="safe-pt px-4 sm:px-6 py-4 sm:py-5 bg-white border-b border-gray-200 z-10">
+        <div className="flex items-center gap-3 sm:gap-4">
           <button 
             onClick={onBack}
-            className="size-11 flex items-center justify-center rounded-2xl bg-slate-50 text-gray-700 hover:bg-primary/10 transition-colors active:scale-95"
+            className="w-10 h-10 sm:w-11 sm:h-11 flex items-center justify-center rounded-lg bg-gray-100 hover:bg-gray-200 text-gray-700 transition-colors active:scale-90"
+            title="Back"
           >
-            <span className="material-symbols-outlined font-bold">arrow_back</span>
+            <span className="material-symbols-outlined text-xl">arrow_back</span>
           </button>
-          <div>
-            <h1 className="text-xl font-black text-gray-900 tracking-tight leading-none uppercase">App Settings</h1>
-            <p className="text-[10px] font-bold text-sage uppercase tracking-[0.2em] mt-1.5">Field Tech Suite v1.5.0</p>
+          <div className="flex-1 min-w-0">
+            <h1 className="text-xl sm:text-2xl font-bold text-gray-900 truncate">Settings</h1>
+            <p className="text-xs text-gray-500 mt-0.5">App Configuration</p>
           </div>
         </div>
       </header>
 
-      <main className="flex-1 overflow-y-auto px-6 py-6 no-scrollbar space-y-8">
+      {/* Content */}
+      <main className="flex-1 overflow-y-auto px-4 sm:px-6 py-4 sm:py-6 no-scrollbar space-y-4 sm:space-y-6">
         {/* Camera Section */}
         <section>
-          <h2 className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em] mb-4 flex items-center gap-2">
-            <span className="material-symbols-outlined text-[14px]">photo_camera</span>
-            Camera Defaults
+          <h2 className="text-xs sm:text-sm font-bold text-gray-600 mb-3 flex items-center gap-2 px-1">
+            <span className="material-symbols-outlined text-base text-gray-400">photo_camera</span>
+            Camera
           </h2>
-          <div className="bg-white rounded-3xl p-6 shadow-sm border border-gray-100 space-y-6">
+          <div className="bg-white rounded-lg sm:rounded-xl p-4 sm:p-5 shadow-sm border border-gray-200 space-y-4">
             <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-black text-gray-900">Flash Mode</p>
-                <p className="text-[10px] font-bold text-gray-400">Default flash state</p>
+              <div className="flex-1">
+                <p className="text-sm font-semibold text-gray-900">Flash Mode</p>
+                <p className="text-xs text-gray-500 mt-0.5">Default flash setting</p>
               </div>
-              <div className="flex bg-slate-100 p-1 rounded-xl">
+              <div className="flex bg-gray-100 p-1 rounded-lg ml-4">
                 {(['off', 'auto', 'on'] as const).map(mode => (
                   <button
                     key={mode}
                     onClick={() => updateField('defaultFlash', mode)}
-                    className={`px-3 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all ${settings.defaultFlash === mode ? 'bg-white text-sage shadow-sm' : 'text-gray-400'}`}
+                    className={`px-2.5 sm:px-3 py-1 rounded-md text-xs font-semibold whitespace-nowrap transition-all ${settings.defaultFlash === mode ? 'bg-white text-blue-500 shadow-sm' : 'text-gray-500'}`}
                   >
-                    {mode}
+                    {mode.charAt(0).toUpperCase() + mode.slice(1)}
                   </button>
                 ))}
               </div>
             </div>
+            <div className="h-px bg-gray-100"></div>
             <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-black text-gray-900">Instant Advance</p>
-                <p className="text-[10px] font-bold text-gray-400">Skip the review screen</p>
+              <div className="flex-1">
+                <p className="text-sm font-semibold text-gray-900">Skip Review</p>
+                <p className="text-xs text-gray-500 mt-0.5">Auto-advance after capture</p>
               </div>
               <button 
                 onClick={() => updateField('skipReview', !settings.skipReview)}
-                className={`w-14 h-8 rounded-full p-1 transition-colors duration-300 ${settings.skipReview ? 'bg-primary' : 'bg-slate-200'}`}
+                className={`w-12 h-7 sm:w-14 sm:h-8 flex-shrink-0 rounded-full p-1 transition-colors ml-4 ${settings.skipReview ? 'bg-blue-500' : 'bg-gray-300'}`}
               >
-                <div className={`size-6 bg-white rounded-full shadow-md transition-transform duration-300 ${settings.skipReview ? 'translate-x-6' : 'translate-x-0'}`} />
+                <div className={`w-5 h-5 sm:w-6 sm:h-6 bg-white rounded-full shadow-md transition-transform ${settings.skipReview ? 'translate-x-5 sm:translate-x-6' : ''}`} />
               </button>
             </div>
           </div>
@@ -123,95 +127,87 @@ const SettingsScreen: React.FC<SettingsScreenProps> = ({ settings, onUpdate, act
 
         {/* Cloud Sync Section */}
         <section>
-          <h2 className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em] mb-4 flex items-center gap-2">
-            <span className="material-symbols-outlined text-[14px]">cloud_sync</span>
-            Storage Logic
+          <h2 className="text-xs sm:text-sm font-bold text-gray-600 mb-3 flex items-center gap-2 px-1">
+            <span className="material-symbols-outlined text-base text-gray-400">cloud_sync</span>
+            Cloud Storage
           </h2>
-          <div className="bg-white rounded-3xl p-6 shadow-sm border border-gray-100 space-y-6">
+          <div className="bg-white rounded-lg sm:rounded-xl p-4 sm:p-5 shadow-sm border border-gray-200 space-y-4">
             <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-black text-gray-900">Auto Upload</p>
-                <p className="text-[10px] font-bold text-gray-400">Sync captures instantly</p>
+              <div className="flex-1">
+                <p className="text-sm font-semibold text-gray-900">Auto Upload</p>
+                <p className="text-xs text-gray-500 mt-0.5">Sync photos to cloud</p>
               </div>
               <button 
                 onClick={() => updateField('autoUpload', !settings.autoUpload)}
-                className={`w-14 h-8 rounded-full p-1 transition-colors duration-300 ${settings.autoUpload ? 'bg-primary' : 'bg-slate-200'}`}
+                className={`w-12 h-7 sm:w-14 sm:h-8 flex-shrink-0 rounded-full p-1 transition-colors ml-4 ${settings.autoUpload ? 'bg-blue-500' : 'bg-gray-300'}`}
               >
-                <div className={`size-6 bg-white rounded-full shadow-md transition-transform duration-300 ${settings.autoUpload ? 'translate-x-6' : 'translate-x-0'}`} />
+                <div className={`w-5 h-5 sm:w-6 sm:h-6 bg-white rounded-full shadow-md transition-transform ${settings.autoUpload ? 'translate-x-5 sm:translate-x-6' : ''}`} />
               </button>
             </div>
-
+            <div className="h-px bg-gray-100"></div>
             <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-black text-gray-900">SN Subfolders</p>
-                <p className="text-[10px] font-bold text-gray-400">Organize by Serial Number</p>
+              <div className="flex-1">
+                <p className="text-sm font-semibold text-gray-900">Organize by Serial</p>
+                <p className="text-xs text-gray-500 mt-0.5">Create folders per device</p>
               </div>
               <button 
                 onClick={() => updateField('useSubfoldersBySN', !settings.useSubfoldersBySN)}
-                className={`w-14 h-8 rounded-full p-1 transition-colors duration-300 ${settings.useSubfoldersBySN ? 'bg-primary' : 'bg-slate-200'}`}
+                className={`w-12 h-7 sm:w-14 sm:h-8 flex-shrink-0 rounded-full p-1 transition-colors ml-4 ${settings.useSubfoldersBySN ? 'bg-blue-500' : 'bg-gray-300'}`}
               >
-                <div className={`size-6 bg-white rounded-full shadow-md transition-transform duration-300 ${settings.useSubfoldersBySN ? 'translate-x-6' : 'translate-x-0'}`} />
+                <div className={`w-5 h-5 sm:w-6 sm:h-6 bg-white rounded-full shadow-md transition-transform ${settings.useSubfoldersBySN ? 'translate-x-5 sm:translate-x-6' : ''}`} />
               </button>
             </div>
 
-            <div className="space-y-4 pt-2">
-              <div className="space-y-2">
-                <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Base Path</p>
-                <div className="flex items-center gap-3 bg-slate-50 p-4 rounded-2xl border border-gray-100">
-                  <span className="material-symbols-outlined text-gray-400">folder_open</span>
-                  <input 
-                    type="text" 
-                    value={settings.drivePath}
-                    onChange={(e) => updateField('drivePath', e.target.value)}
-                    className="flex-1 bg-transparent border-none focus:ring-0 text-xs font-bold text-gray-700 p-0"
-                  />
-                </div>
+            <div className="h-px bg-gray-100 mt-4"></div>
+            <div className="space-y-3 pt-2">
+              <label className="text-xs font-bold text-gray-600">Storage Path</label>
+              <div className="flex items-center gap-2 bg-gray-50 px-3 py-2.5 rounded-lg border border-gray-200">
+                <span className="material-symbols-outlined text-sm text-gray-400 flex-shrink-0">folder</span>
+                <input 
+                  type="text" 
+                  value={settings.drivePath}
+                  onChange={(e) => updateField('drivePath', e.target.value)}
+                  className="flex-1 bg-transparent border-none focus:ring-0 text-xs font-medium text-gray-700 p-0 min-w-0"
+                  placeholder="/Drive/Path/"
+                />
               </div>
-
-              <div className="space-y-2">
-                <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Active Storage Map</p>
-                <div className="bg-background-dark p-4 rounded-2xl border border-white/5 overflow-hidden">
-                   <div className="flex items-start gap-2">
-                      <span className="material-symbols-outlined text-primary text-sm mt-0.5">account_tree</span>
-                      <p className="text-[11px] font-mono text-primary/80 break-all leading-relaxed tracking-tighter">
-                        {displayPath}
-                      </p>
-                   </div>
-                </div>
+              
+              <div className="bg-gray-900 text-gray-300 p-3 rounded-lg border border-gray-700 text-xs font-mono overflow-x-auto">
+                <div className="whitespace-nowrap text-xs">{displayPath}</div>
               </div>
             </div>
           </div>
         </section>
 
-        {/* System & Reload Section */}
+        {/* System Section */}
         <section>
-          <h2 className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em] mb-4 flex items-center gap-2">
-            <span className="material-symbols-outlined text-[14px]">system_update</span>
-            Maintenance
+          <h2 className="text-xs sm:text-sm font-bold text-gray-600 mb-3 flex items-center gap-2 px-1">
+            <span className="material-symbols-outlined text-base text-gray-400">settings_suggest</span>
+            System
           </h2>
-          <div className="bg-white rounded-3xl p-6 shadow-sm border border-gray-100 space-y-4">
+          <div className="bg-white rounded-lg sm:rounded-xl p-4 sm:p-5 shadow-sm border border-gray-200">
             <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-black text-gray-900">Reload Application</p>
-                <p className="text-[10px] font-bold text-gray-400 leading-tight">Fetch latest build from cloud.<br/>Persists login and settings.</p>
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-semibold text-gray-900">Refresh App</p>
+                <p className="text-xs text-gray-500 mt-0.5">Reload from cloud</p>
               </div>
               <button 
                 onClick={handleReload}
                 disabled={isReloading}
-                className={`px-5 py-2.5 rounded-xl font-black text-[10px] uppercase tracking-widest transition-all active:scale-95 ${isReloading ? 'bg-gray-100 text-gray-400 cursor-not-allowed' : 'bg-background-dark text-primary hover:bg-black shadow-lg shadow-black/10'}`}
+                className="flex-shrink-0 ml-4 px-3 sm:px-4 py-2 rounded-lg bg-gray-900 hover:bg-black text-white text-xs font-semibold transition-colors active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                {isReloading ? 'Updating...' : 'Reload App'}
+                {isReloading ? 'Updating...' : 'Refresh'}
               </button>
             </div>
             {isReloading && (
-              <div className="space-y-2 pt-2">
-                <div className="flex justify-between text-[9px] font-black text-primary uppercase tracking-widest">
-                  <span>{reloadProgress < 100 ? 'Downloading Packages' : 'Restarting Engine'}</span>
+              <div className="space-y-2 mt-4 pt-4 border-t border-gray-100">
+                <div className="flex justify-between text-xs font-semibold text-gray-600">
+                  <span>Downloading...</span>
                   <span>{Math.round(reloadProgress)}%</span>
                 </div>
-                <div className="h-1.5 w-full bg-gray-100 rounded-full overflow-hidden">
+                <div className="h-2 w-full bg-gray-200 rounded-full overflow-hidden">
                   <div 
-                    className="h-full bg-primary transition-all duration-300 ease-out"
+                    className="h-full bg-blue-500 transition-all duration-300"
                     style={{ width: `${reloadProgress}%` }}
                   />
                 </div>
@@ -221,13 +217,9 @@ const SettingsScreen: React.FC<SettingsScreenProps> = ({ settings, onUpdate, act
         </section>
       </main>
 
-      <footer className="p-6 bg-white border-t border-gray-50 flex flex-col items-center">
-        <p className="text-[9px] font-bold text-gray-300 uppercase tracking-[0.3em] mb-2">Connected to dematic-hub-north</p>
-        <div className="flex gap-2">
-          <div className="size-1.5 rounded-full bg-primary animate-pulse"></div>
-          <div className="size-1.5 rounded-full bg-primary opacity-40"></div>
-          <div className="size-1.5 rounded-full bg-primary opacity-20"></div>
-        </div>
+      {/* Footer */}
+      <footer className="px-4 sm:px-6 py-3 sm:py-4 bg-white border-t border-gray-200 flex items-center justify-center safe-pb">
+        <p className="text-xs text-gray-400 text-center">Photo Suite © 2026</p>
       </footer>
     </div>
   );
