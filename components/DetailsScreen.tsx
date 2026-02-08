@@ -261,59 +261,66 @@ const DetailsScreen: React.FC<DetailsScreenProps> = ({
         </div>
 
         {/* Prominent Info Card */}
-        <div className="bg-gradient-to-br from-blue-50 to-indigo-50 rounded-2xl p-4 border-2 border-blue-200 shadow-sm">
-          <div className="flex items-start justify-between gap-3">
+        <div className="bg-gradient-to-br from-blue-50 to-indigo-50 rounded-2xl p-3 border-2 border-blue-200 shadow-sm relative">
+          <button
+            onClick={handleOpenEdit}
+            className="absolute top-2 right-2 size-7 rounded-lg bg-white border border-blue-300 flex items-center justify-center hover:bg-blue-50 transition-all active:scale-95"
+            title="Edit Serial Number & Model"
+          >
+            <span className="material-symbols-outlined text-blue-500 text-sm">edit</span>
+          </button>
+          
+          <div className="flex items-start gap-4 pr-9">
             <div className="flex-1 min-w-0">
-              <div className="text-xs font-bold text-blue-600 uppercase tracking-wider mb-1.5">Serial Number</div>
-              <div className="text-2xl font-black text-gray-900 tracking-tight uppercase break-all mb-3">
+              <div className="text-xs font-bold text-blue-600 uppercase tracking-wider mb-1">Serial Number</div>
+              <div className="text-base font-black text-gray-900 tracking-tight uppercase break-all">
                 {printer.serialNumber}
               </div>
+            </div>
+            <div className="flex-shrink-0">
               <div className="text-xs font-bold text-blue-600 uppercase tracking-wider mb-1">Model Type</div>
-              <div className="text-xl font-black text-gray-700 tracking-wide uppercase">
+              <div className="text-base font-black text-gray-700 tracking-wide uppercase whitespace-nowrap">
                 {printer.model}
               </div>
             </div>
-            <button
-              onClick={handleOpenEdit}
-              className="flex-shrink-0 size-11 rounded-xl bg-white border-2 border-blue-300 flex items-center justify-center hover:bg-blue-50 transition-all active:scale-95 shadow-sm"
-              title="Edit Serial Number & Model"
-            >
-              <span className="material-symbols-outlined text-blue-600 text-xl">edit</span>
-            </button>
           </div>
         </div>
       </header>
 
-      <main className="flex-1 overflow-y-auto px-5 py-4 no-scrollbar bg-white">
-        <div className="flex items-center justify-between mb-4">
-          <div className="flex items-center gap-2">
-            <div className="size-6 bg-sage/10 rounded-lg flex items-center justify-center">
-              <span className="material-symbols-outlined text-sage text-[14px]">photo_library</span>
+      <main className="flex-1 overflow-y-auto no-scrollbar bg-white">
+        <div className="sticky top-0 bg-white z-10 px-5 py-3 border-b border-gray-100">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <div className="size-6 bg-sage/10 rounded-lg flex items-center justify-center">
+                <span className="material-symbols-outlined text-sage text-[14px]">photo_library</span>
+              </div>
+              <h2 className="text-[10px] font-black text-gray-400 uppercase tracking-[0.1em]">Components</h2>
             </div>
-            <h2 className="text-[10px] font-black text-gray-400 uppercase tracking-[0.1em]">Components</h2>
-          </div>
-          
-          <div className="flex bg-gray-100 p-0.5 rounded-lg border border-gray-200">
-            <button 
-              onClick={() => setViewMode(ViewMode.LIST)}
-              className={`px-2 py-1 rounded-md flex items-center justify-center transition-all ${viewMode === ViewMode.LIST ? 'bg-white text-sage shadow-sm' : 'text-gray-400 hover:text-gray-600'}`}
-            >
-              <span className="material-symbols-outlined text-[16px]">format_list_bulleted</span>
-            </button>
-            <button 
-              onClick={() => setViewMode(ViewMode.GRID)}
-              className={`px-2 py-1 rounded-md flex items-center justify-center transition-all ${viewMode === ViewMode.GRID ? 'bg-white text-sage shadow-sm' : 'text-gray-400 hover:text-gray-600'}`}
-            >
-              <span className="material-symbols-outlined text-[16px]">grid_view</span>
-            </button>
-            <button 
-              onClick={() => setViewMode(ViewMode.LARGE)}
-              className={`px-2 py-1 rounded-md flex items-center justify-center transition-all ${viewMode === ViewMode.LARGE ? 'bg-white text-sage shadow-sm' : 'text-gray-400 hover:text-gray-600'}`}
-            >
-              <span className="material-symbols-outlined text-[16px]">view_agenda</span>
-            </button>
+            
+            <div className="flex bg-gray-100 p-0.5 rounded-lg border border-gray-200">
+              <button 
+                onClick={() => setViewMode(ViewMode.LIST)}
+                className={`px-2 py-1 rounded-md flex items-center justify-center transition-all ${viewMode === ViewMode.LIST ? 'bg-white text-sage shadow-sm' : 'text-gray-400 hover:text-gray-600'}`}
+              >
+                <span className="material-symbols-outlined text-[16px]">format_list_bulleted</span>
+              </button>
+              <button 
+                onClick={() => setViewMode(ViewMode.GRID)}
+                className={`px-2 py-1 rounded-md flex items-center justify-center transition-all ${viewMode === ViewMode.GRID ? 'bg-white text-sage shadow-sm' : 'text-gray-400 hover:text-gray-600'}`}
+              >
+                <span className="material-symbols-outlined text-[16px]">grid_view</span>
+              </button>
+              <button 
+                onClick={() => setViewMode(ViewMode.LARGE)}
+                className={`px-2 py-1 rounded-md flex items-center justify-center transition-all ${viewMode === ViewMode.LARGE ? 'bg-white text-sage shadow-sm' : 'text-gray-400 hover:text-gray-600'}`}
+              >
+                <span className="material-symbols-outlined text-[16px]">view_agenda</span>
+              </button>
+            </div>
           </div>
         </div>
+
+        <div className="px-5 py-4">
 
         {renderContent()}
       </main>
