@@ -130,16 +130,21 @@ const GalleryScreen: React.FC<GalleryScreenProps> = ({
     <div className="flex flex-col h-full bg-gray-50 relative transition-all duration-300">
       {/* Header */}
       <header className={`safe-pt px-5 bg-white border-b border-gray-200 z-30 transition-all ${isLandscape ? 'pb-2' : 'pb-4'}`}>
-        <div className={`flex items-center justify-between transition-all ${isLandscape ? 'mb-2 pt-2' : 'mb-4 pt-4'}`}>
+        {/* Top row: Back button + Title + User + Settings */}
+        <div className={`flex items-center gap-3 transition-all ${isLandscape ? 'mb-2 pt-2' : 'mb-3 pt-4'}`}>
           <button 
             onClick={onBackToProjects}
             style={rotationStyle}
-            className={`${isLandscape ? 'size-9' : 'size-11'} flex items-center justify-center rounded-xl bg-gray-100 text-gray-700 active:scale-95 transition-all hover:bg-gray-200`}
+            className={`${isLandscape ? 'size-9' : 'size-11'} flex items-center justify-center rounded-xl bg-gray-100 text-gray-700 active:scale-95 transition-all hover:bg-gray-200 flex-shrink-0`}
           >
             <span className={`material-symbols-outlined ${isLandscape ? 'text-base' : 'text-xl'}`}>arrow_back_ios_new</span>
           </button>
           
-          <div className="flex items-center gap-2.5">
+          <h1 className={`font-bold text-gray-900 tracking-tight flex-1 min-w-0 ${isLandscape ? 'text-lg' : 'text-2xl'}`}>
+            {activeProject?.name || 'Project Hub'}
+          </h1>
+          
+          <div className="flex items-center gap-2.5 flex-shrink-0">
             {user ? (
               <div className="relative">
                 <button 
@@ -185,64 +190,11 @@ const GalleryScreen: React.FC<GalleryScreenProps> = ({
           </div>
         </div>
 
-        {/* Title and Search */}
-        <div className={`transition-all ${isLandscape ? 'flex items-center justify-between gap-5' : ''}`}>
-          <div className="flex-1 min-w-0">
-             <h1 className={`font-bold text-gray-900 tracking-tight ${isLandscape ? 'text-lg' : 'text-2xl'}`}>
-              {activeProject?.name || 'Project Hub'}
-            </h1>
-            {!isLandscape && (
-              <p className="text-xs font-medium text-gray-500 mt-1">
-                {filteredPrinters.length} {filteredPrinters.length === 1 ? 'Asset' : 'Assets'}{searchTerm ? ' found' : ' Total'}
-              </p>
-            )}
-          </div>
-          {isLandscape && (
-            <div className="w-56">
-              <div className="w-full flex items-center rounded-xl bg-gray-100 border border-transparent gap-3 h-9 px-3">
-                <span className="material-symbols-outlined text-gray-400 text-base">search</span>
-                <input
-                  type="text"
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  placeholder="Search"
-                  className="flex-1 bg-transparent outline-none text-xs font-medium text-gray-700 placeholder:text-gray-400"
-                />
-                {searchTerm && (
-                  <button
-                    onClick={() => setSearchTerm('')}
-                    className="flex-shrink-0 size-5 rounded-full hover:bg-gray-300 flex items-center justify-center transition-colors"
-                  >
-                    <span className="material-symbols-outlined text-xs text-gray-500">close</span>
-                  </button>
-                )}
-              </div>
-            </div>
-          )}
-        </div>
-
-        {/* Search bar (portrait only) */}
+        {/* Asset count */}
         {!isLandscape && (
-          <div className="mt-4">
-            <div className="w-full flex items-center rounded-xl bg-gray-100 border border-transparent gap-3 h-11 px-4">
-              <span className="material-symbols-outlined text-gray-400 text-lg">search</span>
-              <input
-                type="text"
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                placeholder="Search"
-                className="flex-1 bg-transparent outline-none text-sm font-medium text-gray-700 placeholder:text-gray-400"
-              />
-              {searchTerm && (
-                <button
-                  onClick={() => setSearchTerm('')}
-                  className="flex-shrink-0 size-5 rounded-full hover:bg-gray-300 flex items-center justify-center transition-colors"
-                >
-                  <span className="material-symbols-outlined text-xs text-gray-500">close</span>
-                </button>
-              )}
-            </div>
-          </div>
+          <p className="text-xs font-medium text-gray-500 mb-3">
+            {filteredPrinters.length} {filteredPrinters.length === 1 ? 'Asset' : 'Assets'}{searchTerm ? ' found' : ' Total'}
+          </p>
         )}
 
         {/* Filter buttons */}
