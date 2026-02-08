@@ -152,8 +152,8 @@ const ReviewScreen: React.FC<ReviewScreenProps> = ({ imageUrl, data, isAnalyzing
          onTouchMove={handleTouchMove} 
          onTouchEnd={handleTouchEnd}>
       
-      <header className={`safe-pt bg-white rounded-b-[2.5rem] shadow-sm shrink-0 transition-all duration-500 ${isLandscape ? 'px-12 pb-3' : 'px-6 pb-6'}`}>
-        <div className={`flex items-center gap-3 transition-all ${isLandscape ? 'pt-3 mb-2' : 'pt-6 mb-4'}`}>
+      <header className={`safe-pt bg-white rounded-b-3xl shadow-sm shrink-0 transition-all duration-500 ${isLandscape ? 'px-12 pb-2' : 'px-5 pb-3'}`}>
+        <div className={`flex items-center gap-3 transition-all ${isLandscape ? 'pt-2 mb-1.5' : 'pt-3 mb-2'}`}>
            <div style={rotationStyle} className={`size-8 rounded-lg flex items-center justify-center ${isSingleRetake ? 'bg-amber-100' : 'bg-sage/10'}`}>
              <span className={`material-symbols-outlined text-[18px] ${isSingleRetake ? 'text-amber-600' : 'text-sage'}`}>
                {isSingleRetake ? 'published_with_changes' : 'image_search'}
@@ -168,17 +168,17 @@ const ReviewScreen: React.FC<ReviewScreenProps> = ({ imageUrl, data, isAnalyzing
         </div>
 
         {/* 强化后的序列号显示卡片 - 可点击编辑 - 增加 shaking 错误提示 */}
-        <div className={`bg-background-dark p-0.5 rounded-2xl shadow-lg overflow-hidden relative group transition-all duration-300 ${shakeError ? 'ring-4 ring-red-500/50 translate-x-[-2px]' : ''}`}>
+        <div className={`bg-background-dark p-0.5 rounded-xl shadow-lg overflow-hidden relative group transition-all duration-300 ${shakeError ? 'ring-4 ring-red-500/50 translate-x-[-2px]' : ''}`}>
           <button 
             onClick={handleOpenEdit}
             disabled={isAnalyzing}
-            className={`w-full rounded-[1.4rem] px-4 py-3 flex flex-col items-center relative text-left transition-all active:bg-[#fff9c4] disabled:cursor-not-allowed ${
+            className={`w-full rounded-[0.9rem] px-3 py-2 flex flex-col items-center relative text-left transition-all active:bg-[#fff9c4] disabled:cursor-not-allowed ${
               hasValidData ? 'bg-[#fdfbe6]' : 'bg-red-50'
             }`}
           >
-            {shakeError && <div className="absolute inset-0 bg-red-500/10 animate-pulse rounded-[1.4rem]"></div>}
+            {shakeError && <div className="absolute inset-0 bg-red-500/10 animate-pulse rounded-[0.9rem]"></div>}
             
-            <div className="w-full flex justify-between items-center mb-2">
+            <div className="w-full flex justify-between items-center mb-1.5">
                <div className="flex flex-col" style={rotationStyle}>
                   <p className={`text-[9px] font-bold uppercase tracking-[0.15em] leading-none ${hasValidData ? 'text-primary' : 'text-red-500'}`}>
                     {hasValidData ? 'Detected Serial' : 'Missing Info'}
@@ -190,20 +190,20 @@ const ReviewScreen: React.FC<ReviewScreenProps> = ({ imageUrl, data, isAnalyzing
                </div>
             </div>
             
-            <div className="w-full py-1 overflow-hidden flex flex-col items-center justify-center" style={rotationStyle}>
+            <div className="w-full py-0.5 overflow-hidden flex flex-col items-center justify-center" style={rotationStyle}>
               {isAnalyzing ? (
-                <div className="flex flex-col items-center gap-1.5 py-1">
-                   <div className="h-8 w-40 bg-gray-200/50 rounded-xl animate-pulse"></div>
-                   <p className="text-[8px] font-bold text-gray-400 uppercase tracking-[0.2em] animate-bounce">AI Analyzing...</p>
+                <div className="flex flex-col items-center gap-1 py-0.5">
+                   <div className="h-7 w-36 bg-gray-200/50 rounded-xl animate-pulse"></div>
+                   <p className="text-[7px] font-bold text-gray-400 uppercase tracking-[0.2em] animate-bounce">AI Analyzing...</p>
                 </div>
               ) : (
-                <p className={`text-2xl sm:text-3xl font-black tracking-tight truncate uppercase leading-none ${hasValidData ? 'text-gray-900' : 'text-red-500/50'}`}>
+                <p className={`text-xl sm:text-2xl font-black tracking-tight truncate uppercase leading-none ${hasValidData ? 'text-gray-900' : 'text-red-500/50'}`}>
                   {hasValidData ? data?.serialNumber : 'TAP TO ENTER'}
                 </p>
               )}
             </div>
             
-            <div className="w-full h-px bg-gray-200/50 my-2"></div>
+            <div className="w-full h-px bg-gray-200/50 my-1.5"></div>
             <div className={`flex items-center justify-center gap-1.5 transition-opacity ${hasValidData ? 'opacity-60 group-hover:opacity-100' : 'opacity-100 animate-pulse'}`}>
                {!isAnalyzing && <span className={`material-symbols-outlined text-[11px] ${hasValidData ? 'text-gray-400' : 'text-red-400'}`}>edit</span>}
                <p className={`text-[7px] font-bold uppercase tracking-widest leading-none ${hasValidData ? 'text-gray-400' : 'text-red-400'}`}>
@@ -214,7 +214,7 @@ const ReviewScreen: React.FC<ReviewScreenProps> = ({ imageUrl, data, isAnalyzing
         </div>
       </header>
 
-      <main className="flex-1 flex items-center justify-center px-4 py-2 overflow-hidden relative transition-all">
+      <main className="flex-1 flex items-center justify-center px-4 py-1 overflow-hidden relative transition-all">
         <div 
           ref={containerRef} 
           className={`relative bg-black rounded-[2.5rem] overflow-hidden shadow-2xl border-2 border-white transition-all duration-700 ease-out ${isLandscape ? 'h-[90%] aspect-[3/2] max-h-lg' : 'w-full aspect-[4/3] max-w-sm'}`} 
@@ -259,7 +259,7 @@ const ReviewScreen: React.FC<ReviewScreenProps> = ({ imageUrl, data, isAnalyzing
         </div>
       </main>
 
-      <footer className={`safe-pb bg-white rounded-t-[2.5rem] shadow-[0_-15_50px_rgba(0,0,0,0.06)] shrink-0 z-20 transition-all duration-500 ${isLandscape ? 'pb-4 pt-3 px-12' : 'pb-10 pt-4 px-6'}`}>
+      <footer className={`safe-pb bg-white rounded-t-3xl shadow-[0_-15_50px_rgba(0,0,0,0.06)] shrink-0 z-20 transition-all duration-500 ${isLandscape ? 'pb-3 pt-2 px-12' : 'pb-6 pt-3 px-5'}`}>
         <div className={`flex gap-4 ${isLandscape ? 'justify-center' : ''}`}>
           <button 
             onClick={onRetake}
