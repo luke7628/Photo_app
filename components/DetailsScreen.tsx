@@ -347,7 +347,7 @@ const DetailsScreen: React.FC<DetailsScreenProps> = ({
               onAllPhotosComplete?.();
               onBack();
             }}
-            className="bg-green-500 hover:scale-105 active:scale-95 text-white px-8 py-3 rounded-full flex items-center gap-2 shadow-lg transition-all"
+            className="bg-green-500 hover:bg-green-600 active:bg-green-700 hover:scale-105 active:scale-100 text-white px-8 py-3 rounded-full flex items-center gap-2 shadow-lg hover:shadow-xl active:shadow-md transition-all"
           >
             <span className="material-symbols-outlined text-lg font-bold">check_circle</span>
             <span className="font-black text-xs tracking-widest uppercase">Complete</span>
