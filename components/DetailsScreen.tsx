@@ -10,6 +10,7 @@ interface DetailsScreenProps {
   onAddPhoto: (index: number) => void;
   onPreviewImage: (photos: PhotoSetItem[], index: number) => void;
   onManualSync: () => void;
+  onAllPhotosComplete?: () => void; // 12张照片全部完成时的回调
   isSyncing?: boolean;
   user: GoogleUser | null;
   onLogin: () => void;
@@ -36,6 +37,7 @@ const DetailsScreen: React.FC<DetailsScreenProps> = ({
   onAddPhoto, 
   onPreviewImage,
   onManualSync,
+  onAllPhotosComplete,
   isSyncing,
   user,
   onLogin,
@@ -47,7 +49,7 @@ const DetailsScreen: React.FC<DetailsScreenProps> = ({
   const photos: PhotoSetItem[] = printer.photos || Array.from({ length: 12 }, (_, i) => ({
     url: '',
     label: PHOTO_LABELS[i],
-    filename: `${printer.serialNumber}_${i + 1}.jpg`,
+    filename: `${printer.model}_${printer.serialNumber}_${i + 1}.jpg`,
     isSynced: false
   }));
 
@@ -293,6 +295,21 @@ const DetailsScreen: React.FC<DetailsScreenProps> = ({
           >
             <span className="material-symbols-outlined text-xl font-bold">add_a_photo</span>
             <span className="font-black text-xs tracking-widest uppercase">Resume Capture</span>
+          </button>
+        </div>
+      )}
+
+      {capturedCount === 12 && (
+        <div className="absolute bottom-8 left-1/2 -translate-x-1/2 z-20">
+          <button 
+            onClick={() => {
+              onAllPhotosComplete?.();
+              onBack();
+            }}
+            className="bg-green-500 hover:scale-105 active:scale-95 text-white px-12 py-4 rounded-full flex items-center gap-3 shadow-xl transition-all"
+          >
+            <span className="material-symbols-outlined text-xl font-bold">check_circle</span>
+            <span className="font-black text-xs tracking-widest uppercase">Complete</span>
           </button>
         </div>
       )}

@@ -4,6 +4,8 @@ export interface PhotoSetItem {
   label: string;
   filename: string;
   isSynced?: boolean;
+  driveFileId?: string; // 云盘文件ID，用于扩展
+  localPath?: string; // 本地路径，用于扩展
 }
 
 export interface UserPreferences {
@@ -13,6 +15,7 @@ export interface UserPreferences {
   drivePath: string;
   useSubfoldersBySN: boolean;
   imageQuality: 'original' | 'compressed';
+  cloudProvider?: 'none' | 'drive' | 'onedrive'; // 云盘供应商
 }
 
 export interface GoogleUser {
@@ -28,6 +31,8 @@ export interface Project {
   printerIds: string[];
   createdAt: string;
   imageUrl?: string;
+  driveFolderId?: string; // 云盘文件夹ID
+  localPath?: string; // 本地路径
 }
 
 export interface Printer {
@@ -41,6 +46,8 @@ export interface Printer {
   lastSync?: string;
   syncedCount: number;
   isSyncing?: boolean;
+  driveFolderId?: string; // 云盘根文件夹ID
+  localPath?: string; // 本地路径
 }
 
 export enum AppScreen {

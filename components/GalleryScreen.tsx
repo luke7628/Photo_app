@@ -89,6 +89,12 @@ const GalleryScreen: React.FC<GalleryScreenProps> = ({
   user, activeProject, onLogin, onLogout, printers, onSearch, onAdd, onSelectPrinter, onPreviewImage, onOpenSettings, onManualSync, onBackToProjects
 }) => {
   const [filter, setFilter] = useState<'ALL' | 'ZT411' | 'ZT421'>('ALL');
+
+  // 计算实际存在的打印机型号
+  const availableModels = useMemo(() => {
+    const models = new Set<string>(printers.map(p => p.model));
+    return Array.from(models).sort() as ('ZT411' | 'ZT421')[];
+  }, [printers]);
   const [showUserMenu, setShowUserMenu] = useState(false);
   const [uiRotation, setUiRotation] = useState(0);
 
@@ -194,7 +200,7 @@ const GalleryScreen: React.FC<GalleryScreenProps> = ({
 
         {/* Filter buttons */}
         <div className={`flex gap-2 overflow-x-auto no-scrollbar pt-3 transition-all ${isLandscape ? 'mt-1 pb-1' : 'mt-3 pb-1'}`}>
-          {['ALL', 'ZT411', 'ZT421'].map((f) => (
+          {(['ALL'] as const).concat(availableModels).map((f) => (
             <button
               key={f}
               onClick={() => setFilter(f as any)}
