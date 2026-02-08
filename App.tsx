@@ -47,6 +47,8 @@ const App: React.FC = () => {
   const [sessionIndex, setSessionIndex] = useState<number>(0);
   const [sessionPhotos, setSessionPhotos] = useState<PhotoSetItem[]>([]);
   const [sessionData, setSessionData] = useState<{ serialNumber: string; model: string } | null>(null);
+  const [baseSerialNumber, setBaseSerialNumber] = useState<string>('');
+  const [baseModel, setBaseModel] = useState<string>('ZT411');
   const [isAnalyzing, setIsAnalyzing] = useState<boolean>(false);
   const [isSingleRetake, setIsSingleRetake] = useState<boolean>(false);
   const [previewPhotos, setPreviewPhotos] = useState<PhotoSetItem[]>([]);
@@ -260,6 +262,8 @@ const App: React.FC = () => {
         const cleanBase64 = base64.split(',')[1];
         analyzePrinterPhoto(cleanBase64)
           .then(result => { 
+            setBaseSerialNumber(result.serialNumber);
+            setBaseModel(result.model);
             setSessionData({ serialNumber: result.serialNumber, model: result.model });
             // Auto-confirm after analysis
             setTimeout(() => {
@@ -269,6 +273,8 @@ const App: React.FC = () => {
           })
           .catch(() => { 
             const fallbackData = { serialNumber: "", model: "ZT411" };
+            setBaseSerialNumber("");
+            setBaseModel("ZT411");
             setSessionData(fallbackData);
             // Auto-confirm with fallback data
             setTimeout(() => {
@@ -277,8 +283,10 @@ const App: React.FC = () => {
           })
           .finally(() => setIsAnalyzing(false));
       } else {
-        // For non-first photos or single retakes, confirm immediately
-        const currentData = sessionData || { serialNumber: "", model: "ZT411" };
+        // For Step 2-12, use base serial with suffix
+        const suffixedSerial = baseSerialNumber ? `${baseSerialNumber}_${sessionIndex + 1}` : `SERIAL_${sessionIndex + 1}`;
+        const currentData = { serialNumber: suffixedSerial, model: baseModel };
+        setSessionData(currentData);
         setTimeout(() => {
           processConfirmation(base64, currentData);
         }, 100);
@@ -290,9 +298,22 @@ const App: React.FC = () => {
         setIsAnalyzing(true);
         const cleanBase64 = base64.split(',')[1];
         analyzePrinterPhoto(cleanBase64)
-          .then(result => { setSessionData({ serialNumber: result.serialNumber, model: result.model }); })
-          .catch(() => { setSessionData({ serialNumber: "", model: "ZT411" }); })
+          .then(result => { 
+            setBaseSerialNumber(result.serialNumber);
+            setBaseModel(result.model);
+            setSessionData({ serialNumber: result.serialNumber, model: result.model });
+          })
+          .catch(() => { 
+            setBaseSerialNumber("");
+            setBaseModel("ZT411");
+            setSessionData({ serialNumber: "", model: "ZT411" });
+          })
           .finally(() => setIsAnalyzing(false));
+      } else {
+        // For Step 2-12, use base serial with suffix
+        const suffixedSerial = baseSerialNumber ? `${baseSerialNumber}_${sessionIndex + 1}` : `SERIAL_${sessionIndex + 1}`;
+        setSessionData({ serialNumber: suffixedSerial, model: baseModel });
+        setIsAnalyzing(false);
       }
     }
   };
@@ -326,6 +347,8 @@ const App: React.FC = () => {
     setSessionIndex(0);
     setSessionPhotos([]);
     setSessionData(null);
+    setBaseSerialNumber('');
+    setBaseModel('ZT411');
     setIsSingleRetake(false);
     setCurrentScreen(AppScreen.DETAILS);
   }, [selectedPrinter, activeProjectId]);
@@ -371,7 +394,7 @@ const App: React.FC = () => {
         {currentScreen === AppScreen.PROJECT_LIST && <ProjectListScreen projects={projects} onSelectProject={(id) => { setActiveProjectId(id); setCurrentScreen(AppScreen.GALLERY); }} onCreateProject={(name) => setProjects([{ id: `p-${Date.now()}`, name, printerIds: [], createdAt: new Date().toISOString() }, ...projects])} onRenameProject={(id, newName) => setProjects(prev => prev.map(p => p.id === id ? { ...p, name: newName } : p))} onDeleteProject={(id) => { setProjects(prev => prev.filter(p => p.id !== id)); setPrinters(prev => prev.filter(p => p.projectId !== id)); }} onOpenSettings={() => setCurrentScreen(AppScreen.SETTINGS)} user={user} onLogin={handleLogin} onLogout={handleLogout} />}
         {currentScreen === AppScreen.GALLERY && <GalleryScreen user={user} activeProject={activeProject} onLogin={handleLogin} onLogout={handleLogout} printers={activePrinters} onSearch={() => setCurrentScreen(AppScreen.SEARCH)} onAdd={() => { setSessionIndex(0); setSessionPhotos([]); setSessionData(null); setIsSingleRetake(false); setSelectedPrinter(null); setCurrentScreen(AppScreen.CAMERA); }} onSelectPrinter={(p) => { setSelectedPrinter(p); setCurrentScreen(AppScreen.DETAILS); }} onPreviewImage={(url) => { setPreviewPhotos([{url, label: 'Preview', filename: 'p.jpg'}]); setPreviewIndex(0); setLastScreen(AppScreen.GALLERY); setCurrentScreen(AppScreen.PREVIEW); }} onOpenSettings={() => setCurrentScreen(AppScreen.SETTINGS)} onManualSync={performSyncCycle} onBackToProjects={() => setCurrentScreen(AppScreen.PROJECT_LIST)} />}
         {currentScreen === AppScreen.CAMERA && <CameraScreen sessionIndex={sessionIndex} isSingleRetake={isSingleRetake} initialFlash={settings.defaultFlash} onClose={() => { if (sessionPhotos.length > 0 && sessionData) finalizeSession(sessionPhotos, sessionData); else { setCurrentScreen(isSingleRetake ? lastScreen : AppScreen.GALLERY); setIsSingleRetake(false); } }} onCapture={handleCapture} />}
-        {currentScreen === AppScreen.REVIEW && <ReviewScreen imageUrl={capturedImage!} data={sessionData!} isAnalyzing={isAnalyzing} sessionIndex={sessionIndex} isSingleRetake={isSingleRetake} onRetake={() => setCurrentScreen(AppScreen.CAMERA)} onUpdateData={(newData) => setSessionData(newData)} onConfirm={() => processConfirmation(capturedImage!, sessionData || { serialNumber: 'Manual_SN', model: 'ZT411' })} />}
+        {currentScreen === AppScreen.REVIEW && <ReviewScreen imageUrl={capturedImage!} data={sessionData!} isAnalyzing={isAnalyzing} sessionIndex={sessionIndex} isSingleRetake={isSingleRetake} onRetake={() => setCurrentScreen(AppScreen.CAMERA)} onUpdateData={(newData) => { setSessionData(newData); if (sessionIndex === 0 && !isSingleRetake) { setBaseSerialNumber(newData.serialNumber); setBaseModel(newData.model); } }} onConfirm={() => processConfirmation(capturedImage!, sessionData || { serialNumber: 'Manual_SN', model: 'ZT411' })} />}
         {currentScreen === AppScreen.DETAILS && <DetailsScreen printer={selectedPrinter!} viewMode={detailsViewMode} setViewMode={setDetailsViewMode} onBack={() => setCurrentScreen(AppScreen.GALLERY)} onAddPhoto={(idx) => { setSessionIndex(idx); setIsSingleRetake(true); setSessionData({ serialNumber: selectedPrinter!.serialNumber, model: selectedPrinter!.model }); setLastScreen(AppScreen.DETAILS); setCurrentScreen(AppScreen.CAMERA); }} onPreviewImage={(photos, index) => { setPreviewPhotos(photos); setPreviewIndex(index); setLastScreen(AppScreen.DETAILS); setCurrentScreen(AppScreen.PREVIEW); }} onManualSync={performSyncCycle} isSyncing={selectedPrinter?.isSyncing} user={user} onLogin={handleLogin} onLogout={handleLogout} />}
         {currentScreen === AppScreen.PREVIEW && <ImagePreviewScreen photos={previewPhotos} initialIndex={previewIndex} onBack={() => setCurrentScreen(lastScreen)} onRetake={(idx) => { setSessionIndex(idx); setIsSingleRetake(true); if (selectedPrinter) setSessionData({ serialNumber: selectedPrinter.serialNumber, model: selectedPrinter.model }); setCurrentScreen(AppScreen.CAMERA); }} onReplace={(idx, b64) => { if (!selectedPrinter) return; const currentPhotos = selectedPrinter.photos || []; const updatedPhotos = [...currentPhotos]; updatedPhotos[idx] = { ...updatedPhotos[idx], url: b64, isSynced: false }; const updatedPrinter = { ...selectedPrinter, photos: updatedPhotos, imageUrl: idx === 0 ? b64 : selectedPrinter.imageUrl, syncedCount: updatedPhotos.filter(p => p.isSynced).length }; setPrinters(prev => prev.map(p => p.id === selectedPrinter.id ? updatedPrinter : p)); setSelectedPrinter(updatedPrinter); setPreviewPhotos(updatedPhotos); }} />}
         {currentScreen === AppScreen.SETTINGS && <SettingsScreen settings={settings} onUpdate={setSettings} activeProject={activeProject} onBack={() => setCurrentScreen(activeProjectId ? AppScreen.GALLERY : AppScreen.PROJECT_LIST)} />}

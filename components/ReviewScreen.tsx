@@ -20,11 +20,12 @@ const ReviewScreen: React.FC<ReviewScreenProps> = ({ imageUrl, data, isAnalyzing
   const startPos = useRef({ x: 0, y: 0, cropX: 0, cropY: 0, cropW: 0, cropH: 0 });
   
   const [uiRotation, setUiRotation] = useState(0);
+  const [imageRotation, setImageRotation] = useState(0);
 
   // Edit Modal State
   const [showEditModal, setShowEditModal] = useState(false);
   const [editSerial, setEditSerial] = useState('');
-  const [editModel, setEditModel] = useState('ZT411');
+  const [editModel, setEditModel] = useState('');
 
   // Validation & Animation
   const [shakeError, setShakeError] = useState(false);
@@ -44,12 +45,12 @@ const ReviewScreen: React.FC<ReviewScreenProps> = ({ imageUrl, data, isAnalyzing
     return () => window.removeEventListener('deviceorientation', handleOrientation);
   }, []);
 
-  const hasValidData = !isAnalyzing && data?.serialNumber && data.serialNumber.trim().length > 0;
+  const hasValidData = !isAnalyzing && data?.serialNumber && data.serialNumber.trim().length > 0 && data?.model && data.model.trim().length > 0;
 
   const handleOpenEdit = () => {
     if (isAnalyzing) return;
     setEditSerial(data?.serialNumber || '');
-    setEditModel(data?.model || 'ZT411');
+    setEditModel(sessionIndex === 0 ? '' : (data?.model || ''));
     setModalError(false);
     setShowEditModal(true);
   };
@@ -57,7 +58,10 @@ const ReviewScreen: React.FC<ReviewScreenProps> = ({ imageUrl, data, isAnalyzing
   const handleSaveEdit = () => {
     if (!editSerial || !editSerial.trim()) {
       setModalError(true);
-      setTimeout(() => setModalError(false), 500);
+      return;
+    }
+    if (!editModel) {
+      setModalError(true);
       return;
     }
     onUpdateData({ serialNumber: editSerial.toUpperCase(), model: editModel });
@@ -152,18 +156,18 @@ const ReviewScreen: React.FC<ReviewScreenProps> = ({ imageUrl, data, isAnalyzing
          onTouchMove={handleTouchMove} 
          onTouchEnd={handleTouchEnd}>
       
-      <header className={`safe-pt bg-white rounded-b-3xl shadow-sm shrink-0 transition-all duration-500 ${isLandscape ? 'px-12 pb-2' : 'px-5 pb-3'}`}>
-        <div className={`flex items-center gap-3 transition-all ${isLandscape ? 'pt-2 mb-1.5' : 'pt-3 mb-2'}`}>
-           <div style={rotationStyle} className={`size-8 rounded-lg flex items-center justify-center ${isSingleRetake ? 'bg-amber-100' : 'bg-sage/10'}`}>
-             <span className={`material-symbols-outlined text-[18px] ${isSingleRetake ? 'text-amber-600' : 'text-sage'}`}>
+      <header className={`safe-pt bg-white rounded-b-3xl shadow-sm shrink-0 transition-all duration-500 ${isLandscape ? 'px-12 pb-1.5' : 'px-5 pb-2'}`}>
+        <div className={`flex items-center gap-2 transition-all ${isLandscape ? 'pt-1.5 mb-1' : 'pt-2 mb-1.5'}`}>
+           <div style={rotationStyle} className={`size-7 rounded-lg flex items-center justify-center ${isSingleRetake ? 'bg-amber-100' : 'bg-sage/10'}`}>
+             <span className={`material-symbols-outlined text-[16px] ${isSingleRetake ? 'text-amber-600' : 'text-sage'}`}>
                {isSingleRetake ? 'published_with_changes' : 'image_search'}
              </span>
            </div>
-           <div className="flex items-baseline gap-2" style={rotationStyle}>
-             <h1 className="text-lg font-black text-gray-900 tracking-tight leading-none uppercase">
+           <div className="flex items-baseline gap-1.5" style={rotationStyle}>
+             <h1 className="text-base font-black text-gray-900 tracking-tight leading-none uppercase">
                {isSingleRetake ? 'Reviewing' : `Step ${sessionIndex + 1}`}
              </h1>
-             <p className="text-[9px] font-bold text-sage uppercase tracking-widest leading-none">{PHOTO_LABELS[sessionIndex]}</p>
+             <p className="text-[8px] font-bold text-sage uppercase tracking-widest leading-none">{PHOTO_LABELS[sessionIndex]}</p>
            </div>
         </div>
 
@@ -214,7 +218,18 @@ const ReviewScreen: React.FC<ReviewScreenProps> = ({ imageUrl, data, isAnalyzing
         </div>
       </header>
 
-      <main className="flex-1 flex items-center justify-center px-4 py-1 overflow-hidden relative transition-all">
+      <main className="flex-1 flex flex-col items-center justify-center px-4 py-1 overflow-hidden relative transition-all">
+        {/* 旋转按钮 */}
+        <div className="w-full max-w-sm flex justify-end mb-1">
+          <button
+            onClick={() => setImageRotation(prev => (prev - 90) % 360)}
+            className="size-8 flex items-center justify-center bg-blue-500 hover:bg-blue-600 text-white rounded-lg shadow-md active:scale-95 transition-all"
+            title="逆时针旋转90°"
+          >
+            <span className="material-symbols-outlined text-[18px]">rotate_left</span>
+          </button>
+        </div>
+        
         <div 
           ref={containerRef} 
           className={`relative bg-black overflow-hidden shadow-2xl border-2 border-white transition-all duration-700 ease-out ${isLandscape ? 'h-[90%] aspect-[3/2] max-h-lg' : 'w-full aspect-[4/3] max-w-sm'}`} 
@@ -222,8 +237,9 @@ const ReviewScreen: React.FC<ReviewScreenProps> = ({ imageUrl, data, isAnalyzing
         >
           <img 
             alt="Review" 
-            className="w-full h-full object-contain pointer-events-none" 
-            src={imageUrl} 
+            className="w-full h-full object-contain pointer-events-none transition-transform duration-300" 
+            src={imageUrl}
+            style={{ transform: `rotate(${imageRotation}deg)` }}
           />
           
           <div className="absolute inset-0 z-10 pointer-events-none">
@@ -239,21 +255,26 @@ const ReviewScreen: React.FC<ReviewScreenProps> = ({ imageUrl, data, isAnalyzing
 
           <div 
             style={{ left: `${crop.x}%`, top: `${crop.y}%`, width: `${crop.w}%`, height: `${crop.h}%` }}
-            className="absolute z-20 border border-primary rounded-xl shadow-[0_0_20px_rgba(60,230,25,0.4)] transition-[box-shadow]"
+            className="absolute z-20 transition-[box-shadow]"
             onMouseDown={(e) => handleTouchStart(e, 'move')}
             onTouchStart={(e) => handleTouchStart(e, 'move')}
           >
-            <div className="absolute -top-4 -left-4 size-10 flex items-center justify-center pointer-events-auto" onMouseDown={(e) => handleTouchStart(e, 'tl')} onTouchStart={(e) => handleTouchStart(e, 'tl')}>
-               <div className="size-6 border-t-4 border-l-4 border-primary rounded-tl-sm"></div>
+            {/* 四角L型边框 - 蓝色 */}
+            <div className="absolute -top-1 -left-1 size-12 pointer-events-auto" onMouseDown={(e) => handleTouchStart(e, 'tl')} onTouchStart={(e) => handleTouchStart(e, 'tl')}>
+               <div className="w-8 h-1 bg-blue-500 rounded-sm"></div>
+               <div className="w-1 h-8 bg-blue-500 rounded-sm"></div>
             </div>
-            <div className="absolute -top-4 -right-4 size-10 flex items-center justify-center pointer-events-auto" onMouseDown={(e) => handleTouchStart(e, 'tr')} onTouchStart={(e) => handleTouchStart(e, 'tr')}>
-               <div className="size-6 border-t-4 border-r-4 border-primary rounded-tr-sm"></div>
+            <div className="absolute -top-1 -right-1 size-12 flex flex-col items-end pointer-events-auto" onMouseDown={(e) => handleTouchStart(e, 'tr')} onTouchStart={(e) => handleTouchStart(e, 'tr')}>
+               <div className="w-8 h-1 bg-blue-500 rounded-sm"></div>
+               <div className="w-1 h-8 bg-blue-500 rounded-sm ml-auto"></div>
             </div>
-            <div className="absolute -bottom-4 -left-4 size-10 flex items-center justify-center pointer-events-auto" onMouseDown={(e) => handleTouchStart(e, 'bl')} onTouchStart={(e) => handleTouchStart(e, 'bl')}>
-               <div className="size-6 border-b-4 border-l-4 border-primary rounded-bl-sm"></div>
+            <div className="absolute -bottom-1 -left-1 size-12 flex flex-col justify-end pointer-events-auto" onMouseDown={(e) => handleTouchStart(e, 'bl')} onTouchStart={(e) => handleTouchStart(e, 'bl')}>
+               <div className="w-1 h-8 bg-blue-500 rounded-sm"></div>
+               <div className="w-8 h-1 bg-blue-500 rounded-sm"></div>
             </div>
-            <div className="absolute -bottom-4 -right-4 size-10 flex items-center justify-center pointer-events-auto" onMouseDown={(e) => handleTouchStart(e, 'br')} onTouchStart={(e) => handleTouchStart(e, 'br')}>
-               <div className="size-6 border-b-4 border-r-4 border-primary rounded-br-sm"></div>
+            <div className="absolute -bottom-1 -right-1 size-12 flex flex-col items-end justify-end pointer-events-auto" onMouseDown={(e) => handleTouchStart(e, 'br')} onTouchStart={(e) => handleTouchStart(e, 'br')}>
+               <div className="w-1 h-8 bg-blue-500 rounded-sm ml-auto"></div>
+               <div className="w-8 h-1 bg-blue-500 rounded-sm"></div>
             </div>
           </div>
         </div>
@@ -272,11 +293,16 @@ const ReviewScreen: React.FC<ReviewScreenProps> = ({ imageUrl, data, isAnalyzing
           <button 
             onClick={handleConfirm}
             disabled={isAnalyzing}
-            style={rotationStyle}
+            style={{
+              ...rotationStyle,
+              backgroundColor: hasValidData 
+                ? (isSingleRetake ? '#f59e0b' : '#3cb119')
+                : '#e5e7eb'
+            }}
             className={`active:scale-95 rounded-2xl flex items-center justify-center gap-2 transition-all shadow-xl disabled:opacity-50 ${isLandscape ? 'px-12 h-12' : 'flex-[2] h-14'} ${
               hasValidData 
-              ? (isSingleRetake ? 'bg-amber-500' : 'bg-sage') 
-              : 'bg-gray-200 text-gray-400 shadow-none'
+              ? '' 
+              : 'text-gray-400 shadow-none'
             }`}
           >
             {isAnalyzing ? (
@@ -319,7 +345,7 @@ const ReviewScreen: React.FC<ReviewScreenProps> = ({ imageUrl, data, isAnalyzing
                     }}
                     placeholder="N/A"
                     className={`w-full h-12 px-4 bg-gray-100 rounded-lg border-2 text-base font-black uppercase tracking-widest placeholder:text-gray-400 focus:outline-none transition-all ${
-                      modalError 
+                      modalError && (!editSerial || !editSerial.trim())
                       ? 'border-red-400 bg-red-50 text-red-500 animate-pulse' 
                       : 'border-transparent focus:border-primary/50 text-gray-800'
                     }`}
@@ -328,15 +354,20 @@ const ReviewScreen: React.FC<ReviewScreenProps> = ({ imageUrl, data, isAnalyzing
                 
                 <div>
                   <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest block mb-2">Model Type</label>
-                  <div className="flex bg-gray-100 p-1 rounded-lg">
+                  <div className="flex gap-2">
                     {(['ZT411', 'ZT421'] as const).map(m => (
                       <button
                         key={m}
-                        onClick={() => setEditModel(m)}
-                        className={`flex-1 h-9 rounded-md text-[10px] font-black uppercase tracking-widest transition-all ${
+                        onClick={() => {
+                          setEditModel(m);
+                          setModalError(false);
+                        }}
+                        className={`flex-1 h-14 rounded-xl text-sm font-black uppercase tracking-widest transition-all border-2 ${
                           editModel === m 
-                          ? 'bg-white text-gray-900 shadow-sm' 
-                          : 'text-gray-400 hover:text-gray-600'
+                          ? 'bg-blue-500 text-white border-blue-500 shadow-lg shadow-blue-500/30' 
+                          : modalError && editSerial && editSerial.trim() && !editModel
+                          ? 'bg-white text-gray-400 border-red-400 animate-pulse'
+                          : 'bg-white text-gray-400 border-gray-200 hover:border-gray-300'
                         }`}
                       >
                         {m}
@@ -345,6 +376,18 @@ const ReviewScreen: React.FC<ReviewScreenProps> = ({ imageUrl, data, isAnalyzing
                   </div>
                 </div>
               </div>
+
+              {modalError && (!editSerial || !editSerial.trim()) && (
+                <div className="mb-3 px-3 py-2 bg-red-50 border border-red-200 rounded-lg">
+                  <p className="text-xs font-bold text-red-600 text-center">Please enter Serial Number</p>
+                </div>
+              )}
+              
+              {modalError && editSerial && editSerial.trim() && !editModel && (
+                <div className="mb-3 px-3 py-2 bg-red-50 border border-red-200 rounded-lg">
+                  <p className="text-xs font-bold text-red-600 text-center">Please select Model Type</p>
+                </div>
+              )}
 
               <div className="flex items-center gap-3">
                 <button 
@@ -355,7 +398,11 @@ const ReviewScreen: React.FC<ReviewScreenProps> = ({ imageUrl, data, isAnalyzing
                 </button>
                 <button 
                   onClick={handleSaveEdit}
-                  className={`flex-[1.5] h-12 bg-primary text-[#1a2332] rounded-lg font-black uppercase text-[10px] tracking-widest shadow-lg shadow-primary/20 transition-all active:scale-95 hover:brightness-105`}
+                  className={`flex-[1.5] h-12 rounded-lg font-black uppercase text-[10px] tracking-widest transition-all ${
+                    editModel
+                    ? 'bg-blue-500 text-white shadow-lg shadow-blue-500/20 active:scale-95 hover:brightness-105' 
+                    : 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                  }`}
                 >
                   Confirm
                 </button>
