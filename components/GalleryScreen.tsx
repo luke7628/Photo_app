@@ -197,15 +197,41 @@ const GalleryScreen: React.FC<GalleryScreenProps> = ({
               </p>
             )}
           </div>
-          <div className={`${isLandscape ? 'w-56' : 'mt-4'}`}>
-            <div className={`w-full flex items-center rounded-xl bg-gray-100 border border-transparent gap-3 ${isLandscape ? 'h-9 px-3' : 'h-11 px-4'}`}>
-              <span className={`material-symbols-outlined text-gray-400 ${isLandscape ? 'text-base' : 'text-lg'}`}>search</span>
+          {isLandscape && (
+            <div className="w-56">
+              <div className="w-full flex items-center rounded-xl bg-gray-100 border border-transparent gap-3 h-9 px-3">
+                <span className="material-symbols-outlined text-gray-400 text-base">search</span>
+                <input
+                  type="text"
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  placeholder="Search"
+                  className="flex-1 bg-transparent outline-none text-xs font-medium text-gray-700 placeholder:text-gray-400"
+                />
+                {searchTerm && (
+                  <button
+                    onClick={() => setSearchTerm('')}
+                    className="flex-shrink-0 size-5 rounded-full hover:bg-gray-300 flex items-center justify-center transition-colors"
+                  >
+                    <span className="material-symbols-outlined text-xs text-gray-500">close</span>
+                  </button>
+                )}
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Search bar (portrait only) */}
+        {!isLandscape && (
+          <div className="mt-4">
+            <div className="w-full flex items-center rounded-xl bg-gray-100 border border-transparent gap-3 h-11 px-4">
+              <span className="material-symbols-outlined text-gray-400 text-lg">search</span>
               <input
                 type="text"
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                placeholder="Search by SN or model"
-                className={`flex-1 bg-transparent outline-none ${isLandscape ? 'text-xs' : 'text-sm'} font-medium text-gray-700 placeholder:text-gray-400`}
+                placeholder="Search"
+                className="flex-1 bg-transparent outline-none text-sm font-medium text-gray-700 placeholder:text-gray-400"
               />
               {searchTerm && (
                 <button
@@ -217,7 +243,7 @@ const GalleryScreen: React.FC<GalleryScreenProps> = ({
               )}
             </div>
           </div>
-        </div>
+        )}
 
         {/* Filter buttons */}
         <div className={`flex gap-2 overflow-x-auto no-scrollbar pt-3 transition-all ${isLandscape ? 'mt-1 pb-1' : 'mt-3 pb-1'}`}>
