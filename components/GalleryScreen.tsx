@@ -197,6 +197,54 @@ const GalleryScreen: React.FC<GalleryScreenProps> = ({
           </p>
         )}
 
+        {/* Search bar (portrait only) */}
+        {!isLandscape && (
+          <div className="mb-3">
+            <div className="w-full flex items-center rounded-xl bg-gray-100 border border-transparent gap-3 h-11 px-4">
+              <span className="material-symbols-outlined text-gray-400 text-lg">search</span>
+              <input
+                type="text"
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                placeholder="Search by SN, model or site"
+                className="flex-1 bg-transparent outline-none text-sm font-medium text-gray-700 placeholder:text-gray-400"
+              />
+              {searchTerm && (
+                <button
+                  onClick={() => setSearchTerm('')}
+                  className="flex-shrink-0 size-5 rounded-full hover:bg-gray-300 flex items-center justify-center transition-colors"
+                >
+                  <span className="material-symbols-outlined text-xs text-gray-500">close</span>
+                </button>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* Search bar (landscape mode) */}
+        {isLandscape && (
+          <div className="mb-2 flex items-center gap-3">
+            <div className="flex-1 flex items-center rounded-xl bg-gray-100 border border-transparent gap-3 h-9 px-3">
+              <span className="material-symbols-outlined text-gray-400 text-base">search</span>
+              <input
+                type="text"
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                placeholder="Search"
+                className="flex-1 bg-transparent outline-none text-xs font-medium text-gray-700 placeholder:text-gray-400"
+              />
+              {searchTerm && (
+                <button
+                  onClick={() => setSearchTerm('')}
+                  className="flex-shrink-0 size-4 rounded-full hover:bg-gray-300 flex items-center justify-center transition-colors"
+                >
+                  <span className="material-symbols-outlined text-[10px] text-gray-500">close</span>
+                </button>
+              )}
+            </div>
+          </div>
+        )}
+
         {/* Filter buttons */}
         <div className={`flex gap-2 overflow-x-auto no-scrollbar pt-3 transition-all ${isLandscape ? 'mt-1 pb-1' : 'mt-3 pb-1'}`}>
           {(['ALL'] as const).concat(availableModels).map((f) => (
