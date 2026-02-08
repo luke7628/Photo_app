@@ -4,7 +4,11 @@ A modern web application for capturing and managing printer documentation photos
 
 ## Features
 
-✨ **AI-Powered Recognition**: Automatically extract serial numbers and model information from photos using Google's Gemini AI  
+✨ **双模式 AI 识别**: 
+- **云端模式** - Google Gemini AI（需要 API Key，更准确）
+- **本地模式** - Tesseract.js OCR（无需配置，完全离线）
+- 自动智能切换，无缝回退
+
 📸 **12-Photo Documentation**: Structured photo capture workflow for complete printer documentation  
 ☁️ **Google Drive Integration**: Automatic synchronization to Google Drive  
 🎨 **Modern UI**: Clean, Apple-inspired interface with smooth animations  
@@ -18,11 +22,16 @@ A modern web application for capturing and managing printer documentation photos
 npm install
 ```
 
-### 2. Configure Gemini API Key
+### 2. Configure Gemini API Key (Optional)
 
-The app uses Google's Gemini AI to automatically recognize printer serial numbers and models from photos.
+**⚡ 无需配置即可使用！**  
+应用会自动使用内置的本地 OCR（Tesseract.js）进行识别，完全离线工作。
 
-**Get your API key:**
+**想要更高的识别准确度？** 配置 Gemini API：
+
+The app uses Google's Gemini AI for better recognition accuracy. If not configured, it automatically falls back to local OCR.
+
+**Get your API key (optional):**
 1. Visit [Google AI Studio](https://aistudio.google.com/app/apikey)
 2. Sign in with your Google account
 3. Click "Create API Key"
@@ -34,7 +43,7 @@ The app uses Google's Gemini AI to automatically recognize printer serial number
    ```
    GEMINI_API_KEY=your_actual_api_key_here
    ```
-3. Save the file
+3. Save the file and restart the dev server
 
 ⚠️ **Important**: Never commit your `.env` file to git. It's already in `.gitignore`.
 
@@ -73,32 +82,55 @@ npm run build
 
 ## Troubleshooting
 
+### Recognition System
+
+The app uses an **intelligent dual-mode recognition system**:
+
+**🤖 Mode 1: Gemini AI (Cloud)**
+- Used when API key is configured
+- Higher accuracy
+- Requires internet connection
+
+**📷 Mode 2: Local OCR (Tesseract.js)**
+- Automatic fallback when Gemini is unavailable
+- Works completely offline
+- No API key needed
+- Good accuracy for clear photos
+
+**How it works:**
+1. Takes photo → Check if Gemini API key exists
+2. If YES → Try Gemini AI
+3. If Gemini fails OR no API key → Use local OCR
+4. Display results to user
+
 ### AI Recognition Not Working
 
-**Symptom**: Photos are captured but serial number is not automatically extracted
+**Check Console Logs**:
+1. Open browser DevTools (F12)
+2. Look for recognition status messages:
+   - 🤖 "使用 Gemini AI 识别..." - Using cloud AI
+   - 📷 "使用本地 OCR 识别..." - Using local OCR
+   - ✅ "识别成功" - Recognition succeeded
+   - ⚠️ "识别失败" - Recognition failed
 
 **Solutions**:
-1. **Check API Key Configuration**:
-   - Open `.env` file
-   - Ensure `GEMINI_API_KEY` is set correctly
-   - Restart the dev server after changing `.env`
+1. **For poor OCR results**:
+   - Ensure good lighting
+   - Hold camera steady
+   - Get close to the label
+   - Make sure text is in focus
+   - Try configuring Gemini API for better accuracy
 
-2. **Check Developer Console**:
-   - Open browser DevTools (F12)
-   - Look for errors in the Console tab
-   - Common errors:
-     - `API Key not configured`: API key is missing
-     - `API quota exceeded`: Need to upgrade API plan
-     - `Invalid API key`: Key is incorrect or expired
+2. **For Gemini API errors**:
+   - Check API key in `.env`
+   - Verify key is valid at [Google AI Studio](https://aistudio.google.com/)
+   - Check quota limits
+   - Restart dev server after changing `.env`
 
 3. **Disable "Skip Review Screen"**:
    - Go to Settings
    - Turn OFF "Skip Review Screen"
-   - This lets you see the AI analysis process
-
-4. **Test API Key**:
-   - Visit [Google AI Studio](https://aistudio.google.com/)
-   - Try asking a question to verify your key works
+   - This lets you see the recognition process and results
 
 ### Manual Entry
 
@@ -112,7 +144,8 @@ If AI recognition fails, you can always manually enter the information:
 - **React 19** + **TypeScript**
 - **Vite** - Fast build tool
 - **Tailwind CSS** - Utility-first styling
-- **Google Gemini AI** - Image analysis
+- **Google Gemini AI** - Cloud-based image analysis (optional)
+- **Tesseract.js** - Local OCR engine (offline capable)
 - **Google Drive API** - Cloud storage
 - **IndexedDB** - Local data persistence
 
