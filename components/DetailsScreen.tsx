@@ -80,7 +80,7 @@ const DetailsScreen: React.FC<DetailsScreenProps> = ({
                   <p className={`text-xs font-bold tracking-tight ${photo.url ? 'text-gray-900' : 'text-gray-400 italic'}`}>
                     {photo.label}
                   </p>
-                  <p className=\"text-[8px] font-black text-gray-400 uppercase tracking-tighter leading-none mt-0.5\">
+                  <p className="text-[8px] font-black text-gray-400 uppercase tracking-tighter leading-none mt-0.5">
                     {photo.filename}
                   </p>
                 </div>
@@ -165,7 +165,7 @@ const DetailsScreen: React.FC<DetailsScreenProps> = ({
                   <p className={`text-[10px] font-semibold truncate leading-none ${photo.url ? 'text-gray-900' : 'text-gray-500'}`}>
                     {photo.label}
                   </p>
-                  {photo.url && <p className="text-[7px] text-gray-400 mt-0.5 truncate leading-none\">{photo.filename}</p>}
+                  {photo.url && <p className="text-[7px] text-gray-400 mt-0.5 truncate leading-none">{photo.filename}</p>}
                 </div>
               </button>
             ))}
