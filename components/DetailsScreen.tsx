@@ -61,10 +61,10 @@ const DetailsScreen: React.FC<DetailsScreenProps> = ({
             {photos.map((photo, index) => (
               <div 
                 key={index} 
-                className="flex items-center gap-3 py-3 px-2 border-b border-gray-50 active:bg-gray-50 transition-colors cursor-pointer group"
+                className="flex items-center gap-2 py-2 px-1.5 border-b border-gray-50 active:bg-gray-50 transition-colors cursor-pointer group"
                 onClick={() => photo.url ? onPreviewImage(photos, index) : onAddPhoto(index)}
               >
-                <div className={`size-12 rounded-xl overflow-hidden shrink-0 border relative flex items-center justify-center ${photo.url ? 'border-gray-100 shadow-sm' : 'border-dashed border-gray-200 bg-gray-50 text-gray-400'}`}>
+                <div className={`size-10 rounded-lg overflow-hidden shrink-0 border relative flex items-center justify-center ${photo.url ? 'border-gray-100 shadow-sm' : 'border-dashed border-gray-200 bg-gray-50 text-gray-400'}`}>
                   {photo.url ? (
                     <>
                       <img src={photo.url} className="size-full object-cover" alt={photo.label} />
@@ -77,11 +77,11 @@ const DetailsScreen: React.FC<DetailsScreenProps> = ({
                   )}
                 </div>
                 <div className="flex-1 min-w-0">
-                  <p className={`text-[13px] font-bold tracking-tight ${photo.url ? 'text-gray-900' : 'text-gray-400 italic'}`}>
+                  <p className={`text-xs font-bold tracking-tight ${photo.url ? 'text-gray-900' : 'text-gray-400 italic'}`}>
                     {photo.label}
                   </p>
-                  <p className="text-[9px] font-black text-gray-400 uppercase tracking-tighter">
-                    {photo.url ? photo.filename : 'Pending Capture'}
+                  <p className=\"text-[8px] font-black text-gray-400 uppercase tracking-tighter leading-none mt-0.5\">
+                    {photo.filename}
                   </p>
                 </div>
                 <span className="material-symbols-outlined text-gray-300 text-[18px]">
@@ -93,33 +93,33 @@ const DetailsScreen: React.FC<DetailsScreenProps> = ({
         );
       case ViewMode.LARGE:
         return (
-          <div className="flex flex-col gap-8 pb-40">
+          <div className="flex flex-col gap-5 pb-40 px-2">
             {photos.map((photo, index) => (
-              <div key={index} className="flex flex-col gap-3 group cursor-pointer" onClick={() => photo.url ? onPreviewImage(photos, index) : onAddPhoto(index)}>
-                <div className={`relative aspect-video rounded-[2.5rem] overflow-hidden flex items-center justify-center border-4 transition-all ${photo.url ? 'bg-slate-100 border-white shadow-xl' : 'bg-gray-50 border-dashed border-gray-200'}`}>
+              <div key={index} className="flex flex-col gap-2 group cursor-pointer" onClick={() => photo.url ? onPreviewImage(photos, index) : onAddPhoto(index)}>
+                <div className={`relative aspect-video rounded-xl overflow-hidden flex items-center justify-center border-2 transition-all ${photo.url ? 'bg-slate-100 border-white shadow-md' : 'bg-gray-50 border-dashed border-gray-200'}`}>
                   {photo.url ? (
                     <>
                       <img src={photo.url} className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105" alt={photo.label} />
                       <SyncIndicator isSynced={photo.isSynced} size="md" />
-                      <div className="absolute top-4 right-4 bg-background-dark/80 backdrop-blur-md px-3 py-1.5 rounded-full border border-white/10">
-                        <p className="text-[10px] font-black text-primary uppercase tracking-widest leading-none">{index + 1} / 12</p>
+                      <div className="absolute top-2 right-2 bg-background-dark/80 backdrop-blur-md px-2 py-1 rounded-full border border-white/10">
+                        <p className="text-[9px] font-black text-primary uppercase tracking-widest leading-none">{index + 1} / 12</p>
                       </div>
                     </>
                   ) : (
-                    <div className="flex flex-col items-center gap-2 text-gray-300">
-                      <span className="material-symbols-outlined text-5xl">add_a_photo</span>
-                      <p className="text-[10px] font-black uppercase tracking-widest">Capture {photo.label}</p>
+                    <div className="flex flex-col items-center gap-1 text-gray-300">
+                      <span className="material-symbols-outlined text-3xl">add_a_photo</span>
+                      <p className="text-[9px] font-black uppercase tracking-widest">Capture {photo.label}</p>
                     </div>
                   )}
                 </div>
-                <div className="px-4 flex justify-between items-center">
-                  <div>
-                    <p className={`text-lg font-black tracking-tight leading-none ${photo.url ? 'text-gray-900' : 'text-gray-400'}`}>{photo.label}</p>
-                    <p className="text-[10px] font-bold text-gray-400 mt-1 uppercase tracking-widest">
-                      {photo.url ? photo.filename : 'Not Captured'}
+                <div className="px-2 flex justify-between items-start gap-2">
+                  <div className="min-w-0 flex-1">
+                    <p className={`text-sm font-black tracking-tight leading-none ${photo.url ? 'text-gray-900' : 'text-gray-400'}`}>{photo.label}</p>
+                    <p className="text-[8px] font-bold text-gray-400 mt-1 uppercase tracking-widest leading-none">
+                      {photo.filename}
                     </p>
                   </div>
-                  <button className="size-10 rounded-full bg-gray-100 flex items-center justify-center text-gray-500 hover:text-sage transition-colors">
+                  <button className="size-8 rounded-lg bg-gray-100 flex-shrink-0 flex items-center justify-center text-gray-500 hover:text-gray-700 transition-colors text-base">
                     <span className="material-symbols-outlined">{photo.url ? 'zoom_in' : 'camera'}</span>
                   </button>
                 </div>
@@ -130,18 +130,18 @@ const DetailsScreen: React.FC<DetailsScreenProps> = ({
       case ViewMode.GRID:
       default:
         return (
-          <div className="grid grid-cols-3 gap-2.5 pb-32 px-4">
+          <div className="grid grid-cols-3 gap-1.5 pb-32 px-2">
             {photos.map((photo, index) => (
               <button 
                 key={index} 
-                className="flex flex-col gap-2 group cursor-pointer active:scale-95 transition-transform"
+                className="flex flex-col gap-1 group cursor-pointer active:scale-95 transition-transform"
                 onClick={() => photo.url ? onPreviewImage(photos, index) : onAddPhoto(index)}
               >
-                <div className={`relative aspect-square rounded-2xl overflow-hidden flex items-center justify-center border transition-all ${photo.url ? 'bg-gray-100 border-gray-200 shadow-sm group-hover:shadow-md group-hover:scale-105' : 'bg-blue-50 border-2 border-dashed border-blue-300 hover:bg-blue-100'}`}>
+                <div className={`relative aspect-square rounded-lg overflow-hidden flex items-center justify-center border transition-all ${photo.url ? 'bg-gray-100 border-gray-200 shadow-sm group-hover:shadow-md group-hover:scale-105' : 'bg-blue-50 border-2 border-dashed border-blue-300 hover:bg-blue-100'}`}>
                   {photo.url ? (
                     <>
                       <img src={photo.url} className="w-full h-full object-cover" alt={photo.label} />
-                      <div className={`absolute top-2 left-2 flex items-center justify-center rounded-full size-5 border-2 border-white shadow-md ${
+                      <div className={`absolute top-1.5 left-1.5 flex items-center justify-center rounded-full size-5 border-2 border-white shadow-md ${
                         photo.isSynced 
                         ? 'bg-green-500' 
                         : 'bg-orange-500'
@@ -150,22 +150,22 @@ const DetailsScreen: React.FC<DetailsScreenProps> = ({
                           {photo.isSynced ? 'check' : 'schedule'}
                         </span>
                       </div>
-                      <div className="absolute top-2 right-2 bg-black/40 backdrop-blur-sm px-2 py-1 rounded-full border border-white/20">
-                        <p className="text-[9px] font-semibold text-white">{index + 1}/12</p>
+                      <div className="absolute top-1.5 right-1.5 bg-black/40 backdrop-blur-sm px-1.5 py-0.5 rounded-full border border-white/20">
+                        <p className="text-[8px] font-semibold text-white leading-none\">{index + 1}/12</p>
                       </div>
                     </>
                   ) : (
-                    <div className="flex flex-col items-center gap-1">
-                      <span className="material-symbols-outlined text-3xl text-blue-400">add_a_photo</span>
-                      <p className="text-[9px] font-semibold text-blue-500 text-center px-1">Tap to capture</p>
+                    <div className="flex flex-col items-center gap-0.5">
+                      <span className="material-symbols-outlined text-2xl text-blue-400">add_a_photo</span>
+                      <p className="text-[8px] font-semibold text-blue-500 text-center px-0.5 leading-none">Tap</p>
                     </div>
                   )}
                 </div>
-                <div className="px-1">
-                  <p className={`text-[11px] font-semibold truncate ${photo.url ? 'text-gray-900' : 'text-gray-500'}`}>
+                <div className="px-0.5">
+                  <p className={`text-[10px] font-semibold truncate leading-none ${photo.url ? 'text-gray-900' : 'text-gray-500'}`}>
                     {photo.label}
                   </p>
-                  {photo.url && <p className="text-[8px] text-gray-500 mt-0.5">✓ Captured</p>}
+                  {photo.url && <p className="text-[7px] text-gray-400 mt-0.5 truncate leading-none\">{photo.filename}</p>}
                 </div>
               </button>
             ))}

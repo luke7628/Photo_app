@@ -1,6 +1,8 @@
 
 import React, { useState, useRef, useEffect } from 'react';
 import { PHOTO_LABELS } from '../types';
+import ModelSelector from './ModelSelector';
+import { recordModelUsage } from '../services/modelMemoryService';
 
 interface ReviewScreenProps {
   imageUrl: string;
@@ -64,6 +66,7 @@ const ReviewScreen: React.FC<ReviewScreenProps> = ({ imageUrl, data, isAnalyzing
       setModalError(true);
       return;
     }
+    recordModelUsage(editModel);
     onUpdateData({ serialNumber: editSerial.toUpperCase(), model: editModel });
     setShowEditModal(false);
   };
@@ -354,25 +357,16 @@ const ReviewScreen: React.FC<ReviewScreenProps> = ({ imageUrl, data, isAnalyzing
                 
                 <div>
                   <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest block mb-2">Model Type</label>
-                  <div className="flex gap-2">
-                    {(['ZT411', 'ZT421'] as const).map(m => (
-                      <button
-                        key={m}
-                        onClick={() => {
-                          setEditModel(m);
-                          setModalError(false);
-                        }}
-                        className={`flex-1 h-14 rounded-xl text-sm font-black uppercase tracking-widest transition-all border-2 ${
-                          editModel === m 
-                          ? 'bg-blue-500 text-white border-blue-500 shadow-lg shadow-blue-500/30' 
-                          : modalError && editSerial && editSerial.trim() && !editModel
-                          ? 'bg-white text-gray-400 border-red-400 animate-pulse'
-                          : 'bg-white text-gray-400 border-gray-200 hover:border-gray-300'
-                        }`}
-                      >
-                        {m}
-                      </button>
-                    ))}
+                  <div className={`transition-all ${modalError && editSerial && editSerial.trim() && !editModel ? 'ring-2 ring-red-400 rounded-lg p-2' : ''}`}>
+                    <ModelSelector
+                      standardModels={['ZT411', 'ZT421']}
+                      value={editModel}
+                      onChange={(model) => {
+                        setEditModel(model);
+                        setModalError(false);
+                      }}
+                      onError={(msg) => console.warn(msg)}
+                    />
                   </div>
                 </div>
               </div>
