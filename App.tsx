@@ -252,15 +252,48 @@ const App: React.FC = () => {
 
   const handleCapture = (base64: string) => {
     setCapturedImage(base64);
-    setCurrentScreen(AppScreen.REVIEW);
-
-    if (sessionIndex === 0 && !isSingleRetake) {
-      setIsAnalyzing(true);
-      const cleanBase64 = base64.split(',')[1];
-      analyzePrinterPhoto(cleanBase64)
-        .then(result => { setSessionData({ serialNumber: result.serialNumber, model: result.model }); })
-        .catch(() => { setSessionData({ serialNumber: "", model: "ZT411" }); })
-        .finally(() => setIsAnalyzing(false));
+    
+    if (settings.skipReview) {
+      // Skip review screen if configured
+      if (sessionIndex === 0 && !isSingleRetake) {
+        setIsAnalyzing(true);
+        const cleanBase64 = base64.split(',')[1];
+        analyzePrinterPhoto(cleanBase64)
+          .then(result => { 
+            setSessionData({ serialNumber: result.serialNumber, model: result.model });
+            // Auto-confirm after analysis
+            setTimeout(() => {
+              const newData = { serialNumber: result.serialNumber, model: result.model };
+              processConfirmation(base64, newData);
+            }, 300);
+          })
+          .catch(() => { 
+            const fallbackData = { serialNumber: "", model: "ZT411" };
+            setSessionData(fallbackData);
+            // Auto-confirm with fallback data
+            setTimeout(() => {
+              processConfirmation(base64, fallbackData);
+            }, 300);
+          })
+          .finally(() => setIsAnalyzing(false));
+      } else {
+        // For non-first photos or single retakes, confirm immediately
+        const currentData = sessionData || { serialNumber: "", model: "ZT411" };
+        setTimeout(() => {
+          processConfirmation(base64, currentData);
+        }, 100);
+      }
+    } else {
+      // Show review screen if skipReview is false
+      setCurrentScreen(AppScreen.REVIEW);
+      if (sessionIndex === 0 && !isSingleRetake) {
+        setIsAnalyzing(true);
+        const cleanBase64 = base64.split(',')[1];
+        analyzePrinterPhoto(cleanBase64)
+          .then(result => { setSessionData({ serialNumber: result.serialNumber, model: result.model }); })
+          .catch(() => { setSessionData({ serialNumber: "", model: "ZT411" }); })
+          .finally(() => setIsAnalyzing(false));
+      }
     }
   };
 

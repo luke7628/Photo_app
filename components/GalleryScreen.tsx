@@ -111,7 +111,7 @@ const GalleryScreen: React.FC<GalleryScreenProps> = ({
   const rotationStyle = { transform: `rotate(${uiRotation}deg)`, transition: 'transform 0.3s cubic-bezier(0.4, 0, 0.2, 1)' };
 
   return (
-    <div className="flex flex-col h-full bg-gray-50 relative overflow-hidden transition-all duration-300">
+    <div className="flex flex-col h-full bg-gray-50 relative transition-all duration-300">
       {/* Header */}
       <header className={`safe-pt px-5 bg-white border-b border-gray-200 z-30 transition-all ${isLandscape ? 'pb-2' : 'pb-4'}`}>
         <div className={`flex items-center justify-between transition-all ${isLandscape ? 'mb-2 pt-2' : 'mb-4 pt-4'}`}>
@@ -209,7 +209,7 @@ const GalleryScreen: React.FC<GalleryScreenProps> = ({
       </header>
 
       {/* Printer list */}
-      <main className={`flex-1 overflow-y-auto px-5 no-scrollbar transition-all ${isLandscape ? 'pt-3 pb-20' : 'pt-5 pb-32'}`}>
+      <main className={`flex-1 overflow-y-auto px-5 no-scrollbar transition-all ${isLandscape ? 'pt-3 pb-4' : 'pt-5 pb-24'}`}>
         <div className={`grid gap-3 transition-all ${isLandscape ? 'grid-cols-2 md:grid-cols-3' : 'grid-cols-1'}`}>
           {filteredPrinters.map((printer, idx) => (
             <PrinterItem key={printer.id} printer={printer} onSelect={onSelectPrinter} isLandscape={isLandscape} index={idx} />
@@ -224,7 +224,7 @@ const GalleryScreen: React.FC<GalleryScreenProps> = ({
       </main>
 
       {/* Floating Action Button */}
-      <div className={`absolute safe-pb left-1/2 -translate-x-1/2 z-20 transition-all ${isLandscape ? 'bottom-4' : 'bottom-8'}`}>
+      <div className={`fixed left-1/2 -translate-x-1/2 z-40 pointer-events-auto transition-all ${isLandscape ? 'bottom-4' : 'bottom-8'}`}>
         <button 
           onClick={onAdd}
           style={rotationStyle}
