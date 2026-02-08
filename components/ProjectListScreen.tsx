@@ -1,9 +1,11 @@
 
-import React, { useState } from 'react';
-import { Project, GoogleUser } from '../types';
+import React, { useState, useMemo } from 'react';
+import { Project, GoogleUser, Printer } from '../types';
+import { getProjectThumbnail, getProjectStats } from '../services/projectUtils';
 
 interface ProjectListScreenProps {
   projects: Project[];
+  printers: Printer[];
   onSelectProject: (id: string) => void;
   onCreateProject: (name: string) => void;
   onRenameProject: (id: string, newName: string) => void;
@@ -15,10 +17,19 @@ interface ProjectListScreenProps {
 }
 
 const ProjectListScreen: React.FC<ProjectListScreenProps> = ({ 
-  projects, onSelectProject, onCreateProject, onRenameProject, onDeleteProject, onOpenSettings, user, onLogin, onLogout
+  projects, printers, onSelectProject, onCreateProject, onRenameProject, onDeleteProject, onOpenSettings, user, onLogin, onLogout
 }) => {
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [activeMenuId, setActiveMenuId] = useState<string | null>(null);
+  
+  // 计算项目缩略图和统计信息
+  const projectsWithMeta = useMemo(() => {
+    return projects.map(project => ({
+      ...project,
+      thumbnail: getProjectThumbnail(project, printers),
+      stats: getProjectStats(project, printers)
+    }));
+  }, [projects, printers]);
 
   return (
     <div className="flex flex-col h-full bg-gray-50 overflow-hidden">
@@ -77,20 +88,44 @@ const ProjectListScreen: React.FC<ProjectListScreenProps> = ({
           </button>
 
           {/* Project Cards */}
-          {projects.map((project) => (
+          {projectsWithMeta.map((project) => (
             <div key={project.id} className="relative group">
               <button 
                 onClick={() => onSelectProject(project.id)}
-                className="w-full aspect-square bg-white rounded-xl shadow-sm border border-gray-200 hover:shadow-md hover:border-gray-300 active:scale-95 transition-all p-3 sm:p-4 flex flex-col text-left"
+                className="w-full aspect-square bg-white rounded-xl shadow-sm border border-gray-200 hover:shadow-md hover:border-gray-300 active:scale-95 transition-all overflow-hidden flex flex-col text-left"
               >
-                <div className="flex-shrink-0 w-6 h-6 sm:w-7 sm:h-7 mb-auto rounded-lg bg-blue-50 flex items-center justify-center">
-                  <span className="material-symbols-outlined text-sm text-blue-500">folder</span>
+                {/* 缩略图区域 */}
+                <div className="relative flex-1 w-full overflow-hidden">
+                  {project.thumbnail ? (
+                    <div className="relative w-full h-full">
+                      <img 
+                        src={project.thumbnail} 
+                        alt={project.name}
+                        className="w-full h-full object-cover"
+                      />
+                      <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/20 to-transparent"></div>
+                    </div>
+                  ) : (
+                    <div className="w-full h-full bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50 flex items-center justify-center">
+                      <span className="material-symbols-outlined text-4xl text-blue-300">folder</span>
+                    </div>
+                  )}
                 </div>
-                <div className="min-w-0 mt-2">
-                  <h3 className="text-xs sm:text-sm font-bold text-gray-900 truncate break-words line-clamp-2">{project.name}</h3>
-                  <p className="text-[9px] sm:text-xs font-medium text-gray-500 mt-1">
-                    {project.printerIds.length} Assets
-                  </p>
+                
+                {/* 信息区域 */}
+                <div className="relative px-3 py-2.5 bg-white">
+                  <h3 className="text-xs sm:text-sm font-bold text-gray-900 truncate">{project.name}</h3>
+                  <div className="flex items-center justify-between mt-1">
+                    <p className="text-[9px] sm:text-xs font-medium text-gray-500">
+                      {project.stats.printerCount} Assets
+                    </p>
+                    {project.stats.totalPhotos > 0 && (
+                      <div className="flex items-center gap-1">
+                        <span className="material-symbols-outlined text-[10px] text-blue-500">photo_camera</span>
+                        <span className="text-[9px] font-semibold text-blue-500">{project.stats.totalPhotos}</span>
+                      </div>
+                    )}
+                  </div>
                 </div>
               </button>
               
