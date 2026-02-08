@@ -159,11 +159,11 @@ const ReviewScreen: React.FC<ReviewScreenProps> = ({ imageUrl, data, isAnalyzing
                {isSingleRetake ? 'published_with_changes' : 'image_search'}
              </span>
            </div>
-           <div className="flex flex-col" style={rotationStyle}>
+           <div className="flex items-baseline gap-2" style={rotationStyle}>
              <h1 className="text-lg font-black text-gray-900 tracking-tight leading-none uppercase">
                {isSingleRetake ? 'Reviewing' : `Step ${sessionIndex + 1}`}
              </h1>
-             <p className="text-[9px] font-bold text-sage uppercase tracking-widest mt-0.5 leading-none">{PHOTO_LABELS[sessionIndex]}</p>
+             <p className="text-[9px] font-bold text-sage uppercase tracking-widest leading-none">{PHOTO_LABELS[sessionIndex]}</p>
            </div>
         </div>
 
@@ -217,7 +217,7 @@ const ReviewScreen: React.FC<ReviewScreenProps> = ({ imageUrl, data, isAnalyzing
       <main className="flex-1 flex items-center justify-center px-4 py-1 overflow-hidden relative transition-all">
         <div 
           ref={containerRef} 
-          className={`relative bg-black rounded-[2.5rem] overflow-hidden shadow-2xl border-2 border-white transition-all duration-700 ease-out ${isLandscape ? 'h-[90%] aspect-[3/2] max-h-lg' : 'w-full aspect-[4/3] max-w-sm'}`} 
+          className={`relative bg-black overflow-hidden shadow-2xl border-2 border-white transition-all duration-700 ease-out ${isLandscape ? 'h-[90%] aspect-[3/2] max-h-lg' : 'w-full aspect-[4/3] max-w-sm'}`} 
           style={{ transform: `rotate(${uiRotation}deg)` }}
         >
           <img 
