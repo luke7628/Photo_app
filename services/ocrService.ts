@@ -1,4 +1,5 @@
 import { createWorker } from 'tesseract.js';
+import { preprocessImage } from './imagePreprocessor';
 
 /**
  * 本地 OCR 识别服务 - 使用 Tesseract.js
@@ -24,10 +25,15 @@ async function initWorker() {
 
 export async function analyzeWithOCR(base64Image: string): Promise<{ serialNumber: string; model: string; confidence: number }> {
   try {
+    // 图像预处理（增强对比度，锐化等）
+    console.log('🎨 开始图像预处理...');
+    const processedImage = await preprocessImage(base64Image);
+    console.log('✅ 图像预处理完成');
+    
     const worker = await initWorker();
     
     // 识别图像中的文字
-    const { data: { text, confidence } } = await worker.recognize(`data:image/jpeg;base64,${base64Image}`);
+    const { data: { text, confidence } } = await worker.recognize(`data:image/jpeg;base64,${processedImage}`);
     
     console.log('OCR Raw Text:', text);
     console.log('OCR Confidence:', confidence);
@@ -47,42 +53,63 @@ export async function analyzeWithOCR(base64Image: string): Promise<{ serialNumbe
 
 /**
  * 从 OCR 文本中提取打印机序列号和型号
+ * 针对 Zebra 打印机标签优化
  */
 function extractPrinterInfo(text: string): { serialNumber: string; model: string } {
-  // 常见的序列号模式
-  // 示例: s123456789, TEST123456, SN:12345, Serial Number: ABCD1234
+  console.log('📝 OCR 原始文本:', text);
+  
+  // Zebra 标签的序列号模式（优先级高到低）
   const serialPatterns = [
-    /(?:S\/N|SN|Serial\s*Number|Serial)[:\s]*([A-Z0-9]+)/i,
-    /\b([A-Z]{1,5}\d{6,12})\b/, // 如 TEST123456
-    /\b(s\d{9})\b/i, // 如 s123456789
-    /\b([A-Z0-9]{8,15})\b/ // 通用字母数字组合
+    // "Serial No." 或 "Serial No./No. de Série" 后面的数字
+    /Serial\s*No\.?[/\s]*(?:No\.\s*de\s*Série)?[:\s]*([A-Z0-9]{10,15})/i,
+    // 独立的长数字序列（10-15位）
+    /\b(\d{10,15})\b/,
+    // 带字母前缀的序列号（如 99J204501782）
+    /\b([A-Z0-9]{2}[A-Z]\d{9})\b/i,
+    // S/N 格式
+    /S[\s/]*N[:\s]*([A-Z0-9]{10,15})/i,
+    // 通用格式：SN: 或 Serial Number: 后面的内容
+    /(?:SN|Serial\s*Number)[:\s]*([A-Z0-9]+)/i,
+    // 小写 s 开头的序列号（如 s123456789）
+    /\b(s\d{9})\b/i,
+    // 通用字母数字组合（8-15位）
+    /\b([A-Z0-9]{8,15})\b/
   ];
   
-  // 常见的型号模式
-  // 示例: ZT411, ZT421, Model: ZT411
+  // Zebra 打印机型号模式（优先级高到低）
   const modelPatterns = [
-    /\b(ZT4[0-9]{2})\b/i, // ZT4xx 系列
-    /(?:Model|Type)[:\s]*(ZT4[0-9]{2})/i,
-    /\b(ZT\s*4\s*[0-9]\s*[0-9])\b/i // 处理空格分隔的情况
+    // "Model:" 或 "Model/Modèle:" 后面的内容
+    /Model(?:\/Modèle)?[:\s]*(ZT\d{3,4})/i,
+    // 独立的 ZT 型号
+    /\b(ZT\s*4\s*\d{2})\b/i,
+    /\b(ZT4\d{2})\b/i,
+    // 更宽泛的 ZT 系列匹配
+    /\b(ZT\d{3,4})\b/i
   ];
   
   let serialNumber = '';
   let model = '';
   
-  // 提取序列号
+  // 提取序列号 - 尝试所有模式
   for (const pattern of serialPatterns) {
     const match = text.match(pattern);
     if (match && match[1]) {
-      serialNumber = match[1].toUpperCase().replace(/\s/g, '');
-      break;
+      const candidate = match[1].toUpperCase().replace(/\s/g, '');
+      // 验证候选序列号的质量
+      if (candidate.length >= 10 && /[0-9]/.test(candidate)) {
+        serialNumber = candidate;
+        console.log('✅ 找到序列号:', serialNumber, '(模式:', pattern, ')');
+        break;
+      }
     }
   }
   
-  // 提取型号
+  // 提取型号 - 尝试所有模式
   for (const pattern of modelPatterns) {
     const match = text.match(pattern);
     if (match && match[1]) {
       model = match[1].toUpperCase().replace(/\s/g, '');
+      console.log('✅ 找到型号:', model, '(模式:', pattern, ')');
       break;
     }
   }
@@ -90,6 +117,11 @@ function extractPrinterInfo(text: string): { serialNumber: string; model: string
   // 如果没找到型号，默认使用 ZT411
   if (!model) {
     model = 'ZT411';
+    console.log('⚠️ 未找到型号，使用默认值:', model);
+  }
+  
+  if (!serialNumber) {
+    console.log('⚠️ 未找到序列号');
   }
   
   return { serialNumber, model };

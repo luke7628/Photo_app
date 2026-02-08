@@ -4,15 +4,24 @@ A modern web application for capturing and managing printer documentation photos
 
 ## Features
 
-✨ **双模式 AI 识别**: 
-- **云端模式** - Google Gemini AI（需要 API Key，更准确）
-- **本地模式** - Tesseract.js OCR（无需配置，完全离线）
-- 自动智能切换，无缝回退
+✨ **三重智能识别系统** - 最高准确率方案:
+- **条形码识别** - 直接读取标签条形码（最准确，针对序列号）
+- **云端 AI** - Google Gemini（需要 API Key，全面识别）
+- **本地 OCR** - Tesseract.js（无需配置，离线可用）
+- 自动智能切换，多重备份保障
 
 📸 **12-Photo Documentation**: Structured photo capture workflow for complete printer documentation  
 ☁️ **Google Drive Integration**: Automatic synchronization to Google Drive  
 🎨 **Modern UI**: Clean, Apple-inspired interface with smooth animations  
 📱 **Responsive Design**: Works on desktop and mobile devices  
+
+### 识别效果说明
+
+针对 **Zebra 打印机标签**（如 ZT411/ZT421）优化：
+- ✅ 自动识别标签上的条形码（序列号）
+- ✅ OCR 识别 "Model/Modèle: ZT411" 格式
+- ✅ OCR 识别 "Serial No./No. de Série: 99J204501782" 格式
+- ✅ 图像预处理增强识别准确率  
 
 ## Setup Instructions
 
@@ -84,53 +93,84 @@ npm run build
 
 ### Recognition System
 
-The app uses an **intelligent dual-mode recognition system**:
+The app uses an **intelligent triple recognition system** with automatic fallback:
 
-**🤖 Mode 1: Gemini AI (Cloud)**
+**📊 Phase 1: Barcode Recognition**
+- Scans the printer label's barcode
+- Extracts serial number directly (most accurate)
+- Uses ZXing library
+
+**🤖 Phase 2: Gemini AI (Cloud)**
 - Used when API key is configured
-- Higher accuracy
+- Comprehensive text recognition
+- Highest accuracy for both serial number and model
 - Requires internet connection
 
-**📷 Mode 2: Local OCR (Tesseract.js)**
-- Automatic fallback when Gemini is unavailable
+**📷 Phase 3: Local OCR (Tesseract.js)**
+- Automatic fallback when barcode/Gemini unavailable
 - Works completely offline
-- No API key needed
-- Good accuracy for clear photos
+- Enhanced with image preprocessing:
+  - Grayscale conversion
+  - Contrast enhancement
+  - Sharpening filter
+- Optimized regex patterns for Zebra labels
 
-**How it works:**
-1. Takes photo → Check if Gemini API key exists
-2. If YES → Try Gemini AI
-3. If Gemini fails OR no API key → Use local OCR
-4. Display results to user
+**Recognition Flow:**
+```
+Photo Captured
+    ↓
+[1] Try Barcode → Found serial? ✓ → Store serial number
+    ↓
+[2] Check Gemini API Key
+    ├─ Available → Gemini AI → Get model + serial (if not found)
+    └─ Not available → Skip
+    ↓
+[3] Local OCR → Get missing info (model/serial)
+    ↓
+Return combined results
+```
 
 ### AI Recognition Not Working
 
 **Check Console Logs**:
 1. Open browser DevTools (F12)
 2. Look for recognition status messages:
+   - 📊 "尝试条形码识别..." - Scanning barcode
    - 🤖 "使用 Gemini AI 识别..." - Using cloud AI
    - 📷 "使用本地 OCR 识别..." - Using local OCR
+   - 🎨 "开始图像预处理..." - Image preprocessing
    - ✅ "识别成功" - Recognition succeeded
    - ⚠️ "识别失败" - Recognition failed
 
 **Solutions**:
-1. **For poor OCR results**:
-   - Ensure good lighting
-   - Hold camera steady
-   - Get close to the label
-   - Make sure text is in focus
-   - Try configuring Gemini API for better accuracy
+1. **For Zebra Label Recognition**:
+   - ✅ Ensure barcode is clearly visible and in focus
+   - ✅ Center the label in frame
+   - ✅ Good lighting (avoid glare/shadows)
+   - ✅ Hold steady for 1-2 seconds
+   - ✅ Make sure "Serial No." and "Model" text are readable
+   
+2. **For Low OCR Accuracy**:
+   - Configure Gemini API for better results
+   - Ensure text is large enough in frame
+   - Clean the label if dirty/scratched
+   - Try multiple angles
 
-2. **For Gemini API errors**:
+3. **For Barcode Issues**:
+   - Get closer to the label
+   - Ensure barcode is not damaged
+   - Check lighting (barcode needs good contrast)
+
+4. **For Gemini API errors**:
    - Check API key in `.env`
    - Verify key is valid at [Google AI Studio](https://aistudio.google.com/)
    - Check quota limits
    - Restart dev server after changing `.env`
 
-3. **Disable "Skip Review Screen"**:
+5. **Debug Mode**:
    - Go to Settings
    - Turn OFF "Skip Review Screen"
-   - This lets you see the recognition process and results
+   - This shows full recognition process and allows manual editing
 
 ### Manual Entry
 
@@ -144,8 +184,11 @@ If AI recognition fails, you can always manually enter the information:
 - **React 19** + **TypeScript**
 - **Vite** - Fast build tool
 - **Tailwind CSS** - Utility-first styling
-- **Google Gemini AI** - Cloud-based image analysis (optional)
-- **Tesseract.js** - Local OCR engine (offline capable)
+- **Recognition Stack**:
+  - **ZXing** - Barcode/QR code reader
+  - **Google Gemini AI** - Cloud-based image analysis (optional)
+  - **Tesseract.js** - Local OCR engine (offline capable)
+  - **Custom image preprocessing** - Contrast enhancement, sharpening
 - **Google Drive API** - Cloud storage
 - **IndexedDB** - Local data persistence
 
