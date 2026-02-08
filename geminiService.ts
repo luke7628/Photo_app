@@ -2,10 +2,17 @@
 import { GoogleGenAI, Type } from "@google/genai";
 
 export async function analyzePrinterPhoto(base64Image: string) {
-  const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+  const apiKey = process.env.API_KEY;
+  
+  if (!apiKey || apiKey === 'undefined') {
+    console.warn('Gemini API Key not configured. Please add GEMINI_API_KEY to .env file.');
+    throw new Error('API Key not configured');
+  }
+  
+  const ai = new GoogleGenAI({ apiKey });
   try {
     const response = await ai.models.generateContent({
-      model: 'gemini-3-flash-preview',
+      model: 'gemini-1.5-flash',
       contents: {
         parts: [
           {
