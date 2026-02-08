@@ -128,25 +128,44 @@ const DetailsScreen: React.FC<DetailsScreenProps> = ({
       case ViewMode.GRID:
       default:
         return (
-          <div className="grid grid-cols-3 gap-3 pb-32">
+          <div className="grid grid-cols-3 gap-2.5 pb-32 px-4">
             {photos.map((photo, index) => (
-              <div key={index} className="flex flex-col gap-1.5 group cursor-pointer" onClick={() => photo.url ? onPreviewImage(photos, index) : onAddPhoto(index)}>
-                <div className={`relative aspect-square rounded-2xl overflow-hidden flex items-center justify-center border transition-all ${photo.url ? 'bg-slate-100 border-transparent shadow-sm group-hover:border-primary' : 'bg-gray-50 border-dashed border-gray-200 hover:bg-gray-100'}`}>
+              <button 
+                key={index} 
+                className="flex flex-col gap-2 group cursor-pointer active:scale-95 transition-transform"
+                onClick={() => photo.url ? onPreviewImage(photos, index) : onAddPhoto(index)}
+              >
+                <div className={`relative aspect-square rounded-2xl overflow-hidden flex items-center justify-center border transition-all ${photo.url ? 'bg-gray-100 border-gray-200 shadow-sm group-hover:shadow-md group-hover:scale-105' : 'bg-blue-50 border-2 border-dashed border-blue-300 hover:bg-blue-100'}`}>
                   {photo.url ? (
                     <>
-                      <img src={photo.url} className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110" alt={photo.label} />
-                      <SyncIndicator isSynced={photo.isSynced} />
+                      <img src={photo.url} className="w-full h-full object-cover" alt={photo.label} />
+                      <div className={`absolute top-2 left-2 flex items-center justify-center rounded-full size-5 border-2 border-white shadow-md ${
+                        photo.isSynced 
+                        ? 'bg-green-500' 
+                        : 'bg-orange-500'
+                      }`}>
+                        <span className="material-symbols-outlined text-xs text-white font-bold">
+                          {photo.isSynced ? 'check' : 'schedule'}
+                        </span>
+                      </div>
+                      <div className="absolute top-2 right-2 bg-black/40 backdrop-blur-sm px-2 py-1 rounded-full border border-white/20">
+                        <p className="text-[9px] font-semibold text-white">{index + 1}/12</p>
+                      </div>
                     </>
                   ) : (
-                    <span className="material-symbols-outlined text-2xl text-gray-300">add</span>
+                    <div className="flex flex-col items-center gap-1">
+                      <span className="material-symbols-outlined text-3xl text-blue-400">add_a_photo</span>
+                      <p className="text-[9px] font-semibold text-blue-500 text-center px-1">Tap to capture</p>
+                    </div>
                   )}
                 </div>
-                <div className="px-0.5">
-                  <p className={`text-[10px] font-black tracking-tight leading-none truncate ${photo.url ? 'text-gray-700' : 'text-gray-400'}`}>
+                <div className="px-1">
+                  <p className={`text-[11px] font-semibold truncate ${photo.url ? 'text-gray-900' : 'text-gray-500'}`}>
                     {photo.label}
                   </p>
+                  {photo.url && <p className="text-[8px] text-gray-500 mt-0.5">✓ Captured</p>}
                 </div>
-              </div>
+              </button>
             ))}
           </div>
         );
