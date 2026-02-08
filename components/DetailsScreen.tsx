@@ -11,6 +11,7 @@ interface DetailsScreenProps {
   onPreviewImage: (photos: PhotoSetItem[], index: number) => void;
   onManualSync: () => void;
   onAllPhotosComplete?: () => void; // 12张照片全部完成时的回调
+  onUpdatePrinter?: (printerId: string, updates: Partial<Printer>) => void; // 更新printer信息
   isSyncing?: boolean;
   user: GoogleUser | null;
   onLogin: () => void;
@@ -38,12 +39,16 @@ const DetailsScreen: React.FC<DetailsScreenProps> = ({
   onPreviewImage,
   onManualSync,
   onAllPhotosComplete,
+  onUpdatePrinter,
   isSyncing,
   user,
   onLogin,
   onLogout
 }) => {
   const [showUserMenu, setShowUserMenu] = useState(false);
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [editSerial, setEditSerial] = useState('');
+  const [editModel, setEditModel] = useState('');
 
   // Use printer's actual photos, filling with labels
   const photos: PhotoSetItem[] = printer.photos || Array.from({ length: 12 }, (_, i) => ({
@@ -176,10 +181,27 @@ const DetailsScreen: React.FC<DetailsScreenProps> = ({
 
   const capturedCount = photos.filter(p => p.url).length;
 
+  const handleOpenEdit = () => {
+    setEditSerial(printer.serialNumber);
+    setEditModel(printer.model);
+    setShowEditModal(true);
+  };
+
+  const handleSaveEdit = () => {
+    if (!editSerial.trim() || !editModel.trim()) {
+      return;
+    }
+    onUpdatePrinter?.(printer.id, {
+      serialNumber: editSerial.trim(),
+      model: editModel.trim()
+    });
+    setShowEditModal(false);
+  };
+
   return (
     <div className="flex flex-col h-full w-full bg-white overflow-hidden animate-in fade-in duration-300 relative">
-      <header className="pt-14 pb-4 px-5 bg-white border-b border-gray-100 z-10">
-        <div className="flex items-center gap-3">
+      <header className="pt-14 pb-3 px-5 bg-white border-b border-gray-100 z-10">
+        <div className="flex items-center gap-3 mb-3">
           <button 
             onClick={onBack}
             className="size-10 flex items-center justify-center rounded-xl bg-gray-50 text-gray-700 hover:bg-primary/10 transition-colors active:scale-95"
@@ -187,21 +209,10 @@ const DetailsScreen: React.FC<DetailsScreenProps> = ({
             <span className="material-symbols-outlined font-bold">arrow_back</span>
           </button>
           
-          <div className="flex-1 flex flex-col min-w-0">
-            <div className="flex items-center gap-2">
-              {/* 放大后的序列号 */}
-              <h1 className="text-2xl font-black text-gray-900 tracking-tighter truncate uppercase leading-none">
-                {printer.serialNumber}
-              </h1>
-              <span className="px-1.5 py-0.5 bg-background-dark text-primary rounded text-[8px] font-black uppercase tracking-tighter shrink-0">
-                {printer.model}
-              </span>
-            </div>
-            <div className="flex items-center gap-1.5 mt-1">
-              <div className="flex items-center gap-1">
-                <span className="material-symbols-outlined text-sage text-[12px]">check_circle</span>
-                <span className="text-[10px] font-bold text-sage">{capturedCount}/12 Steps Done</span>
-              </div>
+          <div className="flex-1 flex items-center gap-1.5">
+            <div className="flex items-center gap-1">
+              <span className="material-symbols-outlined text-sage text-[12px]">check_circle</span>
+              <span className="text-[10px] font-bold text-sage">{capturedCount}/12 Steps Done</span>
             </div>
           </div>
 
@@ -246,6 +257,29 @@ const DetailsScreen: React.FC<DetailsScreenProps> = ({
                 <span className="text-[9px] font-black uppercase tracking-widest whitespace-nowrap">Sign in with Google</span>
               </button>
             )}
+          </div>
+        </div>
+
+        {/* Prominent Info Card */}
+        <div className="bg-gradient-to-br from-blue-50 to-indigo-50 rounded-2xl p-4 border-2 border-blue-200 shadow-sm">
+          <div className="flex items-start justify-between gap-3">
+            <div className="flex-1 min-w-0">
+              <div className="text-xs font-bold text-blue-600 uppercase tracking-wider mb-1.5">Serial Number</div>
+              <div className="text-2xl font-black text-gray-900 tracking-tight uppercase break-all mb-3">
+                {printer.serialNumber}
+              </div>
+              <div className="text-xs font-bold text-blue-600 uppercase tracking-wider mb-1">Model Type</div>
+              <div className="text-xl font-black text-gray-700 tracking-wide uppercase">
+                {printer.model}
+              </div>
+            </div>
+            <button
+              onClick={handleOpenEdit}
+              className="flex-shrink-0 size-11 rounded-xl bg-white border-2 border-blue-300 flex items-center justify-center hover:bg-blue-50 transition-all active:scale-95 shadow-sm"
+              title="Edit Serial Number & Model"
+            >
+              <span className="material-symbols-outlined text-blue-600 text-xl">edit</span>
+            </button>
           </div>
         </div>
       </header>
@@ -311,6 +345,67 @@ const DetailsScreen: React.FC<DetailsScreenProps> = ({
             <span className="material-symbols-outlined text-xl font-bold">check_circle</span>
             <span className="font-black text-xs tracking-widest uppercase">Complete</span>
           </button>
+        </div>
+      )}
+
+      {/* Edit Modal */}
+      {showEditModal && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-5 animate-in fade-in duration-200">
+          <div className="bg-white rounded-3xl w-full max-w-md p-6 shadow-2xl animate-in zoom-in-95 duration-200">
+            <div className="flex items-center justify-between mb-5">
+              <h2 className="text-xl font-black text-gray-900 uppercase tracking-tight">Edit Information</h2>
+              <button
+                onClick={() => setShowEditModal(false)}
+                className="size-8 rounded-lg flex items-center justify-center hover:bg-gray-100 transition-colors"
+              >
+                <span className="material-symbols-outlined text-gray-400">close</span>
+              </button>
+            </div>
+
+            <div className="space-y-4">
+              <div>
+                <label className="block text-xs font-bold text-gray-600 uppercase tracking-wider mb-2">
+                  Serial Number
+                </label>
+                <input
+                  type="text"
+                  value={editSerial}
+                  onChange={(e) => setEditSerial(e.target.value.toUpperCase())}
+                  className="w-full h-12 px-4 bg-gray-50 border-2 border-gray-200 rounded-xl font-black text-gray-900 uppercase focus:outline-none focus:border-blue-400 transition-colors"
+                  placeholder="Enter serial number"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-gray-600 uppercase tracking-wider mb-2">
+                  Model Type
+                </label>
+                <input
+                  type="text"
+                  value={editModel}
+                  onChange={(e) => setEditModel(e.target.value.toUpperCase())}
+                  className="w-full h-12 px-4 bg-gray-50 border-2 border-gray-200 rounded-xl font-black text-gray-900 uppercase focus:outline-none focus:border-blue-400 transition-colors"
+                  placeholder="Enter model type"
+                />
+              </div>
+            </div>
+
+            <div className="flex gap-3 mt-6">
+              <button
+                onClick={() => setShowEditModal(false)}
+                className="flex-1 h-12 bg-gray-200 text-gray-700 rounded-xl font-black text-sm hover:bg-gray-300 transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleSaveEdit}
+                className="flex-1 h-12 bg-blue-500 text-white rounded-xl font-black text-sm hover:bg-blue-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                disabled={!editSerial.trim() || !editModel.trim()}
+              >
+                Save
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </div>
