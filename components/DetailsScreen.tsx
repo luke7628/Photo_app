@@ -270,16 +270,16 @@ const DetailsScreen: React.FC<DetailsScreenProps> = ({
             <span className="material-symbols-outlined text-blue-500 text-sm">edit</span>
           </button>
           
-          <div className="flex items-start gap-4 pr-9">
-            <div className="flex-1 min-w-0">
-              <div className="text-xs font-bold text-blue-600 uppercase tracking-wider mb-1">Serial Number</div>
-              <div className="text-base font-black text-gray-900 tracking-tight uppercase break-all">
+          <div className="flex gap-4 pr-9">
+            <div className="flex-1 min-w-0 flex flex-col">
+              <div className="text-xs font-bold text-blue-600 uppercase tracking-wider h-4 flex items-center">Serial Number</div>
+              <div className="text-base font-black text-gray-900 tracking-tight uppercase break-all leading-tight">
                 {printer.serialNumber}
               </div>
             </div>
-            <div className="flex-shrink-0">
-              <div className="text-xs font-bold text-blue-600 uppercase tracking-wider mb-1">Model Type</div>
-              <div className="text-base font-black text-gray-700 tracking-wide uppercase whitespace-nowrap">
+            <div className="flex-shrink-0 flex flex-col">
+              <div className="text-xs font-bold text-blue-600 uppercase tracking-wider h-4 flex items-center">Model Type</div>
+              <div className="text-base font-black text-gray-700 tracking-wide uppercase whitespace-nowrap leading-tight">
                 {printer.model}
               </div>
             </div>

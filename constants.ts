@@ -1,7 +1,39 @@
 
-import { Printer, Project } from './types';
+import { Printer, Project, PhotoSetItem } from './types';
+
+const PHOTO_LABELS = [
+  "Serial Number",
+  "Front View",
+  "Side View",
+  "Roller Path",
+  "Platen View",
+  "Laser Head",
+  "Post Service",
+  "Internal Log",
+  "Ribbon Path",
+  "Top Cover",
+  "Control Panel",
+  "Overall View"
+];
+
+const generateMockPhotos = (serialNumber: string, model: string): PhotoSetItem[] => {
+  return Array.from({ length: 12 }, (_, i) => ({
+    url: `https://picsum.photos/seed/${serialNumber}-${i}/800/600`,
+    label: PHOTO_LABELS[i],
+    filename: `${model}_${serialNumber}_${i + 1}.jpg`,
+    isSynced: true
+  }));
+};
 
 export const MOCK_PROJECTS: Project[] = [
+  {
+    id: 'proj-test',
+    name: 'ABCD',
+    description: 'Test Project',
+    printerIds: ['test-1', 'test-2'],
+    createdAt: new Date().toISOString(),
+    imageUrl: 'https://picsum.photos/seed/test/400/300'
+  },
   {
     id: 'proj-1',
     name: 'Amazon WRDC-1',
@@ -21,6 +53,26 @@ export const MOCK_PROJECTS: Project[] = [
 ];
 
 export const MOCK_PRINTERS: Printer[] = [
+  {
+    id: 'test-1',
+    projectId: 'proj-test',
+    serialNumber: 'TEST123456',
+    model: 'ZT411',
+    site: 'Test Site',
+    imageUrl: 'https://picsum.photos/seed/test1/200/200',
+    photos: generateMockPhotos('TEST123456', 'ZT411'),
+    syncedCount: 12
+  },
+  {
+    id: 'test-2',
+    projectId: 'proj-test',
+    serialNumber: 'TEST789012',
+    model: 'ZT421',
+    site: 'Test Site',
+    imageUrl: 'https://picsum.photos/seed/test2/200/200',
+    photos: generateMockPhotos('TEST789012', 'ZT421'),
+    syncedCount: 12
+  },
   {
     id: '1',
     projectId: 'proj-1',
