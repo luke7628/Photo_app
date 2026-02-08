@@ -28,6 +28,7 @@ const CameraScreen: React.FC<CameraScreenProps> = ({
   const [uiRotation, setUiRotation] = useState<OrientationAngle>(0);
   const [cameraError, setCameraError] = useState<string | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
+  const [retryCount, setRetryCount] = useState(0);
 
   // 陀螺仪处理 UI 元素的旋转
   useEffect(() => {
@@ -80,61 +81,125 @@ const CameraScreen: React.FC<CameraScreenProps> = ({
           streamRef.current.getTracks().forEach(track => track.stop());
         }
 
-        const constraints: MediaStreamConstraints = {
-          video: {
-            facingMode: { ideal: 'environment' },
-            width: { ideal: 1920 },
-            height: { ideal: 1080 },
-            aspectRatio: { ideal: 16 / 9 }
+        let newStream: MediaStream | null = null;
+        
+        // 尝试多个constraints配置，从宽松到严格
+        const constraintsList: MediaStreamConstraints[] = [
+          // 最宽松的配置 - 任何摄像头，任何分辨率
+          {
+            video: true,
+            audio: false
           },
-          audio: false
-        };
+          // 后置摄像头，宽松分辨率
+          {
+            video: {
+              facingMode: { ideal: 'environment' }
+            },
+            audio: false
+          },
+          // 指定分辨率
+          {
+            video: {
+              facingMode: { ideal: 'environment' },
+              width: { ideal: 1280 },
+              height: { ideal: 720 }
+            },
+            audio: false
+          },
+          // 原始配置
+          {
+            video: {
+              facingMode: { ideal: 'environment' },
+              width: { ideal: 1920 },
+              height: { ideal: 1080 },
+              aspectRatio: { ideal: 16 / 9 }
+            },
+            audio: false
+          }
+        ];
 
-        console.log('Starting camera with constraints:', constraints);
-        const newStream = await navigator.mediaDevices.getUserMedia(constraints);
+        for (let i = 0; i < constraintsList.length; i++) {
+          try {
+            console.log(`Trying constraints ${i + 1}:`, constraintsList[i]);
+            newStream = await navigator.mediaDevices.getUserMedia(constraintsList[i]);
+            console.log(`Successfully got stream with constraints ${i + 1}`);
+            break;
+          } catch (err) {
+            console.warn(`Constraints ${i + 1} failed:`, err);
+            if (i === constraintsList.length - 1) {
+              throw err;
+            }
+          }
+        }
+
+        if (!newStream) {
+          throw new Error('Failed to get media stream');
+        }
+
         streamRef.current = newStream;
         setStream(newStream);
         
         if (videoRef.current) {
           videoRef.current.srcObject = newStream;
           
-          // 确保视频加载完成
+          // 等待视频可以播放
+          videoRef.current.oncanplay = () => {
+            console.log('Video can play');
+            setIsCameraReady(true);
+          };
+          
+          videoRef.current.onerror = (err) => {
+            console.error('Video error:', err);
+            setCameraError('视频加载失败，请刷新重试');
+          };
+
+          // 尝试播放
           const playPromise = videoRef.current.play();
           if (playPromise !== undefined) {
             playPromise
               .then(() => {
                 console.log('Video playing successfully');
-                // 给视频一些时间来加载元数据
-                timeoutId = window.setTimeout(() => {
-                  if (videoRef.current && videoRef.current.videoWidth > 0) {
-                    setIsCameraReady(true);
-                    console.log('Camera ready:', {
-                      width: videoRef.current.videoWidth,
-                      height: videoRef.current.videoHeight
-                    });
-                  }
-                }, 500);
               })
               .catch(err => {
                 console.error('Play error:', err);
-                setCameraError('无法播放视频流');
+                // 不要立即设置错误，而是等待oncanplay
+                setCameraError('无法播放视频流，请刷新重试');
               });
           }
+
+          // 备用：500ms后如果videoWidth > 0则认为ready
+          timeoutId = window.setTimeout(() => {
+            if (videoRef.current && videoRef.current.videoWidth > 0 && !cameraError) {
+              console.log('Camera ready by timeout detection:', {
+                width: videoRef.current.videoWidth,
+                height: videoRef.current.videoHeight
+              });
+              setIsCameraReady(true);
+            }
+          }, 800);
         }
       } catch (err: any) {
         console.error("Camera Access Error:", err);
         let errorMessage = '无法访问摄像头';
         
         if (err.name === 'NotAllowedError') {
-          errorMessage = '摄像头权限被拒绝';
+          errorMessage = '摄像头权限被拒绝，请在浏览器设置中允许摄像头访问';
         } else if (err.name === 'NotFoundError') {
-          errorMessage = '未找到摄像头设备';
+          errorMessage = '设备上未找到摄像头';
         } else if (err.name === 'NotReadableError') {
-          errorMessage = '摄像头被其他应用占用';
+          errorMessage = '摄像头被其他应用占用，请关闭其他使用摄像头的应用';
+        } else if (err.name === 'TypeError') {
+          errorMessage = '摄像头配置错误，请刷新页面重试';
+        } else if (err.name === 'SecurityError') {
+          errorMessage = '安全错误：请在HTTPS或localhost上访问此应用';
         }
         
         setCameraError(errorMessage);
-        console.error('Full error:', err);
+        console.error('Full error details:', {
+          name: err.name,
+          message: err.message,
+          stack: err.stack
+        });
       }
     };
 
@@ -155,31 +220,65 @@ const CameraScreen: React.FC<CameraScreenProps> = ({
         streamRef.current.getTracks().forEach(track => track.stop());
       }
     };
-  }, []);
+  }, [retryCount]);
 
   const handleTakePhoto = () => {
-    if (!videoRef.current || !canvasRef.current || isCapturing || !isCameraReady) return;
-    if ('vibrate' in navigator) navigator.vibrate(50);
+    if (!videoRef.current || !canvasRef.current) {
+      setCameraError('摄像头未初始化');
+      return;
+    }
+    
+    if (!isCameraReady) {
+      setCameraError('摄像头尚未准备就绪');
+      return;
+    }
+    
+    if (isCapturing) {
+      return;
+    }
+
+    if ('vibrate' in navigator) {
+      navigator.vibrate([50]);
+    }
 
     setIsCapturing(true);
-    const video = videoRef.current;
-    const canvas = canvasRef.current;
-    const context = canvas.getContext('2d');
+    
+    try {
+      const video = videoRef.current;
+      const canvas = canvasRef.current;
+      const context = canvas.getContext('2d');
 
-    if (context) {
-      // 使用视频流的原始分辨率进行采集，确保不拉伸
+      if (!context) {
+        throw new Error('无法获取画布上下文');
+      }
+
+      // 使用视频流的实际分辨率
+      if (video.videoWidth <= 0 || video.videoHeight <= 0) {
+        throw new Error('视频流未正确加载');
+      }
+
       canvas.width = video.videoWidth;
       canvas.height = video.videoHeight;
       context.drawImage(video, 0, 0, canvas.width, canvas.height);
-      const fullBase64 = canvas.toDataURL('image/jpeg', 0.90);
       
+      const fullBase64 = canvas.toDataURL('image/jpeg', 0.85);
+      
+      // 快门效果
       const shutter = document.getElementById('shutter-overlay');
       if (shutter) {
         shutter.style.opacity = '1';
-        setTimeout(() => shutter.style.opacity = '0', 100);
+        setTimeout(() => { shutter.style.opacity = '0'; }, 100);
       }
 
-      setTimeout(() => onCapture(fullBase64), 150);
+      // 延迟后回调
+      setTimeout(() => {
+        onCapture(fullBase64);
+        setIsCapturing(false);
+      }, 150);
+    } catch (err: any) {
+      console.error('Take photo error:', err);
+      setCameraError(err.message || '拍照失败，请重试');
+      setIsCapturing(false);
     }
   };
 
@@ -194,17 +293,36 @@ const CameraScreen: React.FC<CameraScreenProps> = ({
       <div className="relative flex-1 bg-black overflow-hidden flex items-center justify-center">
         {/* 摄像头错误提示 */}
         {cameraError && (
-          <div className="absolute inset-0 z-40 flex items-center justify-center bg-black/80 backdrop-blur-sm">
-            <div className="flex flex-col items-center gap-4 px-6 py-8 bg-black/90 rounded-3xl border border-red-500/50 max-w-xs">
-              <span className="material-symbols-outlined text-4xl text-red-500">error_outline</span>
-              <p className="text-white text-center font-semibold">{cameraError}</p>
-              <p className="text-gray-400 text-xs text-center">请检查摄像头权限和设备状态</p>
-              <button
-                onClick={onClose}
-                className="mt-2 px-6 py-2 bg-blue-500 text-white rounded-xl font-semibold"
-              >
-                返回
-              </button>
+          <div className="absolute inset-0 z-40 flex items-center justify-center bg-black/85 backdrop-blur-md">
+            <div className="flex flex-col items-center gap-4 px-6 py-8 bg-black/95 rounded-3xl border border-red-500/50 max-w-sm">
+              <span className="material-symbols-outlined text-5xl text-red-500">error_outline</span>
+              <div className="text-center">
+                <p className="text-white text-lg font-bold mb-2">{cameraError}</p>
+                <p className="text-gray-400 text-sm">请检查摄像头权限、设备状态和浏览器设置</p>
+              </div>
+              <div className="flex flex-col gap-3 w-full">
+                <button
+                  onClick={() => {
+                    setCameraError(null);
+                    setRetryCount(retryCount + 1);
+                  }}
+                  className="w-full px-4 py-2 bg-blue-500 text-white rounded-xl font-semibold hover:bg-blue-600 transition-colors"
+                >
+                  重试
+                </button>
+                <button
+                  onClick={() => window.location.reload()}
+                  className="w-full px-4 py-2 bg-green-500 text-white rounded-xl font-semibold hover:bg-green-600 transition-colors"
+                >
+                  刷新页面
+                </button>
+                <button
+                  onClick={onClose}
+                  className="w-full px-4 py-2 bg-gray-600 text-white rounded-xl font-semibold hover:bg-gray-700 transition-colors"
+                >
+                  返回
+                </button>
+              </div>
             </div>
           </div>
         )}
@@ -212,20 +330,30 @@ const CameraScreen: React.FC<CameraScreenProps> = ({
         {/* 摄像头加载状态 */}
         {!isCameraReady && !cameraError && (
           <div className="absolute inset-0 z-35 flex items-center justify-center bg-black/80 backdrop-blur-sm">
-            <div className="flex flex-col items-center gap-4">
-              <div className="w-12 h-12 border-4 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
-              <p className="text-white font-semibold">初始化摄像头...</p>
+            <div className="flex flex-col items-center gap-6">
+              <div className="relative w-16 h-16">
+                <div className="absolute inset-0 w-16 h-16 border-4 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
+                <div className="absolute inset-3 flex items-center justify-center">
+                  <span className="material-symbols-outlined text-blue-500 text-2xl">photo_camera</span>
+                </div>
+              </div>
+              <div className="text-center">
+                <p className="text-white font-semibold">初始化摄像头...</p>
+                <p className="text-gray-400 text-xs mt-2">请允许浏览器访问摄像头</p>
+              </div>
             </div>
           </div>
         )}
 
         {/* 使用 object-contain 确保横版视频流完整显示且不变形 */}
         <video 
-          ref={videoRef} 
-          autoPlay 
-          playsInline 
-          muted
-          className="w-full h-full object-contain"
+          ref={videoRef}
+          autoPlay={true}
+          playsInline={true}
+          muted={true}
+          controls={false}
+          className="w-full h-full object-contain bg-black"
+          style={{ WebkitPlaysinline: 'true' } as any}
         />
         
         {/* 快门闪烁反馈 */}
