@@ -89,6 +89,7 @@ const GalleryScreen: React.FC<GalleryScreenProps> = ({
   user, activeProject, onLogin, onLogout, printers, onSearch, onAdd, onSelectPrinter, onPreviewImage, onOpenSettings, onManualSync, onBackToProjects
 }) => {
   const [filter, setFilter] = useState<'ALL' | 'ZT411' | 'ZT421'>('ALL');
+  const [searchTerm, setSearchTerm] = useState('');
 
   // 计算实际存在的打印机型号
   const availableModels = useMemo(() => {
@@ -111,8 +112,17 @@ const GalleryScreen: React.FC<GalleryScreenProps> = ({
 
   const isLandscape = uiRotation !== 0;
   const filteredPrinters = useMemo(() => {
-    return filter === 'ALL' ? printers : printers.filter(p => p.model === filter);
-  }, [printers, filter]);
+    let result = filter === 'ALL' ? printers : printers.filter(p => p.model === filter);
+    if (searchTerm.trim()) {
+      const term = searchTerm.toLowerCase();
+      result = result.filter(p => 
+        p.serialNumber.toLowerCase().includes(term) || 
+        p.model.toLowerCase().includes(term) ||
+        p.site.toLowerCase().includes(term)
+      );
+    }
+    return result;
+  }, [printers, filter, searchTerm]);
 
   const rotationStyle = { transform: `rotate(${uiRotation}deg)`, transition: 'transform 0.3s cubic-bezier(0.4, 0, 0.2, 1)' };
 
@@ -183,18 +193,29 @@ const GalleryScreen: React.FC<GalleryScreenProps> = ({
             </h1>
             {!isLandscape && (
               <p className="text-xs font-medium text-gray-500 mt-1">
-                {printers.length} {printers.length === 1 ? 'Asset' : 'Assets'} Total
+                {filteredPrinters.length} {filteredPrinters.length === 1 ? 'Asset' : 'Assets'}{searchTerm ? ' found' : ' Total'}
               </p>
             )}
           </div>
           <div className={`${isLandscape ? 'w-56' : 'mt-4'}`}>
-            <button
-              onClick={onSearch}
-              className={`w-full flex items-center rounded-xl bg-gray-100 border border-transparent gap-3 text-gray-500 hover:bg-gray-200 transition-colors ${isLandscape ? 'h-9 px-3' : 'h-11 px-4'}`}
-            >
+            <div className={`w-full flex items-center rounded-xl bg-gray-100 border border-transparent gap-3 ${isLandscape ? 'h-9 px-3' : 'h-11 px-4'}`}>
               <span className={`material-symbols-outlined text-gray-400 ${isLandscape ? 'text-base' : 'text-lg'}`}>search</span>
-              <span className={`${isLandscape ? 'text-xs' : 'text-sm'} font-medium opacity-70`}>Search</span>
-            </button>
+              <input
+                type="text"
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                placeholder="Search by SN or model"
+                className={`flex-1 bg-transparent outline-none ${isLandscape ? 'text-xs' : 'text-sm'} font-medium text-gray-700 placeholder:text-gray-400`}
+              />
+              {searchTerm && (
+                <button
+                  onClick={() => setSearchTerm('')}
+                  className="flex-shrink-0 size-5 rounded-full hover:bg-gray-300 flex items-center justify-center transition-colors"
+                >
+                  <span className="material-symbols-outlined text-xs text-gray-500">close</span>
+                </button>
+              )}
+            </div>
           </div>
         </div>
 
