@@ -108,11 +108,13 @@ async function createBarcodeCandidates(base64Images: string[]): Promise<string[]
     if (!base64Image) continue;
 
     const img = await loadImageFromBase64(base64Image);
+    console.log('🔍 [createBarcodeCandidates] 原始图像尺寸:', img.width, 'x', img.height);
     const maxWidth = 2400;
     const scale = img.width > maxWidth ? maxWidth / img.width : 1;
 
     const scaledWidth = Math.max(1, Math.round(img.width * scale));
     const scaledHeight = Math.max(1, Math.round(img.height * scale));
+    console.log('🔍 [createBarcodeCandidates] 缩放比例:', scale, '缩放后尺寸:', scaledWidth, 'x', scaledHeight);
 
     const canvas = document.createElement('canvas');
     const ctx = canvas.getContext('2d');
@@ -127,6 +129,7 @@ async function createBarcodeCandidates(base64Images: string[]): Promise<string[]
     ctx.drawImage(img, 0, 0, scaledWidth, scaledHeight);
 
     const full = canvasToBase64(canvas);
+    console.log('🔍 [createBarcodeCandidates] 生成完整图候选，大小:', full.length);
 
     // Top half (serial number label)
     const topCanvas = document.createElement('canvas');
@@ -137,6 +140,7 @@ async function createBarcodeCandidates(base64Images: string[]): Promise<string[]
       topCtx.drawImage(canvas, 0, 0, scaledWidth, topCanvas.height, 0, 0, scaledWidth, topCanvas.height);
     }
     const top = topCtx ? canvasToBase64(topCanvas) : '';
+    console.log('🔍 [createBarcodeCandidates] 生成顶部候选，尺寸:', topCanvas.width, 'x', topCanvas.height);
 
     // Bottom half (part number label)
     const bottomCanvas = document.createElement('canvas');
@@ -147,13 +151,16 @@ async function createBarcodeCandidates(base64Images: string[]): Promise<string[]
       bottomCtx.drawImage(canvas, 0, topCanvas.height, scaledWidth, bottomCanvas.height, 0, 0, scaledWidth, bottomCanvas.height);
     }
     const bottom = bottomCtx ? canvasToBase64(bottomCanvas) : '';
+    console.log('🔍 [createBarcodeCandidates] 生成底部候选，尺寸:', bottomCanvas.width, 'x', bottomCanvas.height);
 
     const topBand = cropBandToBase64(canvas, 0.18, 0.38, 1);
     const topBandZoom = cropBandToBase64(canvas, 0.18, 0.38, 2);
     const bottomBand = cropBandToBase64(canvas, 0.58, 0.78, 1);
     const bottomBandZoom = cropBandToBase64(canvas, 0.58, 0.78, 2);
+    console.log('🔍 [createBarcodeCandidates] 生成带状候选，共4个');
 
     candidates.push(base64Image, full, top, bottom, topBand, topBandZoom, bottomBand, bottomBandZoom);
+    console.log('🔍 [createBarcodeCandidates] 总候选数:', candidates.length);
   }
 
   return uniqueBase64List(candidates);
@@ -213,27 +220,65 @@ async function decodeBarcodeFromBase64(base64Image: string): Promise<{ text: str
     const multiDecode = (reader as any).decodeMultipleFromImageElement as ((el: HTMLImageElement) => any) | undefined;
 
     if (multiDecode) {
+      console.log('🔍 [decodeBarcodeFromBase64] 使用 multiDecode');
       const results = await multiDecode(img);
+      console.log('🔍 [decodeBarcodeFromBase64] multiDecode 返回:', results);
       if (Array.isArray(results) && results.length > 0) {
         const first = results.find((res: any) => res?.getText?.()) || results[0];
+        console.log('🔍 [decodeBarcodeFromBase64] 第一个结果:', first);
         const text = first?.getText?.()?.trim();
+        console.log('🔍 [decodeBarcodeFromBase64] getText 返回:', text);
         if (!text) return null;
+        
+        // 正确调用 getBarcodeFormat 函数
+        let format = 'UNKNOWN';
+        try {
+          const formatFunc = first.getBarcodeFormat;
+          console.log('🔍 [decodeBarcodeFromBase64] formatFunc:', formatFunc);
+          if (formatFunc && typeof formatFunc === 'function') {
+            const formatObj = formatFunc.call(first);
+            console.log('🔍 [decodeBarcodeFromBase64] formatObj:', formatObj);
+            format = formatObj?.toString?.() || 'UNKNOWN';
+          }
+        } catch (e) {
+          console.log('🔍 [decodeBarcodeFromBase64] 获取格式失败:', e);
+        }
+        
         return {
           text,
-          format: first.getBarcodeFormat?.toString() || 'UNKNOWN'
+          format
         };
       }
       return null;
     }
 
+    console.log('🔍 [decodeBarcodeFromBase64] 使用单 decode');
     const result = await reader.decodeFromImageElement(img);
+    console.log('🔍 [decodeBarcodeFromBase64] decode 返回:', result);
     const text = result?.getText?.()?.trim();
+    console.log('🔍 [decodeBarcodeFromBase64] getText 返回:', text);
     if (!text) return null;
+    
+    // 正确调用 getBarcodeFormat 函数
+    let format = 'UNKNOWN';
+    try {
+      const formatFunc = result.getBarcodeFormat;
+      console.log('🔍 [decodeBarcodeFromBase64] formatFunc:', formatFunc);
+      if (formatFunc && typeof formatFunc === 'function') {
+        const formatObj = formatFunc.call(result);
+        console.log('🔍 [decodeBarcodeFromBase64] formatObj:', formatObj);
+        format = formatObj?.toString?.() || 'UNKNOWN';
+      }
+    } catch (e) {
+      console.log('🔍 [decodeBarcodeFromBase64] 获取格式失败:', e);
+    }
+    
     return {
       text,
-      format: result.getBarcodeFormat?.toString() || 'UNKNOWN'
+      format
     };
-  } catch {
+  } catch (error) {
+    console.log('🔍 [decodeBarcodeFromBase64] 异常:', error);
     return null;
   }
 }
@@ -291,17 +336,21 @@ export async function readBarcode(base64Image: string): Promise<BarcodeResult[]>
     
     // 1. 尝试识别条形码（Code128, EAN等）
     try {
-      console.log('🔍 [readBarcode] 尝试 ZXing...');
-      for (const candidate of barcodeCandidates) {
+      console.log('🔍 [readBarcode] 尝试 ZXing... (候选总数:', barcodeCandidates.length, ')');
+      for (let i = 0; i < barcodeCandidates.length; i++) {
+        const candidate = barcodeCandidates[i];
+        console.log(`🔍 [readBarcode] 处理候选 ${i}，长度:`, candidate.length);
         const decoded = await decodeBarcodeFromBase64(candidate);
         if (decoded) {
-          console.log('🔍 [readBarcode] ZXing 返回:', decoded.text);
+          console.log(`✅ [readBarcode] 候选 ${i} 返回文本:`, decoded.text, '格式:', decoded.format);
           addUniqueResult(results, {
             type: 'barcode',
             value: decoded.text,
             format: decoded.format || 'UNKNOWN'
           });
           console.log('✅ 条形码识别成功:', decoded.text, '(格式:', decoded.format, ')');
+        } else {
+          console.log(`ℹ️ [readBarcode] 候选 ${i} 无结果`);
         }
         if (results.length >= 2) break;
       }
