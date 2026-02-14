@@ -104,12 +104,58 @@ function cropBandToBase64(source: HTMLCanvasElement, yStartRatio: number, yEndRa
 async function createBarcodeCandidates(base64Images: string[]): Promise<string[]> {
   const candidates: string[] = [];
 
+  // Helper: 增强对比度并转换为 base64
+  const enhanceContrast = (srcCanvas: HTMLCanvasElement, multiplier: number, quality = 0.85): string => {
+    const canvas = document.createElement('canvas');
+    canvas.width = srcCanvas.width;
+    canvas.height = srcCanvas.height;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return '';
+    
+    ctx.drawImage(srcCanvas, 0, 0);
+    const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+    const data = imageData.data;
+    
+    // 应用对比度增强 + 灰度化
+    for (let i = 0; i < data.length; i += 4) {
+      const gray = data[i] * 0.299 + data[i + 1] * 0.587 + data[i + 2] * 0.114;
+      // 对比度增强：(gray - 128) * multiplier + 128
+      const enhanced = Math.min(255, Math.max(0, (gray - 128) * multiplier + 128));
+      data[i] = enhanced;
+      data[i + 1] = enhanced;
+      data[i + 2] = enhanced;
+    }
+    ctx.putImageData(imageData, 0, 0);
+    return canvasToBase64(canvas, quality);
+  };
+
+  // Helper: 反色处理
+  const invertColors = (srcCanvas: HTMLCanvasElement, quality = 0.85): string => {
+    const canvas = document.createElement('canvas');
+    canvas.width = srcCanvas.width;
+    canvas.height = srcCanvas.height;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return '';
+    
+    ctx.drawImage(srcCanvas, 0, 0);
+    const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+    const data = imageData.data;
+    
+    for (let i = 0; i < data.length; i += 4) {
+      data[i] = 255 - data[i];       // R
+      data[i + 1] = 255 - data[i + 1]; // G
+      data[i + 2] = 255 - data[i + 2]; // B
+    }
+    ctx.putImageData(imageData, 0, 0);
+    return canvasToBase64(canvas, quality);
+  };
+
   for (const base64Image of base64Images) {
     if (!base64Image) continue;
 
     const img = await loadImageFromBase64(base64Image);
     console.log('🔍 [createBarcodeCandidates] 原始图像尺寸:', img.width, 'x', img.height);
-    const maxWidth = 1920; // 降低到 1920 而不是 2400，更快更有效
+    const maxWidth = 1920;
     const scale = img.width > maxWidth ? maxWidth / img.width : 1;
 
     const scaledWidth = Math.max(1, Math.round(img.width * scale));
@@ -127,13 +173,33 @@ async function createBarcodeCandidates(base64Images: string[]): Promise<string[]
     ctx.imageSmoothingEnabled = true;
     ctx.drawImage(img, 0, 0, scaledWidth, scaledHeight);
 
-    // 添加原始和不同 JPEG 质量的版本
-    // JPEG 0.85 质量有时反而能帮助边界检测（JPEG 伪影优势）
-    candidates.push(base64Image); // 原始
+    // 1. 原始图像 + 不同质量
+    candidates.push(base64Image);
+    candidates.push(canvasToBase64(canvas, 0.80));
     candidates.push(canvasToBase64(canvas, 0.85));
     candidates.push(canvasToBase64(canvas, 0.90));
 
-    // 添加 2x 放大版本用于远距离和小条码
+    // 2. 对比度增强版本（2.0x 和 2.5x）- 帮助模糊或低对比图像
+    candidates.push(enhanceContrast(canvas, 2.0, 0.85));
+    candidates.push(enhanceContrast(canvas, 2.5, 0.85));
+
+    // 3. 反色版本 - 某些条码反色识别更好
+    candidates.push(invertColors(canvas, 0.85));
+    const invertedEnhanced = invertColors(canvas, 0.85);
+    const invertCanvas = document.createElement('canvas');
+    const invertCtx = invertCanvas.getContext('2d');
+    if (invertCtx) {
+      const invertImg = new Image();
+      invertImg.onload = () => {
+        invertCanvas.width = invertImg.width;
+        invertCanvas.height = invertImg.height;
+        invertCtx.drawImage(invertImg, 0, 0);
+      };
+      invertImg.src = `data:image/jpeg;base64,${invertedEnhanced}`;
+    }
+    candidates.push(invertedEnhanced);
+
+    // 4. 2x 放大
     const canvas2x = document.createElement('canvas');
     const ctx2x = canvas2x.getContext('2d');
     if (ctx2x) {
@@ -142,26 +208,44 @@ async function createBarcodeCandidates(base64Images: string[]): Promise<string[]
       ctx2x.imageSmoothingEnabled = true;
       ctx2x.drawImage(canvas, 0, 0, scaledWidth, scaledHeight, 0, 0, canvas2x.width, canvas2x.height);
       candidates.push(canvasToBase64(canvas2x, 0.85));
-      candidates.push(canvasToBase64(canvas2x, 0.90));
+      candidates.push(enhanceContrast(canvas2x, 2.0, 0.85));
+      candidates.push(enhanceContrast(canvas2x, 2.5, 0.85));
     }
 
-    // 更多水平条带 - 条码通常在特定高度
-    // 上部区域（SN）：10-35%, 20-45%, 25-50%
-    // 中部区域：40-65%
-    // 下部区域（PN）：50-75%, 55-80%, 60-85%
+    // 5. 覆盖更多水平带状区域 - 手机拍摄角度可能导致条码在意外位置
     const bandRatios = [
-      [0.10, 0.35], // 上部 1
-      [0.15, 0.40], // 上部 2
-      [0.20, 0.45], // 上部 3
-      [0.40, 0.65], // 中部
-      [0.50, 0.75], // 下部 1
-      [0.55, 0.80], // 下部 2
-      [0.60, 0.85], // 下部 3
+      [0.05, 0.30],   // 上部早期
+      [0.10, 0.35],   // 上部 1
+      [0.15, 0.40],   // 上部 2
+      [0.20, 0.45],   // 上部 3
+      [0.25, 0.50],   // 上部 4
+      [0.30, 0.55],   // 中上
+      [0.40, 0.65],   // 中部
+      [0.45, 0.70],   // 中下
+      [0.50, 0.75],   // 下部 1
+      [0.55, 0.80],   // 下部 2
+      [0.60, 0.85],   // 下部 3
+      [0.65, 0.90],   // 下部 4
     ];
 
     for (const [start, end] of bandRatios) {
+      // 原始带状
       const band = cropBandToBase64(canvas, start, end, 1, 0.85);
       candidates.push(band);
+      
+      // 增强对比的带状
+      const bandEnhanced = cropBandToBase64(canvas, start, end, 1, 0.85);
+      const bandCanvas = document.createElement('canvas');
+      const bandCtx = bandCanvas.getContext('2d');
+      if (bandCtx) {
+        const startY = Math.max(0, Math.floor(canvas.height * start));
+        const endY = Math.min(canvas.height, Math.ceil(canvas.height * end));
+        const bandHeight = Math.max(1, endY - startY);
+        bandCanvas.width = canvas.width;
+        bandCanvas.height = bandHeight;
+        bandCtx.drawImage(canvas, 0, startY, canvas.width, bandHeight, 0, 0, canvas.width, bandHeight);
+        candidates.push(enhanceContrast(bandCanvas, 2.0, 0.85));
+      }
     }
 
     console.log('🔍 [createBarcodeCandidates] 总候选数:', candidates.length);
