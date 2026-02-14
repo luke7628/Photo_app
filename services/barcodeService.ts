@@ -108,7 +108,7 @@ async function createBarcodeCandidates(base64Images: string[]): Promise<string[]
     if (!base64Image) continue;
 
     const img = await loadImageFromBase64(base64Image);
-    const maxWidth = 1600;
+    const maxWidth = 2400;
     const scale = img.width > maxWidth ? maxWidth / img.width : 1;
 
     const scaledWidth = Math.max(1, Math.round(img.width * scale));

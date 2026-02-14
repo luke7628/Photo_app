@@ -407,26 +407,44 @@ const App: React.FC = () => {
       let partNumber = '';
 
       const parsePayload = (payload: string) => {
-        const value = payload.toUpperCase();
-        const partMatch = value.match(/ZT4(11|21)\d{2,3}[-_][A-Z0-9]+/i);
-        if (partMatch && !partNumber) {
-          partNumber = partMatch[0];
-          console.log('识别为部件号:', partNumber);
-        }
+        const parts = payload
+          .toUpperCase()
+          .split(/[\n|;]+/)
+          .map(p => p.trim())
+          .filter(Boolean);
 
-        const labeledSerial = value.match(/SN[:=\s]+([A-Z0-9-]{8,})/i);
-        if (labeledSerial && !serialNumber) {
-          serialNumber = labeledSerial[1];
-          console.log('识别为序列号:', serialNumber);
-        }
+        parts.forEach(part => {
+          const compact = part.replace(/\s+/g, '');
+          const cleaned = compact.replace(/[^A-Z0-9-_]/g, '');
 
-        if (!serialNumber) {
-          const serialMatch = value.match(/[A-Z0-9]{2}[A-Z]\d{9}/i) || value.match(/\d{10,15}/);
-          if (serialMatch) {
-            serialNumber = serialMatch[0];
-            console.log('识别为序列号:', serialNumber);
+          if (!partNumber) {
+            const partMatch = cleaned.match(/ZT4(11|21)\d{2,3}[-_]?[A-Z0-9]+/i);
+            if (partMatch) {
+              let normalized = partMatch[0].replace('_', '-');
+              if (!normalized.includes('-') && normalized.length > 7) {
+                normalized = `${normalized.slice(0, 7)}-${normalized.slice(7)}`;
+              }
+              partNumber = normalized;
+              console.log('识别为部件号:', partNumber);
+            }
           }
-        }
+
+          if (!serialNumber) {
+            const labeledSerial = cleaned.match(/SN[:=]?([A-Z0-9-]{8,})/i);
+            if (labeledSerial) {
+              serialNumber = labeledSerial[1];
+              console.log('识别为序列号:', serialNumber);
+            }
+          }
+
+          if (!serialNumber) {
+            const serialMatch = cleaned.match(/[A-Z0-9]{2}[A-Z]\d{9}/i) || cleaned.match(/\d{10,15}/);
+            if (serialMatch) {
+              serialNumber = serialMatch[0];
+              console.log('识别为序列号:', serialNumber);
+            }
+          }
+        });
       };
       
       if (barcodeResults && barcodeResults.length > 0) {

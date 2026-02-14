@@ -319,7 +319,7 @@ const CameraScreen: React.FC<CameraScreenProps> = ({
       canvas.height = video.videoHeight;
       context.drawImage(video, 0, 0, canvas.width, canvas.height);
       
-      const fullBase64 = canvas.toDataURL('image/jpeg', 0.85);
+      const fullBase64 = canvas.toDataURL('image/jpeg', 0.95);
       
       // 快门效果
       const shutter = document.getElementById('shutter-overlay');
