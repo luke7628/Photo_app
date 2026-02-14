@@ -34,7 +34,7 @@ const ProjectListScreen: React.FC<ProjectListScreenProps> = ({
   return (
     <div className="flex flex-col h-full bg-gray-50 overflow-hidden">
       {/* Top Header */}
-      <header className="safe-pt flex items-center justify-between px-3 sm:px-6 py-3 sm:py-5 bg-white border-b border-gray-200 shrink-0">
+      <header className="safe-pt flex items-center justify-between px-3 sm:px-6 py-4 sm:py-6 bg-white border-b border-gray-200 shrink-0">
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 sm:gap-3 mb-1">
             <div className="flex-shrink-0 w-8 h-8 sm:w-12 sm:h-12 flex items-center justify-center rounded-xl sm:rounded-2xl bg-blue-50 border border-blue-100">
@@ -166,7 +166,7 @@ const ProjectListScreen: React.FC<ProjectListScreenProps> = ({
       </main>
 
       {/* Footer */}
-      <footer className="px-3 sm:px-4 py-2 sm:py-4 text-center border-t border-gray-200 bg-white shrink-0 safe-pb">
+      <footer className="px-3 sm:px-4 py-3 sm:py-5 text-center border-t border-gray-200 bg-white shrink-0 safe-pb">
         <p className="text-[10px] sm:text-xs font-medium text-gray-400">Photo Suite © 2026</p>
       </footer>
 

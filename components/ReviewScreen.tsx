@@ -344,20 +344,30 @@ const ReviewScreen: React.FC<ReviewScreenProps> = ({ imageUrl, data, isAnalyzing
               <div className="space-y-4 mb-8">
                 <div>
                   <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest block mb-2">Serial Number</label>
-                  <input 
-                    autoFocus
-                    value={editSerial}
-                    onChange={(e) => {
-                      setEditSerial(e.target.value.toUpperCase());
-                      setModalError(false);
-                    }}
-                    placeholder="N/A"
-                    className={`w-full h-12 px-4 bg-gray-100 rounded-lg border-2 text-base font-black uppercase tracking-widest placeholder:text-gray-400 focus:outline-none transition-all ${
-                      modalError && (!editSerial || !editSerial.trim())
-                      ? 'border-red-400 bg-red-50 text-red-500 animate-pulse' 
-                      : 'border-transparent focus:border-primary/50 text-gray-800'
-                    }`}
-                  />
+                  <div className="flex gap-2 items-center">
+                    <input 
+                      autoFocus
+                      value={editSerial}
+                      onChange={(e) => {
+                        setEditSerial(e.target.value.toUpperCase());
+                        setModalError(false);
+                      }}
+                      placeholder="N/A"
+                      className={`flex-1 h-12 px-4 bg-gray-100 rounded-lg border-2 text-base font-black uppercase tracking-widest placeholder:text-gray-400 focus:outline-none transition-all ${
+                        modalError && (!editSerial || !editSerial.trim())
+                        ? 'border-red-400 bg-red-50 text-red-500 animate-pulse' 
+                        : 'border-transparent focus:border-primary/50 text-gray-800'
+                      }`}
+                    />
+                    <button
+                      onClick={onRetake}
+                      type="button"
+                      className="h-12 w-12 flex items-center justify-center bg-blue-500 hover:bg-blue-600 text-white rounded-lg shadow-md active:scale-95 transition-all flex-shrink-0"
+                      title="Re-scan barcode"
+                    >
+                      <span className="material-symbols-outlined text-lg">qr_code_2</span>
+                    </button>
+                  </div>
                 </div>
                 
                 <div>
