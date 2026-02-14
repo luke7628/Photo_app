@@ -74,6 +74,33 @@ function canvasToBase64(canvas: HTMLCanvasElement, quality = 0.9): string {
   return canvas.toDataURL('image/jpeg', quality).split(',')[1] || '';
 }
 
+function cropBandToBase64(source: HTMLCanvasElement, yStartRatio: number, yEndRatio: number, scale = 1): string {
+  const startY = Math.max(0, Math.floor(source.height * yStartRatio));
+  const endY = Math.min(source.height, Math.ceil(source.height * yEndRatio));
+  const bandHeight = Math.max(1, endY - startY);
+
+  const outCanvas = document.createElement('canvas');
+  outCanvas.width = Math.max(1, Math.round(source.width * scale));
+  outCanvas.height = Math.max(1, Math.round(bandHeight * scale));
+
+  const outCtx = outCanvas.getContext('2d');
+  if (!outCtx) return '';
+  outCtx.imageSmoothingEnabled = false;
+  outCtx.drawImage(
+    source,
+    0,
+    startY,
+    source.width,
+    bandHeight,
+    0,
+    0,
+    outCanvas.width,
+    outCanvas.height
+  );
+
+  return canvasToBase64(outCanvas);
+}
+
 async function createBarcodeCandidates(base64Images: string[]): Promise<string[]> {
   const candidates: string[] = [];
 
@@ -96,6 +123,7 @@ async function createBarcodeCandidates(base64Images: string[]): Promise<string[]
 
     canvas.width = scaledWidth;
     canvas.height = scaledHeight;
+    ctx.imageSmoothingEnabled = true;
     ctx.drawImage(img, 0, 0, scaledWidth, scaledHeight);
 
     const full = canvasToBase64(canvas);
@@ -120,7 +148,12 @@ async function createBarcodeCandidates(base64Images: string[]): Promise<string[]
     }
     const bottom = bottomCtx ? canvasToBase64(bottomCanvas) : '';
 
-    candidates.push(base64Image, full, top, bottom);
+    const topBand = cropBandToBase64(canvas, 0.18, 0.38, 1);
+    const topBandZoom = cropBandToBase64(canvas, 0.18, 0.38, 2);
+    const bottomBand = cropBandToBase64(canvas, 0.58, 0.78, 1);
+    const bottomBandZoom = cropBandToBase64(canvas, 0.58, 0.78, 2);
+
+    candidates.push(base64Image, full, top, bottom, topBand, topBandZoom, bottomBand, bottomBandZoom);
   }
 
   return uniqueBase64List(candidates);
