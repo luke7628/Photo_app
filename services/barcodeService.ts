@@ -18,12 +18,11 @@ interface BarcodeResult {
 
 function getReader() {
   if (!barcodeReader) {
-    barcodeReader = new BrowserMultiFormatReader();
-    // 优化识别提示：优先识别 Code128（常用于工业标签）
+    // Optimize recognition: prioritize Code128 (commonly used for industrial labels)
     const hints = new Map();
     hints.set(DecodeHintType.POSSIBLE_FORMATS, [
       BarcodeFormat.QR_CODE,
-      BarcodeFormat.CODE_128,  // 工业常用
+      BarcodeFormat.CODE_128,  // Industrial common
       BarcodeFormat.CODE_39,
       BarcodeFormat.CODE_93,
       BarcodeFormat.EAN_13,
@@ -35,6 +34,7 @@ function getReader() {
       BarcodeFormat.PDF_417,
       BarcodeFormat.AZTEC
     ]);
+    // Initialize reader with hints in one step
     barcodeReader = new BrowserMultiFormatReader(hints);
   }
   return barcodeReader;

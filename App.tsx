@@ -100,11 +100,22 @@ const App: React.FC = () => {
 
   const handleLogin = useCallback(() => {
     if (MICROSOFT_CLIENT_ID.includes("YOUR_MICROSOFT_CLIENT_ID")) {
-      alert("Please configure MICROSOFT_CLIENT_ID in App.tsx to enable Microsoft login.");
+      // Show a user-friendly message in the UI instead of an alert
+      const message = "Microsoft Login is not configured.\n\n" +
+        "To enable Microsoft OneDrive integration:\n" +
+        "1. Register an app in Azure AD\n" +
+        "2. Configure MICROSOFT_CLIENT_ID in App.tsx\n" +
+        "3. Rebuild the application\n\n" +
+        "The app will continue to work with local storage.";
+      
+      if (confirm(message + "\n\nWould you like to see the setup guide?")) {
+        // In a real app, this could open documentation
+        console.log("Setup guide: Check MICROSOFT_SETUP.md in the project root");
+      }
       return;
     }
     
-    // 生成登录 URL 并重定向
+    // Generate login URL and redirect
     const loginUrl = microsoftAuthService.getLoginUrl(
       MICROSOFT_CLIENT_ID,
       MICROSOFT_REDIRECT_URI,
