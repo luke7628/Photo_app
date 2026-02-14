@@ -316,41 +316,40 @@ async function decodeFromCanvas(base64Image: string): Promise<{ text: string; fo
     ctx.drawImage(img, 0, 0);
     console.log('🔍 [decodeFromCanvas] 图像绘制完成');
     
-    // 获取图像数据并进行二值化处理
+    // 获取图像数据
     const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
     const data = imageData.data;
     console.log('🔍 [decodeFromCanvas] 获取像素数据，长度:', data.length);
     
-    // 计算平均亮度
-    let sum = 0;
+    // 只做温和的对比度增强，不做激进的二值化
+    // 这样保留更多条码细节
     for (let i = 0; i < data.length; i += 4) {
-      sum += data[i] * 0.299 + data[i + 1] * 0.587 + data[i + 2] * 0.114;
-    }
-    const avgBrightness = sum / (data.length / 4);
-    console.log('🔍 [decodeFromCanvas] 平均亮度:', avgBrightness);
-    
-    // 二值化
-    for (let i = 0; i < data.length; i += 4) {
+      // 计算灰度值
       const gray = data[i] * 0.299 + data[i + 1] * 0.587 + data[i + 2] * 0.114;
-      const value = gray < avgBrightness ? 0 : 255;
-      data[i] = value;
-      data[i + 1] = value;
-      data[i + 2] = value;
+      
+      // 温和的对比度增强（2.5倍而不是3倍）
+      const enhanced = Math.min(255, Math.max(0, (gray - 128) * 2.5 + 128));
+      
+      data[i] = enhanced;
+      data[i + 1] = enhanced;
+      data[i + 2] = enhanced;
     }
     
     ctx.putImageData(imageData, 0, 0);
-    console.log('🔍 [decodeFromCanvas] 二值化完成');
+    console.log('🔍 [decodeFromCanvas] 对比度增强完成');
     
     // 将 Canvas 转换为 base64 图像
-    const binarizedBase64 = canvas.toDataURL('image/jpeg', 0.95).split(',')[1];
-    console.log('🔍 [decodeFromCanvas] 转换为 base64，长度:', binarizedBase64.length);
+    const enhancedBase64 = canvas.toDataURL('image/jpeg', 0.95).split(',')[1];
+    console.log('🔍 [decodeFromCanvas] 转换为 base64，长度:', enhancedBase64.length);
     
-    // 使用 ZXing 解码二值化图像
+    // 使用 ZXing 解码增强后的图像
     const reader = getReader();
-    const binarizedImg = await loadImageFromBase64(binarizedBase64);
-    console.log('🔍 [decodeFromCanvas] 加载二值化图像');
+    console.log('🔍 [decodeFromCanvas] 加载增强后的图像...');
+    const enhancedImg = await loadImageFromBase64(enhancedBase64);
+    console.log('🔍 [decodeFromCanvas] 图像加载成功，尺寸:', enhancedImg.width, 'x', enhancedImg.height);
     
-    const result = await reader.decodeFromImageElement(binarizedImg);
+    console.log('🔍 [decodeFromCanvas] 开始 decodeFromImageElement...');
+    const result = await reader.decodeFromImageElement(enhancedImg);
     console.log('🔍 [decodeFromCanvas] 解码返回:', result);
     
     if (result) {
@@ -365,16 +364,16 @@ async function decodeFromCanvas(base64Image: string): Promise<{ text: string; fo
           format = formatObj?.toString?.() || 'UNKNOWN';
         }
       } catch (e) {
-        // ignore
+        // ignore format error
       }
       
       return { text, format };
     }
     
-    console.log('🔍 [decodeFromCanvas] 无结果');
+    console.log('🔍 [decodeFromCanvas] 无结果返回');
     return null;
   } catch (error) {
-    console.log('❌ [decodeFromCanvas] 异常:', error);
+    console.log('❌ [decodeFromCanvas] 异常:', error instanceof Error ? error.message : String(error));
     return null;
   }
 }
