@@ -6,13 +6,13 @@ import { recordModelUsage } from '../services/modelMemoryService';
 
 interface ReviewScreenProps {
   imageUrl: string;
-  data: { serialNumber: string; model: string } | null;
+  data: { serialNumber: string; model: string; partNumber?: string } | null;
   isAnalyzing: boolean;
   sessionIndex: number;
   isSingleRetake?: boolean;
   onRetake: () => void;
   onConfirm: () => void;
-  onUpdateData: (data: { serialNumber: string; model: string }) => void;
+  onUpdateData: (data: { serialNumber: string; model: string; partNumber?: string }) => void;
 }
 
 const ReviewScreen: React.FC<ReviewScreenProps> = ({ imageUrl, data, isAnalyzing, sessionIndex, isSingleRetake, onRetake, onConfirm, onUpdateData }) => {
@@ -28,6 +28,7 @@ const ReviewScreen: React.FC<ReviewScreenProps> = ({ imageUrl, data, isAnalyzing
   const [showEditModal, setShowEditModal] = useState(false);
   const [editSerial, setEditSerial] = useState('');
   const [editModel, setEditModel] = useState('');
+  const [editPartNumber, setEditPartNumber] = useState('');
 
   // Validation & Animation
   const [shakeError, setShakeError] = useState(false);
@@ -53,6 +54,7 @@ const ReviewScreen: React.FC<ReviewScreenProps> = ({ imageUrl, data, isAnalyzing
     if (isAnalyzing) return;
     setEditSerial(data?.serialNumber || '');
     setEditModel(sessionIndex === 0 ? '' : (data?.model || ''));
+    setEditPartNumber(data?.partNumber || '');
     setModalError(false);
     setShowEditModal(true);
   };
@@ -67,7 +69,7 @@ const ReviewScreen: React.FC<ReviewScreenProps> = ({ imageUrl, data, isAnalyzing
       return;
     }
     recordModelUsage(editModel);
-    onUpdateData({ serialNumber: editSerial.toUpperCase(), model: editModel });
+    onUpdateData({ serialNumber: editSerial.toUpperCase(), model: editModel, partNumber: editPartNumber.toUpperCase() });
     setShowEditModal(false);
   };
 
@@ -368,6 +370,18 @@ const ReviewScreen: React.FC<ReviewScreenProps> = ({ imageUrl, data, isAnalyzing
                       onError={(msg) => console.warn(msg)}
                     />
                   </div>
+                </div>
+
+                <div>
+                  <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest block mb-2">Part Number (Optional)</label>
+                  <input 
+                    value={editPartNumber}
+                    onChange={(e) => {
+                      setEditPartNumber(e.target.value.toUpperCase());
+                    }}
+                    placeholder="e.g. ZT41142-T010000Z"
+                    className="w-full h-12 px-4 bg-gray-100 rounded-lg border-2 border-transparent text-base font-black uppercase tracking-widest placeholder:text-gray-400 focus:outline-none focus:border-primary/50 text-gray-800 transition-all"
+                  />
                 </div>
               </div>
 

@@ -40,6 +40,7 @@ export interface Printer {
   projectId: string; // Associated project ID
   serialNumber: string;
   model: 'ZT411' | 'ZT421';
+  partNumber?: string; // 部件号，如: ZT41142-T010000Z
   site: string;
   imageUrl: string;
   photos?: PhotoSetItem[];

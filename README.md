@@ -4,14 +4,16 @@ A modern web application for capturing and managing printer documentation photos
 
 ## Features
 
-✨ **三重智能识别系统** - 最高准确率方案:
-- **条形码识别** - 直接读取标签条形码（最准确，针对序列号）
-- **云端 AI** - Google Gemini（需要 API Key，全面识别）
-- **本地 OCR** - Tesseract.js（无需配置，离线可用）
-- 自动智能切换，多重备份保障
+✨ **智能条形码识别** - 快速准确:
+- **条形码/QR码识别** - 直接读取标签条形码和QR码（完全离线，100% 准确）
+- 自动识别序列号、型号、部件号
+- 一键手动编辑修正
+
+☁️ **双云存储支持**:
+- **Google Drive** - 官方谷歌云存储集成
+- **Microsoft OneDrive** - 微软 OneDrive 集成，支持企业账户
 
 📸 **12-Photo Documentation**: Structured photo capture workflow for complete printer documentation  
-☁️ **Google Drive Integration**: Automatic synchronization to Google Drive  
 🎨 **Modern UI**: Clean, Apple-inspired interface with smooth animations  
 📱 **Responsive Design**: Works on desktop and mobile devices  
 
@@ -19,9 +21,10 @@ A modern web application for capturing and managing printer documentation photos
 
 针对 **Zebra 打印机标签**（如 ZT411/ZT421）优化：
 - ✅ 自动识别标签上的条形码（序列号）
-- ✅ OCR 识别 "Model/Modèle: ZT411" 格式
-- ✅ OCR 识别 "Serial No./No. de Série: 99J204501782" 格式
-- ✅ 图像预处理增强识别准确率  
+- ✅ 自动识别 QR 码数据
+- ✅ 自动识别部件号（如 ZT41142-T010000Z）
+- ✅ 完全离线，无需任何 API Key
+- ✅ 响应快速 <100ms
 
 ## Setup Instructions
 
@@ -31,30 +34,15 @@ A modern web application for capturing and managing printer documentation photos
 npm install
 ```
 
-### 2. Configure Gemini API Key (Optional)
+### 2. Configure Cloud Provider (Optional)
 
-**⚡ 无需配置即可使用！**  
-应用会自动使用内置的本地 OCR（Tesseract.js）进行识别，完全离线工作。
+你可以选择使用 Google Drive 或 Microsoft OneDrive（或都不使用，仅本地存储）。
 
-**想要更高的识别准确度？** 配置 Gemini API：
+#### 选项 A: Google Drive
+- 详见 README.md 中的 Google Drive 配置部分（原有步骤）
 
-The app uses Google's Gemini AI for better recognition accuracy. If not configured, it automatically falls back to local OCR.
-
-**Get your API key (optional):**
-1. Visit [Google AI Studio](https://aistudio.google.com/app/apikey)
-2. Sign in with your Google account
-3. Click "Create API Key"
-4. Copy your API key
-
-**Configure the key:**
-1. Open the `.env` file in the project root
-2. Replace `GEMINI_API_KEY=` with your actual key:
-   ```
-   GEMINI_API_KEY=your_actual_api_key_here
-   ```
-3. Save the file and restart the dev server
-
-⚠️ **Important**: Never commit your `.env` file to git. It's already in `.gitignore`.
+#### 选项 B: Microsoft OneDrive
+- **详见 [MICROSOFT_SETUP.md](./MICROSOFT_SETUP.md)**
 
 ### 3. Run Development Server
 
@@ -69,6 +57,15 @@ The app will be available at `http://localhost:3000`
 ```bash
 npm run build
 ```
+
+## Cloud Provider Configuration
+
+应用支持在 **Settings** 中选择云提供商：
+- **None** - 仅本地存储，无云同步
+- **Google Drive** - 需要 Google OAuth 配置
+- **Microsoft OneDrive** - 需要 Azure AD 应用注册
+
+选择后，应用会自动使用该提供商上传照片。
 
 ## Usage
 
@@ -119,42 +116,35 @@ The app uses an **intelligent triple recognition system** with automatic fallbac
 ```
 Photo Captured
     ↓
-[1] Try Barcode → Found serial? ✓ → Store serial number
+[1] Barcode/QR Code Recognition (ZXing + jsQR)
+    ├─ Serial Number detected? ✓
+    ├─ Part Number detected? ✓
+    └─ Model detected? ✓
     ↓
-[2] Check Gemini API Key
-    ├─ Available → Gemini AI → Get model + serial (if not found)
-    └─ Not available → Skip
-    ↓
-[3] Local OCR → Get missing info (model/serial)
-    ↓
-Return combined results
+Return results or prompt for manual entry
 ```
 
-### AI Recognition Not Working
+### 识别功能
 
-**Check Console Logs**:
-1. Open browser DevTools (F12)
-2. Look for recognition status messages:
-   - 📊 "尝试条形码识别..." - Scanning barcode
-   - 🤖 "使用 Gemini AI 识别..." - Using cloud AI
-   - 📷 "使用本地 OCR 识别..." - Using local OCR
-   - 🎨 "开始图像预处理..." - Image preprocessing
-   - ✅ "识别成功" - Recognition succeeded
-   - ⚠️ "识别失败" - Recognition failed
+**Barcode Recognition**:
+1. 打开浏览器 DevTools (F12)
+2. 查看识别状态信息：
+   - 📊 "尝试条形码和QR码识别..." - Scanning barcodes
+   - ✅ "找到 X 个条码" - Found barcodes
+   - ⚠️ "未找到条形码或识别失败" - No barcode found
 
-**Solutions**:
-1. **For Zebra Label Recognition**:
-   - ✅ Ensure barcode is clearly visible and in focus
-   - ✅ Center the label in frame
-   - ✅ Good lighting (avoid glare/shadows)
-   - ✅ Hold steady for 1-2 seconds
-   - ✅ Make sure "Serial No." and "Model" text are readable
+**Best Practices**:
+1. **为获得最佳识别效果**:
+   - ✅ 确保条形码清晰可见且对焦准确
+   - ✅ 将标签置于画面中央
+   - ✅ 良好的照明（避免眩光/阴影）
+   - ✅ 保持稳定 1-2 秒
+   - ✅ 确保 "Serial No." 和 "Model" 文字可读
    
-2. **For Low OCR Accuracy**:
-   - Configure Gemini API for better results
-   - Ensure text is large enough in frame
-   - Clean the label if dirty/scratched
-   - Try multiple angles
+2. **如果自动识别失败**:
+   - ✅ 手动输入序列号、型号和部件号
+   - 无需任何 API Key 或云端配置
+
 
 3. **For Barcode Issues**:
    - Get closer to the label

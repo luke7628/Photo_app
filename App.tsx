@@ -4,7 +4,9 @@ import { AppScreen, Printer, Project, PHOTO_LABELS, PhotoSetItem, UserPreference
 import { MOCK_PRINTERS, MOCK_PROJECTS } from './constants';
 import { storageService } from './services/storageService';
 import { googleDriveService } from './services/googleDriveService';
-import { analyzePrinterPhoto } from './geminiService';
+import { oneDriveService } from './services/oneDriveService';
+import { microsoftAuthService, MicrosoftUser } from './services/microsoftAuthService';
+import { readBarcode } from './services/barcodeService';
 import SplashScreen from './components/SplashScreen';
 import GalleryScreen from './components/GalleryScreen';
 import SearchScreen from './components/SearchScreen';
@@ -16,13 +18,28 @@ import SettingsScreen from './components/SettingsScreen';
 import ProjectListScreen from './components/ProjectListScreen';
 
 // !!! IMPORTANT CONFIGURATION !!!
+// GOOGLE DRIVE SETUP:
 // 1. Go to Google Cloud Console (https://console.cloud.google.com)
 // 2. Create a project or select existing one
 // 3. Enable "Google Drive API" in "APIs & Services" -> "Library"
 // 4. Go to "Credentials", create "OAuth client ID" (Web application)
 // 5. Add "http://localhost:3000" (or your domain) to "Authorized JavaScript origins"
 // 6. Paste the Client ID below:
-const GOOGLE_CLIENT_ID = "YOUR_CLIENT_ID.apps.googleusercontent.com"; 
+const GOOGLE_CLIENT_ID = "YOUR_CLIENT_ID.apps.googleusercontent.com";
+
+// MICROSOFT OneDrive SETUP:
+// 1. Go to https://portal.azure.com
+// 2. Navigate to Azure Active Directory → App registrations → New registration
+// 3. Set Redirect URI to "http://localhost:3000/auth/callback" (or your domain)
+// 4. Go to Certificates & secrets → New client secret (copy the value)
+// 5. Go to API permissions → Add "Files.ReadWrite.All" and "User.Read"
+// 6. Grant admin consent
+// 7. Copy Application (client) ID, Tenant ID, and Client Secret here:
+const MICROSOFT_CLIENT_ID = "YOUR_MICROSOFT_CLIENT_ID";
+const MICROSOFT_TENANT_ID = "common"; // or your specific tenant ID
+const MICROSOFT_CLIENT_SECRET = "YOUR_MICROSOFT_CLIENT_SECRET";
+const MICROSOFT_REDIRECT_URI = "http://localhost:3000/auth/callback";
+ 
 
 const App: React.FC = () => {
   const [currentScreen, setCurrentScreen] = useState<AppScreen>(AppScreen.SPLASH);
@@ -35,20 +52,23 @@ const App: React.FC = () => {
   const [user, setUser] = useState<GoogleUser | null>(null);
   const [tokenClient, setTokenClient] = useState<any>(null);
   const [isGoogleReady, setIsGoogleReady] = useState(false);
+  const [isMicrosoftReady, setIsMicrosoftReady] = useState(false);
   const [settings, setSettings] = useState<UserPreferences>({
     defaultFlash: 'auto',
     skipReview: false,
     autoUpload: true,
     drivePath: '/Dematic/FieldPhotos/',
     useSubfoldersBySN: true,
-    imageQuality: 'original'
+    imageQuality: 'original',
+    cloudProvider: 'none'
   });
 
   const [sessionIndex, setSessionIndex] = useState<number>(0);
   const [sessionPhotos, setSessionPhotos] = useState<PhotoSetItem[]>([]);
-  const [sessionData, setSessionData] = useState<{ serialNumber: string; model: string } | null>(null);
+  const [sessionData, setSessionData] = useState<{ serialNumber: string; model: string; partNumber?: string } | null>(null);
   const [baseSerialNumber, setBaseSerialNumber] = useState<string>('');
   const [baseModel, setBaseModel] = useState<string>('ZT411');
+  const [basePartNumber, setBasePartNumber] = useState<string>('');
   const [isAnalyzing, setIsAnalyzing] = useState<boolean>(false);
   const [isSingleRetake, setIsSingleRetake] = useState<boolean>(false);
   const [previewPhotos, setPreviewPhotos] = useState<PhotoSetItem[]>([]);
@@ -82,6 +102,7 @@ const App: React.FC = () => {
                   };
                   setUser(googleUser);
                   storageService.saveUser(googleUser);
+                  setSettings(prev => ({ ...prev, cloudProvider: 'drive' }));
                 } catch (e) {
                   console.error("Profile Fetch Error", e);
                 }
@@ -98,6 +119,30 @@ const App: React.FC = () => {
       }
     };
 
+    // 初始化 Microsoft 登录检查（检查是否有缓存 token）
+    const initMicrosoft = async () => {
+      const hasCachedToken = await microsoftAuthService.initMicrosoft();
+      if (hasCachedToken) {
+        setIsMicrosoftReady(true);
+        try {
+          const userInfo = await microsoftAuthService.getUserInfo();
+          if (userInfo) {
+            setUser(userInfo as any);
+            storageService.saveUser(userInfo as any);
+            oneDriveService.setToken(microsoftAuthService.accessToken!);
+            setSettings(prev => ({ ...prev, cloudProvider: 'onedrive' }));
+          }
+        } catch (e) {
+          console.error("Microsoft Init Error:", e);
+        }
+      }
+      // 总是标记为准备好（即使没有缓存 token，用户可以手动登录）
+      setIsMicrosoftReady(true);
+    };
+
+    initGoogle();
+    initMicrosoft();
+
     initGoogle();
   }, []);
 
@@ -113,10 +158,65 @@ const App: React.FC = () => {
     }
   }, [tokenClient]);
 
+  const handleMicrosoftLogin = useCallback(() => {
+    if (MICROSOFT_CLIENT_ID.includes("YOUR_MICROSOFT_CLIENT_ID")) {
+      alert("Please configure MICROSOFT_CLIENT_ID in App.tsx to enable Microsoft login.");
+      return;
+    }
+    
+    // 生成登录 URL 并重定向
+    const loginUrl = microsoftAuthService.getLoginUrl(
+      MICROSOFT_CLIENT_ID,
+      MICROSOFT_REDIRECT_URI,
+      MICROSOFT_TENANT_ID
+    );
+    
+    // 在新窗口打开登录页面（也可以直接重定向）
+    // window.location.href = loginUrl;
+    
+    // 或者在新窗口打开，保持当前应用继续运行
+    const authWindow = window.open(loginUrl, 'microsoft_auth', 'width=500,height=600');
+    
+    // 监听来自回调页面的消息
+    window.addEventListener('message', async (event) => {
+      if (event.origin !== window.location.origin) return;
+      
+      if (event.data.type === 'microsoft_auth_success') {
+        const { code } = event.data;
+        
+        // 使用授权码交换 token
+        const success = await microsoftAuthService.exchangeCodeForToken(
+          code,
+          MICROSOFT_CLIENT_ID,
+          MICROSOFT_CLIENT_SECRET,
+          MICROSOFT_REDIRECT_URI
+        );
+        
+        if (success && microsoftAuthService.accessToken) {
+          oneDriveService.setToken(microsoftAuthService.accessToken);
+          
+          // 获取用户信息
+          const userInfo = await microsoftAuthService.getUserInfo();
+          if (userInfo) {
+            setUser(userInfo as any);
+            storageService.saveUser(userInfo as any);
+            setSettings(prev => ({ ...prev, cloudProvider: 'onedrive' }));
+            
+            if (authWindow) authWindow.close();
+          }
+        }
+      }
+    });
+  }, []);
+
   const handleLogout = useCallback(() => {
     setUser(null);
     storageService.saveUser(null);
     googleDriveService.setToken("");
+    microsoftAuthService.logout();
+    oneDriveService.setToken("");
+    setSettings(prev => ({ ...prev, cloudProvider: 'none' }));
+    
     if ((window as any).google && googleDriveService.accessToken) {
       (window as any).google.accounts.oauth2.revoke(googleDriveService.accessToken, () => {});
     }
@@ -187,10 +287,13 @@ const App: React.FC = () => {
 
   // Real Sync Cycle to Google Drive
   const performSyncCycle = useCallback(async () => {
-    // Requirements: AutoUpload ON, User Logged In, Access Token Available
-    if (!settings.autoUpload || !user || !googleDriveService.accessToken) return;
+    // 需要：自动上传开启、用户已登录、有访问令牌
+    const hasGoogleToken = googleDriveService.accessToken;
+    const hasMicrosoftToken = oneDriveService.accessToken;
     
-    // Find a printer that has unsynced photos and is not currently syncing
+    if (!settings.autoUpload || !user || (!hasGoogleToken && !hasMicrosoftToken)) return;
+    
+    // 查找有未同步照片且当前未同步的打印机
     const targetPrinter = printers.find(p => {
       const hasUnsynced = p.photos?.some(ph => ph.url && !ph.isSynced);
       return hasUnsynced && !p.isSyncing;
@@ -198,32 +301,74 @@ const App: React.FC = () => {
 
     if (!targetPrinter) return;
     
-    // Mark as syncing in UI
+    // 在 UI 中标记为正在同步
     setPrinters(prev => prev.map(p => p.id === targetPrinter.id ? { ...p, isSyncing: true } : p));
     if (selectedPrinter?.id === targetPrinter.id) {
       setSelectedPrinter(prev => prev ? { ...prev, isSyncing: true } : null);
     }
 
     try {
-      // 1. Ensure Root Folder "Dematic Field Photos"
-      const rootFolderId = await googleDriveService.ensureFolder('Dematic Field Photos');
-      if (!rootFolderId) throw new Error("Could not create/find root folder");
+      let targetFolderId: string | null = null;
 
-      // 2. Ensure Project Folder
-      const project = projects.find(p => p.id === targetPrinter.projectId);
-      const projectName = project ? project.name : 'Unassigned Project';
-      const projectFolderId = await googleDriveService.ensureFolder(projectName, rootFolderId);
-      if (!projectFolderId) throw new Error("Could not create/find project folder");
+      // 根据当前配置选择云服务
+      if (settings.cloudProvider === 'onedrive' && hasMicrosoftToken) {
+        // ==================== OneDrive 同步流程 ====================
+        // 1. 确保根文件夹"Dematic/FieldPhotos"存在
+        const drivePath = settings.drivePath || '/Dematic/FieldPhotos/';
+        let rootFolderId = await oneDriveService.findFolder(drivePath);
+        
+        if (!rootFolderId) {
+          rootFolderId = await oneDriveService.ensureFolder(drivePath);
+        }
+        
+        if (!rootFolderId) throw new Error("Could not create/find root folder in OneDrive");
 
-      // 3. Ensure Serial Number Folder (if enabled)
-      let targetFolderId = projectFolderId;
-      if (settings.useSubfoldersBySN) {
-        targetFolderId = await googleDriveService.ensureFolder(targetPrinter.serialNumber, projectFolderId);
+        // 2. 确保项目文件夹存在
+        const project = projects.find(p => p.id === targetPrinter.projectId);
+        const projectName = project ? project.name : 'Unassigned Project';
+        const projectPath = `${settings.drivePath}${projectName}`;
+        let projectFolderId = await oneDriveService.findFolder(projectPath);
+        
+        if (!projectFolderId) {
+          projectFolderId = await oneDriveService.ensureFolder(projectPath);
+        }
+        
+        if (!projectFolderId) throw new Error("Could not create/find project folder");
+
+        // 3. 如果启用了按序列号分文件夹
+        if (settings.useSubfoldersBySN) {
+          const snPath = `${projectPath}/${targetPrinter.serialNumber}`;
+          targetFolderId = await oneDriveService.findFolder(snPath);
+          
+          if (!targetFolderId) {
+            targetFolderId = await oneDriveService.ensureFolder(snPath);
+          }
+        } else {
+          targetFolderId = projectFolderId;
+        }
+      } else if (settings.cloudProvider === 'drive' || (!hasGoogleToken && hasGoogleToken)) {
+        // ==================== Google Drive 同步流程 ====================
+        // 1. 确保根文件夹"Dematic Field Photos"
+        const rootFolderId = await googleDriveService.ensureFolder('Dematic Field Photos');
+        if (!rootFolderId) throw new Error("Could not create/find root folder");
+
+        // 2. 确保项目文件夹
+        const project = projects.find(p => p.id === targetPrinter.projectId);
+        const projectName = project ? project.name : 'Unassigned Project';
+        const projectFolderId = await googleDriveService.ensureFolder(projectName, rootFolderId);
+        if (!projectFolderId) throw new Error("Could not create/find project folder");
+
+        // 3. 确保序列号文件夹（如果启用）
+        if (settings.useSubfoldersBySN) {
+          targetFolderId = await googleDriveService.ensureFolder(targetPrinter.serialNumber, projectFolderId);
+        } else {
+          targetFolderId = projectFolderId;
+        }
       }
 
-      if (!targetFolderId) throw new Error("Could not create/find target folder");
+      if (!targetFolderId) throw new Error("Could not determine target folder");
 
-      // 4. Upload Photos
+      // 4. 上传照片
       const photos = targetPrinter.photos || [];
       const updatedPhotos = [...photos];
       let hasChanges = false;
@@ -232,17 +377,21 @@ const App: React.FC = () => {
         const photo = updatedPhotos[i];
         if (photo.url && !photo.isSynced) {
           try {
-            await googleDriveService.uploadImage(photo.url, photo.filename, targetFolderId);
+            if (settings.cloudProvider === 'onedrive' && hasMicrosoftToken) {
+              await oneDriveService.uploadImage(photo.url, photo.filename, targetFolderId);
+            } else {
+              await googleDriveService.uploadImage(photo.url, photo.filename, targetFolderId);
+            }
             updatedPhotos[i] = { ...photo, isSynced: true };
             hasChanges = true;
           } catch (uploadError) {
              console.error(`Failed to upload ${photo.filename}`, uploadError);
-             // Continue to next photo
+             // 继续上传下一张照片
           }
         }
       }
 
-      // 5. Update State
+      // 5. 更新状态
       if (hasChanges) {
         setPrinters(currentPrinters => {
           return currentPrinters.map(p => {
@@ -255,7 +404,7 @@ const App: React.FC = () => {
                 isSyncing: false,
                 lastSync: new Date().toISOString()
               };
-              // Update selected printer if it's the one being synced
+              // 如果当前选中的打印机是被同步的那个，更新它
               if (selectedPrinter?.id === p.id) setSelectedPrinter(updatedPrinter);
               return updatedPrinter;
             }
@@ -285,6 +434,58 @@ const App: React.FC = () => {
     return () => clearInterval(interval);
   }, [settings.autoUpload, user, performSyncCycle]);
 
+  /**
+   * 简化的条形码识别
+   * 只使用本地条形码/QR码读取，不依赖云端或OCR
+   */
+  const analyzeWithBarcode = async (base64Image: string): Promise<{ serialNumber: string; model: string; partNumber: string }> => {
+    try {
+      console.log('📊 尝试条形码和QR码识别...');
+      const barcodeResults = await readBarcode(base64Image);
+      
+      let serialNumber = '';
+      let model = '';
+      let partNumber = '';
+      
+      if (barcodeResults && barcodeResults.length > 0) {
+        console.log(`✅ 找到 ${barcodeResults.length} 个条码:`, barcodeResults);
+        
+        // 解析条形码/QR码结果
+        for (const result of barcodeResults) {
+          const value = result.value.toUpperCase();
+          
+          if (result.type === 'qrcode') {
+            // QR码通常包含完整信息
+            console.log('QR码内容:', value);
+            if (!serialNumber && value.length >= 10) {
+              serialNumber = value;
+            }
+          } else if (result.type === 'barcode') {
+            // 识别条形码类型
+            if (value.match(/ZT\d{5,6}[-_][A-Z0-9]+/i)) {
+              // 部件号格式(如 ZT41142-T010000Z)
+              partNumber = value;
+              console.log('识别为部件号:', partNumber);
+            } else if (value.match(/[A-Z0-9]{2}[A-Z]\d{9}/i) || value.match(/\d{10,15}/)) {
+              // 序列号格式
+              serialNumber = value;
+              console.log('识别为序列号:', serialNumber);
+            }
+          }
+        }
+      }
+      
+      if (!model) {
+        model = 'ZT411'; // 默认型号
+      }
+      
+      return { serialNumber, model, partNumber };
+    } catch (error) {
+      console.error('❌ 条形码识别失败:', error);
+      throw new Error('Barcode recognition failed');
+    }
+  };
+
   const handleCapture = (base64: string) => {
     setCapturedImage(base64);
     
@@ -293,21 +494,23 @@ const App: React.FC = () => {
       if (sessionIndex === 0 && !isSingleRetake) {
         setIsAnalyzing(true);
         const cleanBase64 = base64.split(',')[1];
-        analyzePrinterPhoto(cleanBase64)
+        analyzeWithBarcode(cleanBase64)
           .then(result => { 
             setBaseSerialNumber(result.serialNumber);
             setBaseModel(result.model);
-            setSessionData({ serialNumber: result.serialNumber, model: result.model });
+            setBasePartNumber(result.partNumber || '');
+            setSessionData({ serialNumber: result.serialNumber, model: result.model, partNumber: result.partNumber });
             // Auto-confirm after analysis
             setTimeout(() => {
-              const newData = { serialNumber: result.serialNumber, model: result.model };
+              const newData = { serialNumber: result.serialNumber, model: result.model, partNumber: result.partNumber };
               processConfirmation(base64, newData);
             }, 300);
           })
           .catch(() => { 
-            const fallbackData = { serialNumber: "", model: "ZT411" };
+            const fallbackData = { serialNumber: "", model: "ZT411", partNumber: "" };
             setBaseSerialNumber("");
             setBaseModel("ZT411");
+            setBasePartNumber("");
             setSessionData(fallbackData);
             // Auto-confirm with fallback data
             setTimeout(() => {
@@ -318,7 +521,7 @@ const App: React.FC = () => {
       } else {
         // For Step 2-12, use base serial with suffix
         const suffixedSerial = baseSerialNumber ? `${baseSerialNumber}_${sessionIndex + 1}` : `SERIAL_${sessionIndex + 1}`;
-        const currentData = { serialNumber: suffixedSerial, model: baseModel };
+        const currentData = { serialNumber: suffixedSerial, model: baseModel, partNumber: basePartNumber };
         setSessionData(currentData);
         setTimeout(() => {
           processConfirmation(base64, currentData);
@@ -330,22 +533,24 @@ const App: React.FC = () => {
       if (sessionIndex === 0 && !isSingleRetake) {
         setIsAnalyzing(true);
         const cleanBase64 = base64.split(',')[1];
-        analyzePrinterPhoto(cleanBase64)
+        analyzeWithBarcode(cleanBase64)
           .then(result => { 
             setBaseSerialNumber(result.serialNumber);
             setBaseModel(result.model);
-            setSessionData({ serialNumber: result.serialNumber, model: result.model });
+            setBasePartNumber(result.partNumber || '');
+            setSessionData({ serialNumber: result.serialNumber, model: result.model, partNumber: result.partNumber });
           })
           .catch(() => { 
             setBaseSerialNumber("");
             setBaseModel("ZT411");
-            setSessionData({ serialNumber: "", model: "ZT411" });
+            setBasePartNumber("");
+            setSessionData({ serialNumber: "", model: "ZT411", partNumber: "" });
           })
           .finally(() => setIsAnalyzing(false));
       } else {
         // For Step 2-12, use base serial with suffix
         const suffixedSerial = baseSerialNumber ? `${baseSerialNumber}_${sessionIndex + 1}` : `SERIAL_${sessionIndex + 1}`;
-        setSessionData({ serialNumber: suffixedSerial, model: baseModel });
+        setSessionData({ serialNumber: suffixedSerial, model: baseModel, partNumber: basePartNumber });
         setIsAnalyzing(false);
       }
     }
@@ -427,7 +632,7 @@ const App: React.FC = () => {
         {currentScreen === AppScreen.PROJECT_LIST && <ProjectListScreen projects={projects} printers={printers} onSelectProject={(id) => { setActiveProjectId(id); setCurrentScreen(AppScreen.GALLERY); }} onCreateProject={(name) => setProjects([{ id: `p-${Date.now()}`, name, printerIds: [], createdAt: new Date().toISOString() }, ...projects])} onRenameProject={(id, newName) => setProjects(prev => prev.map(p => p.id === id ? { ...p, name: newName } : p))} onDeleteProject={(id) => { setProjects(prev => prev.filter(p => p.id !== id)); setPrinters(prev => prev.filter(p => p.projectId !== id)); }} onOpenSettings={() => setCurrentScreen(AppScreen.SETTINGS)} user={user} onLogin={handleLogin} onLogout={handleLogout} />}
         {currentScreen === AppScreen.GALLERY && <GalleryScreen user={user} activeProject={activeProject} onLogin={handleLogin} onLogout={handleLogout} printers={activePrinters} onSearch={() => setCurrentScreen(AppScreen.SEARCH)} onAdd={() => { setSessionIndex(0); setSessionPhotos([]); setSessionData(null); setIsSingleRetake(false); setSelectedPrinter(null); setCurrentScreen(AppScreen.CAMERA); }} onSelectPrinter={(p) => { setSelectedPrinter(p); setCurrentScreen(AppScreen.DETAILS); }} onPreviewImage={(url) => { setPreviewPhotos([{url, label: 'Preview', filename: 'p.jpg'}]); setPreviewIndex(0); setLastScreen(AppScreen.GALLERY); setCurrentScreen(AppScreen.PREVIEW); }} onOpenSettings={() => setCurrentScreen(AppScreen.SETTINGS)} onManualSync={performSyncCycle} onBackToProjects={() => setCurrentScreen(AppScreen.PROJECT_LIST)} />}
         {currentScreen === AppScreen.CAMERA && <CameraScreen sessionIndex={sessionIndex} isSingleRetake={isSingleRetake} initialFlash={settings.defaultFlash} onClose={() => { if (sessionPhotos.length > 0 && sessionData) finalizeSession(sessionPhotos, sessionData); else { setCurrentScreen(isSingleRetake ? lastScreen : AppScreen.GALLERY); setIsSingleRetake(false); } }} onCapture={handleCapture} />}
-        {currentScreen === AppScreen.REVIEW && <ReviewScreen imageUrl={capturedImage!} data={sessionData!} isAnalyzing={isAnalyzing} sessionIndex={sessionIndex} isSingleRetake={isSingleRetake} onRetake={() => setCurrentScreen(AppScreen.CAMERA)} onUpdateData={(newData) => { setSessionData(newData); if (sessionIndex === 0 && !isSingleRetake) { setBaseSerialNumber(newData.serialNumber); setBaseModel(newData.model); } }} onConfirm={() => processConfirmation(capturedImage!, sessionData || { serialNumber: 'Manual_SN', model: 'ZT411' })} />}
+        {currentScreen === AppScreen.REVIEW && <ReviewScreen imageUrl={capturedImage!} data={sessionData!} isAnalyzing={isAnalyzing} sessionIndex={sessionIndex} isSingleRetake={isSingleRetake} onRetake={() => setCurrentScreen(AppScreen.CAMERA)} onUpdateData={(newData) => { setSessionData(newData); if (sessionIndex === 0 && !isSingleRetake) { setBaseSerialNumber(newData.serialNumber); setBaseModel(newData.model); setBasePartNumber(newData.partNumber || ''); } }} onConfirm={() => processConfirmation(capturedImage!, sessionData || { serialNumber: 'Manual_SN', model: 'ZT411' })} />}
         {currentScreen === AppScreen.DETAILS && <DetailsScreen printer={selectedPrinter!} viewMode={detailsViewMode} setViewMode={setDetailsViewMode} onBack={() => setCurrentScreen(AppScreen.GALLERY)} onAddPhoto={(idx) => { setSessionIndex(idx); setIsSingleRetake(true); setSessionData({ serialNumber: selectedPrinter!.serialNumber, model: selectedPrinter!.model }); setLastScreen(AppScreen.DETAILS); setCurrentScreen(AppScreen.CAMERA); }} onPreviewImage={(photos, index) => { setPreviewPhotos(photos); setPreviewIndex(index); setLastScreen(AppScreen.DETAILS); setCurrentScreen(AppScreen.PREVIEW); }} onManualSync={performSyncCycle} onUpdatePrinter={updatePrinter} onAllPhotosComplete={() => { setSessionIndex(0); setSessionPhotos([]); setSessionData(null); setBaseSerialNumber(''); setBaseModel('ZT411'); }} isSyncing={selectedPrinter?.isSyncing} user={user} onLogin={handleLogin} onLogout={handleLogout} />}
         {currentScreen === AppScreen.PREVIEW && <ImagePreviewScreen photos={previewPhotos} initialIndex={previewIndex} onBack={() => setCurrentScreen(lastScreen)} onRetake={(idx) => { setSessionIndex(idx); setIsSingleRetake(true); if (selectedPrinter) setSessionData({ serialNumber: selectedPrinter.serialNumber, model: selectedPrinter.model }); setCurrentScreen(AppScreen.CAMERA); }} onReplace={(idx, b64) => { if (!selectedPrinter) return; const currentPhotos = selectedPrinter.photos || []; const updatedPhotos = [...currentPhotos]; updatedPhotos[idx] = { ...updatedPhotos[idx], url: b64, isSynced: false }; const updatedPrinter = { ...selectedPrinter, photos: updatedPhotos, imageUrl: idx === 0 ? b64 : selectedPrinter.imageUrl, syncedCount: updatedPhotos.filter(p => p.isSynced).length }; setPrinters(prev => prev.map(p => p.id === selectedPrinter.id ? updatedPrinter : p)); setSelectedPrinter(updatedPrinter); setPreviewPhotos(updatedPhotos); }} />}
         {currentScreen === AppScreen.SETTINGS && <SettingsScreen settings={settings} onUpdate={setSettings} activeProject={activeProject} onBack={() => setCurrentScreen(activeProjectId ? AppScreen.GALLERY : AppScreen.PROJECT_LIST)} />}
