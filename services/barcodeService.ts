@@ -159,7 +159,34 @@ async function createBarcodeCandidates(base64Images: string[]): Promise<string[]
     const bottomBandZoom = cropBandToBase64(canvas, 0.58, 0.78, 2);
     console.log('🔍 [createBarcodeCandidates] 生成带状候选，共4个');
 
-    candidates.push(base64Image, full, top, bottom, topBand, topBandZoom, bottomBand, bottomBandZoom);
+    // 添加高分辨率缩放版本 - 改进远距离识别（1.5x, 2x, 3x）
+    const upscaleCanvas = (srcCanvas: HTMLCanvasElement, scale: number): string => {
+      const upCanvas = document.createElement('canvas');
+      upCanvas.width = srcCanvas.width * scale;
+      upCanvas.height = srcCanvas.height * scale;
+      const upCtx = upCanvas.getContext('2d');
+      if (upCtx) {
+        upCtx.imageSmoothingEnabled = true;
+        upCtx.drawImage(srcCanvas, 0, 0, srcCanvas.width, srcCanvas.height, 0, 0, upCanvas.width, upCanvas.height);
+      }
+      return canvasToBase64(upCanvas);
+    };
+
+    // 缩放版本用于远距离识别
+    const full1_5x = upscaleCanvas(canvas, 1.5);
+    const full2x = upscaleCanvas(canvas, 2);
+    const full3x = upscaleCanvas(canvas, 3);
+
+    candidates.push(
+      base64Image,      // 原始
+      full,              // 缩放到2400px
+      full1_5x,          // 1.5倍视野
+      full2x,            // 2倍视野
+      full3x,            // 3倍视野（小条码）
+      top, bottom,       // 上下分割
+      topBand, topBandZoom,     // 顶部带状
+      bottomBand, bottomBandZoom // 底部带状
+    );
     console.log('🔍 [createBarcodeCandidates] 总候选数:', candidates.length);
   }
 
@@ -214,16 +241,9 @@ async function decodeBarcodeFromBase64(base64Image: string): Promise<{ text: str
   if (!base64Image) return null;
 
   try {
-    // 第一次尝试：使用 canvas（提供二值化图像给 ZXing）
-    console.log('🔍 [decodeBarcodeFromBase64] 尝试 Canvas 方式...');
-    const canvasResult = await decodeFromCanvas(base64Image);
-    if (canvasResult) {
-      console.log('✅ [decodeBarcodeFromBase64] Canvas 方式成功:', canvasResult.text);
-      return canvasResult;
-    }
-    
-    // 第二次尝试：使用 Image 对象方式
-    console.log('🔍 [decodeBarcodeFromBase64] 尝试 Image 方式...');
+    // 跳过 Canvas 处理（测试发现对比度增强反而破坏识别）
+    // 直接用原始图像的 Image 方法 - 这是最可靠的方式
+    console.log('🔍 [decodeBarcodeFromBase64] 直接使用 Image 方式（跳过Canvas）...');
     const img = await loadImageFromBase64(base64Image);
 
     const reader = getReader();
