@@ -6,8 +6,9 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
+    "build:web": "BASE_URL=/Photo_app/ vite build",
+    "build:mobile": "VITE_CAPACITOR=true vite build && npx cap sync",
     "preview": "vite preview",
-    "build:mobile": "vite build && npx cap sync",
     "ios:build": "npm run build:mobile && npx cap open ios",
     "android:build": "npm run build:mobile && npx cap open android",
     "sync:ios": "npx cap sync ios",
