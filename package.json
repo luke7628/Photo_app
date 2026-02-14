@@ -6,7 +6,7 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
-    "build:web": "BASE_URL=/Photo_app/ vite build",
+    "build:web": "cross-env VITE_BASE_URL=/Photo_app/ vite build",
     "build:mobile": "VITE_CAPACITOR=true vite build && npx cap sync",
     "preview": "vite preview",
     "ios:build": "npm run build:mobile && npx cap open ios",
@@ -31,6 +31,7 @@
   "devDependencies": {
     "@types/node": "^22.14.0",
     "@vitejs/plugin-react": "^5.0.0",
+    "cross-env": "^10.1.0",
     "typescript": "~5.8.2",
     "vite": "^6.2.0"
   }
