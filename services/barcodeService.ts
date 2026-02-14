@@ -1,4 +1,4 @@
-import { BrowserMultiFormatReader, DecodeHintType } from '@zxing/library';
+import { BrowserMultiFormatReader, BarcodeFormat, DecodeHintType } from '@zxing/library';
 import jsQR from 'jsqr';
 import { preprocessImage } from './imagePreprocessor';
 
@@ -22,19 +22,20 @@ function getReader() {
     // 优化识别提示：优先识别 Code128（常用于工业标签）
     const hints = new Map();
     hints.set(DecodeHintType.POSSIBLE_FORMATS, [
-      4, // QR_CODE
-      1, // AZTEC
-      2, // CODABAR
-      4, // CODE_39
-      5, // CODE_93
-      13, // CODE_128（工业常用）
-      26, // DATA_MATRIX
-      33, // EAN_13
-      34, // EAN_8
-      10, // PDF_417
-      20, // UPC_A
-      21  // UPC_E
+      BarcodeFormat.QR_CODE,
+      BarcodeFormat.CODE_128,  // 工业常用
+      BarcodeFormat.CODE_39,
+      BarcodeFormat.CODE_93,
+      BarcodeFormat.EAN_13,
+      BarcodeFormat.EAN_8,
+      BarcodeFormat.UPC_A,
+      BarcodeFormat.UPC_E,
+      BarcodeFormat.CODABAR,
+      BarcodeFormat.DATA_MATRIX,
+      BarcodeFormat.PDF_417,
+      BarcodeFormat.AZTEC
     ]);
+    barcodeReader = new BrowserMultiFormatReader(hints);
   }
   return barcodeReader;
 }
