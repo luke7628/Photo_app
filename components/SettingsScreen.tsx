@@ -15,6 +15,9 @@ const SettingsScreen: React.FC<SettingsScreenProps> = ({ settings, onUpdate, act
   const [reloadProgress, setReloadProgress] = useState(0);
   const [showRebootOverlay, setShowRebootOverlay] = useState(false);
 
+  // localStorage keys that should be preserved during app refresh
+  const USER_DATA_KEYS = ['printers', 'projects', 'settings', 'user'];
+
   const updateField = (field: keyof UserPreferences, value: any) => {
     onUpdate({ ...settings, [field]: value });
   };
@@ -23,7 +26,7 @@ const SettingsScreen: React.FC<SettingsScreenProps> = ({ settings, onUpdate, act
     setIsReloading(true);
     let progress = 0;
     const interval = setInterval(() => {
-      // 模拟下载不稳定的进度感
+      // Simulate download progress with variation
       const increment = Math.random() * 15;
       progress += increment;
       
@@ -31,14 +34,14 @@ const SettingsScreen: React.FC<SettingsScreenProps> = ({ settings, onUpdate, act
         progress = 100;
         clearInterval(interval);
         
-        // 第一阶段：完成下载
+        // Phase 1: Complete download
         setReloadProgress(100);
         
-        // 第二阶段：安装并重启
+        // Phase 2: Install and restart
         setTimeout(() => {
           setShowRebootOverlay(true);
           setTimeout(async () => {
-            // 真实刷新页面 - 针对平台优化
+            // Perform platform-optimized reload
             await reloadApp();
           }, 1500);
         }, 800);
@@ -49,17 +52,19 @@ const SettingsScreen: React.FC<SettingsScreenProps> = ({ settings, onUpdate, act
   };
 
   /**
-   * 刷新应用 - 支持原生移动端和Web端
+   * Reload the application with platform-specific cache clearing
+   * - Native apps: Clear caches and reload with cache-busting timestamp
+   * - Web apps: Clear service workers and force reload
    */
   const reloadApp = async () => {
     const isNative = Capacitor.isNativePlatform();
     
     try {
       if (isNative) {
-        // 原生移动端：清除缓存并重新加载
+        // Native mobile: Clear caches and reload
         console.log('Reloading native app...');
         
-        // 清除所有可能的缓存
+        // Clear all Cache API caches
         if ('caches' in window) {
           const cacheNames = await caches.keys();
           await Promise.all(
@@ -68,25 +73,22 @@ const SettingsScreen: React.FC<SettingsScreenProps> = ({ settings, onUpdate, act
           console.log('Cache cleared:', cacheNames.length, 'caches');
         }
         
-        // 清除 localStorage 中的缓存标记（如果有）
-        // 但保留用户设置和数据
-        const keysToPreserve = ['printers', 'projects', 'settings', 'user'];
+        // Clear localStorage cache entries while preserving user data
         const allKeys = Object.keys(localStorage);
         allKeys.forEach(key => {
-          if (!keysToPreserve.some(preserve => key.includes(preserve))) {
+          if (!USER_DATA_KEYS.some(preserve => key.includes(preserve))) {
             localStorage.removeItem(key);
           }
         });
         
-        // 在原生应用中，使用更强的重新加载
-        // 添加时间戳强制绕过缓存
+        // Reload with cache-busting timestamp
         const timestamp = Date.now();
-        window.location.href = window.location.origin + window.location.pathname + '?t=' + timestamp;
+        window.location.href = `${window.location.origin}${window.location.pathname}?t=${timestamp}`;
       } else {
-        // Web端：清除Service Worker缓存并重新加载
+        // Web: Clear service workers and caches, then reload
         console.log('Reloading web app...');
         
-        // 清除所有缓存
+        // Clear all Cache API caches
         if ('caches' in window) {
           const cacheNames = await caches.keys();
           await Promise.all(
@@ -95,7 +97,7 @@ const SettingsScreen: React.FC<SettingsScreenProps> = ({ settings, onUpdate, act
           console.log('Cache cleared:', cacheNames.length, 'caches');
         }
         
-        // 如果有 Service Worker，先注销再重新加载
+        // Unregister all service workers
         if ('serviceWorker' in navigator) {
           const registrations = await navigator.serviceWorker.getRegistrations();
           await Promise.all(
@@ -104,12 +106,12 @@ const SettingsScreen: React.FC<SettingsScreenProps> = ({ settings, onUpdate, act
           console.log('Service workers unregistered:', registrations.length);
         }
         
-        // 强制重新加载，绕过缓存
+        // Force reload bypassing cache
         window.location.reload();
       }
     } catch (error) {
       console.error('Failed to reload app:', error);
-      // 降级方案：简单重新加载
+      // Fallback: simple reload
       window.location.reload();
     }
   };
