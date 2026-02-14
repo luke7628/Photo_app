@@ -1,6 +1,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { UserPreferences, Project } from '../types';
+import { Capacitor } from '@capacitor/core';
 
 interface SettingsScreenProps {
   settings: UserPreferences;
@@ -18,7 +19,7 @@ const SettingsScreen: React.FC<SettingsScreenProps> = ({ settings, onUpdate, act
     onUpdate({ ...settings, [field]: value });
   };
 
-  const handleReload = () => {
+  const handleReload = async () => {
     setIsReloading(true);
     let progress = 0;
     const interval = setInterval(() => {
@@ -36,15 +37,81 @@ const SettingsScreen: React.FC<SettingsScreenProps> = ({ settings, onUpdate, act
         // 第二阶段：安装并重启
         setTimeout(() => {
           setShowRebootOverlay(true);
-          setTimeout(() => {
-            // 真实刷新页面
-            window.location.reload();
+          setTimeout(async () => {
+            // 真实刷新页面 - 针对平台优化
+            await reloadApp();
           }, 1500);
         }, 800);
       } else {
         setReloadProgress(progress);
       }
     }, 200);
+  };
+
+  /**
+   * 刷新应用 - 支持原生移动端和Web端
+   */
+  const reloadApp = async () => {
+    const isNative = Capacitor.isNativePlatform();
+    
+    try {
+      if (isNative) {
+        // 原生移动端：清除缓存并重新加载
+        console.log('Reloading native app...');
+        
+        // 清除所有可能的缓存
+        if ('caches' in window) {
+          const cacheNames = await caches.keys();
+          await Promise.all(
+            cacheNames.map(cacheName => caches.delete(cacheName))
+          );
+          console.log('Cache cleared:', cacheNames.length, 'caches');
+        }
+        
+        // 清除 localStorage 中的缓存标记（如果有）
+        // 但保留用户设置和数据
+        const keysToPreserve = ['printers', 'projects', 'settings', 'user'];
+        const allKeys = Object.keys(localStorage);
+        allKeys.forEach(key => {
+          if (!keysToPreserve.some(preserve => key.includes(preserve))) {
+            localStorage.removeItem(key);
+          }
+        });
+        
+        // 在原生应用中，使用更强的重新加载
+        // 添加时间戳强制绕过缓存
+        const timestamp = Date.now();
+        window.location.href = window.location.origin + window.location.pathname + '?t=' + timestamp;
+      } else {
+        // Web端：清除Service Worker缓存并重新加载
+        console.log('Reloading web app...');
+        
+        // 清除所有缓存
+        if ('caches' in window) {
+          const cacheNames = await caches.keys();
+          await Promise.all(
+            cacheNames.map(cacheName => caches.delete(cacheName))
+          );
+          console.log('Cache cleared:', cacheNames.length, 'caches');
+        }
+        
+        // 如果有 Service Worker，先注销再重新加载
+        if ('serviceWorker' in navigator) {
+          const registrations = await navigator.serviceWorker.getRegistrations();
+          await Promise.all(
+            registrations.map(registration => registration.unregister())
+          );
+          console.log('Service workers unregistered:', registrations.length);
+        }
+        
+        // 强制重新加载，绕过缓存
+        window.location.reload();
+      }
+    } catch (error) {
+      console.error('Failed to reload app:', error);
+      // 降级方案：简单重新加载
+      window.location.reload();
+    }
   };
 
   const projectName = activeProject?.name || 'My_Project';
