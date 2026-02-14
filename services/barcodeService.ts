@@ -341,10 +341,16 @@ async function decodeFromCanvas(base64Image: string): Promise<{ text: string; fo
     ctx.putImageData(imageData, 0, 0);
     console.log('🔍 [decodeFromCanvas] 二值化完成');
     
-    // 使用 ZXing 解码 canvas
+    // 将 Canvas 转换为 base64 图像
+    const binarizedBase64 = canvas.toDataURL('image/jpeg', 0.95).split(',')[1];
+    console.log('🔍 [decodeFromCanvas] 转换为 base64，长度:', binarizedBase64.length);
+    
+    // 使用 ZXing 解码二值化图像
     const reader = getReader();
-    console.log('🔍 [decodeFromCanvas] 开始 decodeFromCanvas...');
-    const result = await reader.decodeFromCanvas(canvas);
+    const binarizedImg = await loadImageFromBase64(binarizedBase64);
+    console.log('🔍 [decodeFromCanvas] 加载二值化图像');
+    
+    const result = await reader.decodeFromImageElement(binarizedImg);
     console.log('🔍 [decodeFromCanvas] 解码返回:', result);
     
     if (result) {
