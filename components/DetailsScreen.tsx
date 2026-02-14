@@ -1,6 +1,6 @@
 
 import React, { useState } from 'react';
-import { Printer, PHOTO_LABELS, PhotoSetItem, GoogleUser, ViewMode } from '../types';
+import { Printer, PHOTO_LABELS, PhotoSetItem, MicrosoftUser, ViewMode } from '../types';
 
 interface DetailsScreenProps {
   printer: Printer;
@@ -13,7 +13,7 @@ interface DetailsScreenProps {
   onAllPhotosComplete?: () => void; // 12张照片全部完成时的回调
   onUpdatePrinter?: (printerId: string, updates: Partial<Printer>) => void; // 更新printer信息
   isSyncing?: boolean;
-  user: GoogleUser | null;
+  user: MicrosoftUser | null;
   onLogin: () => void;
   onLogout: () => void;
 }
@@ -254,7 +254,7 @@ const DetailsScreen: React.FC<DetailsScreenProps> = ({
                 className="h-10 px-3 bg-slate-100 rounded-xl flex items-center gap-2 text-slate-700 active:scale-95 transition-all"
               >
                 <span className="material-symbols-outlined text-[18px]">login</span>
-                <span className="text-[9px] font-black uppercase tracking-widest whitespace-nowrap">Sign in with Google</span>
+                <span className="text-[9px] font-black uppercase tracking-widest whitespace-nowrap">Sign in with Microsoft</span>
               </button>
             )}
           </div>

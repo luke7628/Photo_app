@@ -1,5 +1,5 @@
 
-import { Project, Printer, GoogleUser, UserPreferences } from '../types';
+import { Project, Printer, MicrosoftUser, UserPreferences } from '../types';
 
 const DB_NAME = 'DematicPhotoDB';
 const STORE_NAME = 'printers';
@@ -34,11 +34,11 @@ export const storageService = {
     return data ? JSON.parse(data) : null;
   },
 
-  saveUser: (user: GoogleUser | null) => {
+  saveUser: (user: MicrosoftUser | null) => {
     if (user) localStorage.setItem(KEYS.USER, JSON.stringify(user));
     else localStorage.removeItem(KEYS.USER);
   },
-  loadUser: (): GoogleUser | null => {
+  loadUser: (): MicrosoftUser | null => {
     const data = localStorage.getItem(KEYS.USER);
     return data ? JSON.parse(data) : null;
   },

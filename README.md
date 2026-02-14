@@ -57,13 +57,13 @@ npm install
 
 ### 2. Configure Cloud Provider (Optional)
 
-你可以选择使用 Google Drive 或 Microsoft OneDrive（或都不使用，仅本地存储）。
+你可以选择使用 Microsoft OneDrive 或 Google Drive（或都不使用，仅本地存储）。
 
-#### 选项 A: Google Drive
-- 详见 README.md 中的 Google Drive 配置部分（原有步骤）
-
-#### 选项 B: Microsoft OneDrive
+#### 选项 A: Microsoft OneDrive (推荐)
 - **详见 [MICROSOFT_SETUP.md](./MICROSOFT_SETUP.md)**
+
+#### 选项 B: Google Drive
+- 详见 README.md 中的 Google Drive 配置部分（原有步骤）
 
 ### 3. Run Development Server
 

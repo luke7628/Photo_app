@@ -1,6 +1,6 @@
 
 import React, { useState, useMemo } from 'react';
-import { Project, GoogleUser, Printer } from '../types';
+import { Project, MicrosoftUser, Printer } from '../types';
 import { getProjectThumbnail, getProjectStats } from '../services/projectUtils';
 
 interface ProjectListScreenProps {
@@ -11,7 +11,7 @@ interface ProjectListScreenProps {
   onRenameProject: (id: string, newName: string) => void;
   onDeleteProject: (id: string) => void;
   onOpenSettings: () => void;
-  user: GoogleUser | null;
+  user: MicrosoftUser | null;
   onLogin: () => void;
   onLogout: () => void;
 }
@@ -60,8 +60,8 @@ const ProjectListScreen: React.FC<ProjectListScreenProps> = ({
               onClick={onLogin}
               className="flex items-center gap-1.5 sm:gap-2 bg-blue-500 hover:bg-blue-600 text-white px-3 sm:px-4 py-2 rounded-lg text-xs font-semibold transition-colors active:scale-95"
             >
-               <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" className="w-4 h-4" alt="G" />
-               <span className="hidden sm:inline">Sign In</span>
+               <span className="material-symbols-outlined text-sm">cloud</span>
+               <span className="hidden sm:inline">Microsoft</span>
             </button>
           )}
           <button 

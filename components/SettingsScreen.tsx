@@ -48,7 +48,8 @@ const SettingsScreen: React.FC<SettingsScreenProps> = ({ settings, onUpdate, act
   };
 
   const projectName = activeProject?.name || 'My_Project';
-  const displayPath = `Google Drive${settings.drivePath}${projectName}/${settings.useSubfoldersBySN ? 'SN_123456/' : ''}`;
+  const cloudServiceName = settings.cloudProvider === 'onedrive' ? 'OneDrive' : settings.cloudProvider === 'drive' ? 'Google Drive' : 'Cloud Storage';
+  const displayPath = `${cloudServiceName}${settings.drivePath}${projectName}/${settings.useSubfoldersBySN ? 'SN_123456/' : ''}`;
 
   return (
     <div className="flex flex-col h-full w-full bg-gray-50 relative">
@@ -132,6 +133,28 @@ const SettingsScreen: React.FC<SettingsScreenProps> = ({ settings, onUpdate, act
             Cloud Storage
           </h2>
           <div className="bg-white rounded-lg sm:rounded-xl p-4 sm:p-5 shadow-sm border border-gray-200 space-y-4">
+            <div className="flex items-center justify-between">
+              <div className="flex-1">
+                <p className="text-sm font-semibold text-gray-900">Cloud Provider</p>
+                <p className="text-xs text-gray-500 mt-0.5">Choose cloud storage service</p>
+              </div>
+              <div className="flex bg-gray-100 p-1 rounded-lg ml-4">
+                {[
+                  { value: 'none', label: 'None' },
+                  { value: 'onedrive', label: 'OneDrive' },
+                  { value: 'drive', label: 'Drive' }
+                ].map(provider => (
+                  <button
+                    key={provider.value}
+                    onClick={() => updateField('cloudProvider', provider.value)}
+                    className={`px-2.5 sm:px-3 py-1 rounded-md text-xs font-semibold whitespace-nowrap transition-all ${settings.cloudProvider === provider.value ? 'bg-white text-blue-500 shadow-sm' : 'text-gray-500'}`}
+                  >
+                    {provider.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+            <div className="h-px bg-gray-100"></div>
             <div className="flex items-center justify-between">
               <div className="flex-1">
                 <p className="text-sm font-semibold text-gray-900">Auto Upload</p>

@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
-import { AppScreen, Printer, Project, PHOTO_LABELS, PhotoSetItem, UserPreferences, GoogleUser, ViewMode } from './types';
+import { AppScreen, Printer, Project, PHOTO_LABELS, PhotoSetItem, UserPreferences, MicrosoftUser, ViewMode } from './types';
 import { MOCK_PRINTERS, MOCK_PROJECTS } from './constants';
 import { storageService } from './services/storageService';
 import { googleDriveService } from './services/googleDriveService';
@@ -18,16 +18,7 @@ import SettingsScreen from './components/SettingsScreen';
 import ProjectListScreen from './components/ProjectListScreen';
 
 // !!! IMPORTANT CONFIGURATION !!!
-// GOOGLE DRIVE SETUP:
-// 1. Go to Google Cloud Console (https://console.cloud.google.com)
-// 2. Create a project or select existing one
-// 3. Enable "Google Drive API" in "APIs & Services" -> "Library"
-// 4. Go to "Credentials", create "OAuth client ID" (Web application)
-// 5. Add "http://localhost:3000" (or your domain) to "Authorized JavaScript origins"
-// 6. Paste the Client ID below:
-const GOOGLE_CLIENT_ID = "YOUR_CLIENT_ID.apps.googleusercontent.com";
-
-// MICROSOFT OneDrive SETUP:
+// MICROSOFT OneDrive SETUP (RECOMMENDED):
 // 1. Go to https://portal.azure.com
 // 2. Navigate to Azure Active Directory → App registrations → New registration
 // 3. Set Redirect URI to "http://localhost:3000/auth/callback" (or your domain)
@@ -39,6 +30,15 @@ const MICROSOFT_CLIENT_ID = "YOUR_MICROSOFT_CLIENT_ID";
 const MICROSOFT_TENANT_ID = "common"; // or your specific tenant ID
 const MICROSOFT_CLIENT_SECRET = "YOUR_MICROSOFT_CLIENT_SECRET";
 const MICROSOFT_REDIRECT_URI = "http://localhost:3000/auth/callback";
+
+// GOOGLE DRIVE SETUP (ALTERNATIVE):
+// 1. Go to Google Cloud Console (https://console.cloud.google.com)
+// 2. Create a project or select existing one
+// 3. Enable "Google Drive API" in "APIs & Services" -> "Library"
+// 4. Go to "Credentials", create "OAuth client ID" (Web application)
+// 5. Add "http://localhost:3000" (or your domain) to "Authorized JavaScript origins"
+// 6. Paste the Client ID below:
+const GOOGLE_CLIENT_ID = "YOUR_CLIENT_ID.apps.googleusercontent.com";
  
 
 const App: React.FC = () => {
@@ -49,9 +49,7 @@ const App: React.FC = () => {
   const [printers, setPrinters] = useState<Printer[]>([]);
   const [selectedPrinter, setSelectedPrinter] = useState<Printer | null>(null);
   const [detailsViewMode, setDetailsViewMode] = useState<ViewMode>(ViewMode.GRID);
-  const [user, setUser] = useState<GoogleUser | null>(null);
-  const [tokenClient, setTokenClient] = useState<any>(null);
-  const [isGoogleReady, setIsGoogleReady] = useState(false);
+  const [user, setUser] = useState<MicrosoftUser | null>(null);
   const [isMicrosoftReady, setIsMicrosoftReady] = useState(false);
   const [settings, setSettings] = useState<UserPreferences>({
     defaultFlash: 'auto',
@@ -60,7 +58,7 @@ const App: React.FC = () => {
     drivePath: '/Dematic/FieldPhotos/',
     useSubfoldersBySN: true,
     imageQuality: 'original',
-    cloudProvider: 'none'
+    cloudProvider: 'onedrive'
   });
 
   const [sessionIndex, setSessionIndex] = useState<number>(0);
@@ -75,51 +73,8 @@ const App: React.FC = () => {
   const [previewIndex, setPreviewIndex] = useState<number>(0);
   const [capturedImage, setCapturedImage] = useState<string | null>(null);
 
-  // Initialize Google OAuth2 Token Client safely
+  // Initialize Microsoft Auth
   useEffect(() => {
-    const initGoogle = () => {
-      if ((window as any).google && (window as any).google.accounts) {
-        setIsGoogleReady(true);
-        try {
-          const client = (window as any).google.accounts.oauth2.initTokenClient({
-            client_id: GOOGLE_CLIENT_ID,
-            scope: 'https://www.googleapis.com/auth/drive.file https://www.googleapis.com/auth/userinfo.profile https://www.googleapis.com/auth/userinfo.email',
-            callback: async (tokenResponse: any) => {
-              if (tokenResponse && tokenResponse.access_token) {
-                googleDriveService.setToken(tokenResponse.access_token);
-                
-                // Fetch User Profile
-                try {
-                  const res = await fetch('https://www.googleapis.com/oauth2/v3/userinfo', {
-                    headers: { Authorization: `Bearer ${tokenResponse.access_token}` }
-                  });
-                  if (!res.ok) throw new Error('Failed to fetch profile');
-                  const profile = await res.json();
-                  const googleUser: GoogleUser = { 
-                    name: profile.name, 
-                    email: profile.email, 
-                    photoUrl: profile.picture 
-                  };
-                  setUser(googleUser);
-                  storageService.saveUser(googleUser);
-                  setSettings(prev => ({ ...prev, cloudProvider: 'drive' }));
-                } catch (e) {
-                  console.error("Profile Fetch Error", e);
-                }
-              }
-            },
-          });
-          setTokenClient(client);
-        } catch (err) {
-          console.error("Google Auth Init Error:", err);
-        }
-      } else {
-        // Retry if script not loaded yet
-        setTimeout(initGoogle, 500);
-      }
-    };
-
-    // 初始化 Microsoft 登录检查（检查是否有缓存 token）
     const initMicrosoft = async () => {
       const hasCachedToken = await microsoftAuthService.initMicrosoft();
       if (hasCachedToken) {
@@ -140,25 +95,10 @@ const App: React.FC = () => {
       setIsMicrosoftReady(true);
     };
 
-    initGoogle();
     initMicrosoft();
-
-    initGoogle();
   }, []);
 
   const handleLogin = useCallback(() => {
-    if (GOOGLE_CLIENT_ID.includes("YOUR_CLIENT_ID")) {
-      alert("Please configure the GOOGLE_CLIENT_ID in App.tsx to enable real login.");
-      return;
-    }
-    if (tokenClient) {
-      tokenClient.requestAccessToken();
-    } else {
-      console.warn("Google Token Client not ready. Check internet connection or API config.");
-    }
-  }, [tokenClient]);
-
-  const handleMicrosoftLogin = useCallback(() => {
     if (MICROSOFT_CLIENT_ID.includes("YOUR_MICROSOFT_CLIENT_ID")) {
       alert("Please configure MICROSOFT_CLIENT_ID in App.tsx to enable Microsoft login.");
       return;
@@ -209,17 +149,14 @@ const App: React.FC = () => {
     });
   }, []);
 
+
+
   const handleLogout = useCallback(() => {
     setUser(null);
     storageService.saveUser(null);
-    googleDriveService.setToken("");
     microsoftAuthService.logout();
     oneDriveService.setToken("");
     setSettings(prev => ({ ...prev, cloudProvider: 'none' }));
-    
-    if ((window as any).google && googleDriveService.accessToken) {
-      (window as any).google.accounts.oauth2.revoke(googleDriveService.accessToken, () => {});
-    }
   }, []);
 
   const updatePrinter = useCallback((printerId: string, updates: Partial<Printer>) => {
@@ -428,11 +365,17 @@ const App: React.FC = () => {
   useEffect(() => {
     let interval: number;
     // Run sync cycle every 5 seconds if conditions met
-    if (settings.autoUpload && user && googleDriveService.accessToken) {
+    const hasGoogleToken = googleDriveService.accessToken;
+    const hasMicrosoftToken = microsoftAuthService.accessToken;
+    const hasValidToken = (settings.cloudProvider === 'drive' && hasGoogleToken) || 
+                         (settings.cloudProvider === 'onedrive' && hasMicrosoftToken) ||
+                         (settings.cloudProvider === 'none' && (hasGoogleToken || hasMicrosoftToken));
+    
+    if (settings.autoUpload && hasValidToken) {
       interval = window.setInterval(performSyncCycle, 5000); 
     }
     return () => clearInterval(interval);
-  }, [settings.autoUpload, user, performSyncCycle]);
+  }, [settings.autoUpload, settings.cloudProvider, user, performSyncCycle]);
 
   /**
    * 简化的条形码识别

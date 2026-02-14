@@ -1,9 +1,9 @@
 
 import React, { useState, useMemo, memo, useEffect } from 'react';
-import { Printer, GoogleUser, Project } from '../types';
+import { Printer, MicrosoftUser, Project } from '../types';
 
 interface GalleryScreenProps {
-  user: GoogleUser | null;
+  user: MicrosoftUser | null;
   activeProject?: Project;
   onLogin: () => void;
   onLogout: () => void;
@@ -177,7 +177,7 @@ const GalleryScreen: React.FC<GalleryScreenProps> = ({
                 style={rotationStyle} 
                 className="h-9 px-4 bg-blue-500 text-white rounded-lg text-xs font-semibold hover:bg-blue-600 transition-colors"
               >
-                Sign In
+                Microsoft
               </button>
             )}
             <button 

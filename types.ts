@@ -18,7 +18,7 @@ export interface UserPreferences {
   cloudProvider?: 'none' | 'drive' | 'onedrive'; // 云盘供应商
 }
 
-export interface GoogleUser {
+export interface MicrosoftUser {
   name: string;
   email: string;
   photoUrl: string;
