@@ -74,47 +74,56 @@ function canvasToBase64(canvas: HTMLCanvasElement, quality = 0.9): string {
   return canvas.toDataURL('image/jpeg', quality).split(',')[1] || '';
 }
 
-async function createBarcodeCandidates(base64Image: string): Promise<string[]> {
-  if (!base64Image) return [];
+async function createBarcodeCandidates(base64Images: string[]): Promise<string[]> {
+  const candidates: string[] = [];
 
-  const img = await loadImageFromBase64(base64Image);
-  const maxWidth = 1600;
-  const scale = img.width > maxWidth ? maxWidth / img.width : 1;
+  for (const base64Image of base64Images) {
+    if (!base64Image) continue;
 
-  const scaledWidth = Math.max(1, Math.round(img.width * scale));
-  const scaledHeight = Math.max(1, Math.round(img.height * scale));
+    const img = await loadImageFromBase64(base64Image);
+    const maxWidth = 1600;
+    const scale = img.width > maxWidth ? maxWidth / img.width : 1;
 
-  const canvas = document.createElement('canvas');
-  const ctx = canvas.getContext('2d');
-  if (!ctx) return [base64Image];
+    const scaledWidth = Math.max(1, Math.round(img.width * scale));
+    const scaledHeight = Math.max(1, Math.round(img.height * scale));
 
-  canvas.width = scaledWidth;
-  canvas.height = scaledHeight;
-  ctx.drawImage(img, 0, 0, scaledWidth, scaledHeight);
+    const canvas = document.createElement('canvas');
+    const ctx = canvas.getContext('2d');
+    if (!ctx) {
+      candidates.push(base64Image);
+      continue;
+    }
 
-  const full = canvasToBase64(canvas);
+    canvas.width = scaledWidth;
+    canvas.height = scaledHeight;
+    ctx.drawImage(img, 0, 0, scaledWidth, scaledHeight);
 
-  // Top half (serial number label)
-  const topCanvas = document.createElement('canvas');
-  topCanvas.width = scaledWidth;
-  topCanvas.height = Math.max(1, Math.round(scaledHeight * 0.55));
-  const topCtx = topCanvas.getContext('2d');
-  if (topCtx) {
-    topCtx.drawImage(canvas, 0, 0, scaledWidth, topCanvas.height, 0, 0, scaledWidth, topCanvas.height);
+    const full = canvasToBase64(canvas);
+
+    // Top half (serial number label)
+    const topCanvas = document.createElement('canvas');
+    topCanvas.width = scaledWidth;
+    topCanvas.height = Math.max(1, Math.round(scaledHeight * 0.55));
+    const topCtx = topCanvas.getContext('2d');
+    if (topCtx) {
+      topCtx.drawImage(canvas, 0, 0, scaledWidth, topCanvas.height, 0, 0, scaledWidth, topCanvas.height);
+    }
+    const top = topCtx ? canvasToBase64(topCanvas) : '';
+
+    // Bottom half (part number label)
+    const bottomCanvas = document.createElement('canvas');
+    bottomCanvas.width = scaledWidth;
+    bottomCanvas.height = Math.max(1, scaledHeight - topCanvas.height);
+    const bottomCtx = bottomCanvas.getContext('2d');
+    if (bottomCtx) {
+      bottomCtx.drawImage(canvas, 0, topCanvas.height, scaledWidth, bottomCanvas.height, 0, 0, scaledWidth, bottomCanvas.height);
+    }
+    const bottom = bottomCtx ? canvasToBase64(bottomCanvas) : '';
+
+    candidates.push(base64Image, full, top, bottom);
   }
-  const top = topCtx ? canvasToBase64(topCanvas) : '';
 
-  // Bottom half (part number label)
-  const bottomCanvas = document.createElement('canvas');
-  bottomCanvas.width = scaledWidth;
-  bottomCanvas.height = Math.max(1, scaledHeight - topCanvas.height);
-  const bottomCtx = bottomCanvas.getContext('2d');
-  if (bottomCtx) {
-    bottomCtx.drawImage(canvas, 0, topCanvas.height, scaledWidth, bottomCanvas.height, 0, 0, scaledWidth, bottomCanvas.height);
-  }
-  const bottom = bottomCtx ? canvasToBase64(bottomCanvas) : '';
-
-  return uniqueBase64List([base64Image, full, top, bottom]);
+  return uniqueBase64List(candidates);
 }
 
 async function decodeWithBarcodeDetector(base64Image: string): Promise<BarcodeResult[]> {
@@ -168,6 +177,22 @@ async function decodeBarcodeFromBase64(base64Image: string): Promise<{ text: str
 
   try {
     const reader = getReader();
+    const multiDecode = (reader as any).decodeMultipleFromImageElement as ((el: HTMLImageElement) => any) | undefined;
+
+    if (multiDecode) {
+      const results = await multiDecode(img);
+      if (Array.isArray(results) && results.length > 0) {
+        const first = results.find((res: any) => res?.getText?.()) || results[0];
+        const text = first?.getText?.()?.trim();
+        if (!text) return null;
+        return {
+          text,
+          format: first.getBarcodeFormat?.toString() || 'UNKNOWN'
+        };
+      }
+      return null;
+    }
+
     const result = await reader.decodeFromImageElement(img);
     const text = result?.getText?.()?.trim();
     if (!text) return null;
@@ -202,7 +227,10 @@ export async function readBarcode(base64Image: string): Promise<BarcodeResult[]>
     // 预处理图像以提高识别率
     const processedImage = await preprocessImage(normalizedBase64);
 
-    const barcodeCandidates = await createBarcodeCandidates(processedImage || normalizedBase64);
+    const barcodeCandidates = await createBarcodeCandidates([
+      normalizedBase64,
+      processedImage || ''
+    ]);
 
     // 0. 尝试原生 BarcodeDetector（部分移动端更稳定）
     try {
