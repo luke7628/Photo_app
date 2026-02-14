@@ -399,23 +399,29 @@ const App: React.FC = () => {
 
   const analyzeWithBarcode = async (base64Image: string): Promise<{ serialNumber: string; model: string; partNumber: string }> => {
     try {
-      console.log('📊 尝试条形码和QR码识别...');
+      console.log('📊 [analyzeWithBarcode] 开始...输入长度:', base64Image.length);
       const barcodeResults = await readBarcode(base64Image);
+      console.log('📊 [analyzeWithBarcode] readBarcode 返回:', barcodeResults.length, '个结果');
       
       let serialNumber = '';
       let model = '';
       let partNumber = '';
 
       const parsePayload = (payload: string) => {
+        console.log('📊 [parsePayload] 输入:', payload);
         const parts = payload
           .toUpperCase()
           .split(/[\n|;]+/)
           .map(p => p.trim())
           .filter(Boolean);
 
-        parts.forEach(part => {
+        console.log('📊 [parsePayload] 分割后:', parts.length, '部分', parts);
+
+        parts.forEach((part, idx) => {
+          console.log(`📊 [parsePayload] 处理部分 ${idx}:`, part);
           const compact = part.replace(/\s+/g, '');
           const cleaned = compact.replace(/[^A-Z0-9-_]/g, '');
+          console.log(`📊 [parsePayload] 清理后:`, cleaned);
 
           if (!partNumber) {
             const partMatch = cleaned.match(/ZT4(11|21)\d{2,3}[-_]?[A-Z0-9]+/i);
@@ -425,7 +431,7 @@ const App: React.FC = () => {
                 normalized = `${normalized.slice(0, 7)}-${normalized.slice(7)}`;
               }
               partNumber = normalized;
-              console.log('识别为部件号:', partNumber);
+              console.log('✅ [parsePayload] 识别为部件号:', partNumber);
             }
           }
 
@@ -433,7 +439,7 @@ const App: React.FC = () => {
             const labeledSerial = cleaned.match(/SN[:=]?([A-Z0-9-]{8,})/i);
             if (labeledSerial) {
               serialNumber = labeledSerial[1];
-              console.log('识别为序列号:', serialNumber);
+              console.log('✅ [parsePayload] 识别为序列号（带标签）:', serialNumber);
             }
           }
 
@@ -441,21 +447,28 @@ const App: React.FC = () => {
             const serialMatch = cleaned.match(/[A-Z0-9]{2}[A-Z]\d{9}/i) || cleaned.match(/\d{10,15}/);
             if (serialMatch) {
               serialNumber = serialMatch[0];
-              console.log('识别为序列号:', serialNumber);
+              console.log('✅ [parsePayload] 识别为序列号（正则）:', serialNumber);
             }
           }
         });
+        
+        console.log('📊 [parsePayload] 完成，最终: SN=', serialNumber, ', PN=', partNumber);
       };
       
       if (barcodeResults && barcodeResults.length > 0) {
-        console.log(`✅ 找到 ${barcodeResults.length} 个条码:`, barcodeResults);
+        console.log(`✅ [analyzeWithBarcode] 找到 ${barcodeResults.length} 个条码:`, barcodeResults);
         
         // 解析条形码/QR码结果
         for (const result of barcodeResults) {
-          if (!result.value) continue;
-          console.log(result.type === 'qrcode' ? 'QR码内容:' : '条形码内容:', result.value);
+          if (!result.value) {
+            console.log('⚠️ [analyzeWithBarcode] 跳过空值结果');
+            continue;
+          }
+          console.log('[analyzeWithBarcode] ' + (result.type === 'qrcode' ? 'QR码内容:' : '条形码内容:'), result.value);
           parsePayload(result.value);
         }
+      } else {
+        console.log('❌ [analyzeWithBarcode] 未找到条码结果');
       }
       
       if (!model && partNumber) {
@@ -463,65 +476,78 @@ const App: React.FC = () => {
       }
       if (!model) model = 'ZT411';
       
+      console.log('📊 [analyzeWithBarcode] 最终返回:', { serialNumber, model, partNumber });
       return { serialNumber, model, partNumber };
     } catch (error) {
-      console.error('❌ 条形码识别失败:', error);
+      console.error('❌ [analyzeWithBarcode] 条形码识别失败:', error);
       throw new Error('Barcode recognition failed');
     }
   };
 
   const handleCapture = (base64: string) => {
+    console.log('📸 [handleCapture] 收到图像，长度:', base64.length);
     setCapturedImage(base64);
     
     if (settings.skipReview) {
       // Skip review screen if configured
       if (sessionIndex === 0 && !isSingleRetake) {
+        console.log('📸 [handleCapture] skipReview=true，sessionIndex=0， 开始分析...');
         setIsAnalyzing(true);
         const cleanBase64 = base64.split(',')[1];
         analyzeWithBarcode(cleanBase64)
           .then(result => { 
+            console.log('📸 [handleCapture] 分析成功，结果:', result);
             setBaseSerialNumber(result.serialNumber);
             setBasePartNumber(result.partNumber || '');
             setSessionData({ serialNumber: result.serialNumber, model: result.model, partNumber: result.partNumber });
             // Auto-confirm after analysis
             setTimeout(() => {
               const newData = { serialNumber: result.serialNumber, model: result.model, partNumber: result.partNumber };
+              console.log('📸 [handleCapture] 自动确认，数据:', newData);
               processConfirmation(base64, newData);
             }, 300);
           })
-          .catch(() => { 
+          .catch((error) => { 
+            console.error('📸 [handleCapture] 分析失败:', error);
             const fallbackData = { serialNumber: "", model: "ZT411", partNumber: "" };
             setBaseSerialNumber("");
             setBasePartNumber("");
             setSessionData(fallbackData);
             // Auto-confirm with fallback data
             setTimeout(() => {
+              console.log('📸 [handleCapture] 使用默认数据确认');
               processConfirmation(base64, fallbackData);
             }, 300);
           })
           .finally(() => setIsAnalyzing(false));
       } else {
+        console.log('📸 [handleCapture] skipReview=true，但不是第一张图或单次重拍');
         // For Step 2-12, use base serial with suffix
         const suffixedSerial = baseSerialNumber ? `${baseSerialNumber}_${sessionIndex + 1}` : `SERIAL_${sessionIndex + 1}`;
         const currentData = { serialNumber: suffixedSerial, model: inferModelFromPartNumber(basePartNumber || 'ZT411'), partNumber: basePartNumber };
         setSessionData(currentData);
         setTimeout(() => {
+          console.log('📸 [handleCapture] 确认后续图像');
           processConfirmation(base64, currentData);
         }, 100);
       }
     } else {
       // Show review screen if skipReview is false
+      console.log('📸 [handleCapture] skipReview=false，显示审查屏幕');
       setCurrentScreen(AppScreen.REVIEW);
       if (sessionIndex === 0 && !isSingleRetake) {
+        console.log('📸 [handleCapture] 首次拍摄，开始分析...');
         setIsAnalyzing(true);
         const cleanBase64 = base64.split(',')[1];
         analyzeWithBarcode(cleanBase64)
           .then(result => { 
+            console.log('📸 [handleCapture] 分析成功，设置sessionData:', result);
             setBaseSerialNumber(result.serialNumber);
             setBasePartNumber(result.partNumber || '');
             setSessionData({ serialNumber: result.serialNumber, model: result.model, partNumber: result.partNumber });
           })
-          .catch(() => { 
+          .catch((error) => { 
+            console.error('📸 [handleCapture] 分析失败:', error);
             setBaseSerialNumber("");
             setBasePartNumber("");
             setSessionData({ serialNumber: "", model: "ZT411", partNumber: "" });

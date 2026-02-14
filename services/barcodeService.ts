@@ -256,34 +256,46 @@ export async function readBarcode(base64Image: string): Promise<BarcodeResult[]>
   const results: BarcodeResult[] = [];
   
   try {
+    console.log('🔍 [readBarcode] 开始识别，输入长度:', base64Image.length);
     const normalizedBase64 = normalizeBase64(base64Image);
+    console.log('🔍 [readBarcode] 规范化后长度:', normalizedBase64.length);
+    
     // 预处理图像以提高识别率
     const processedImage = await preprocessImage(normalizedBase64);
+    console.log('🔍 [readBarcode] 预处理完成，输出长度:', processedImage?.length);
 
     const barcodeCandidates = await createBarcodeCandidates([
       normalizedBase64,
       processedImage || ''
     ]);
+    console.log('🔍 [readBarcode] 生成候选接收', barcodeCandidates.length, '个');
 
     // 0. 尝试原生 BarcodeDetector（部分移动端更稳定）
     try {
+      console.log('🔍 [readBarcode] 尝试 BarcodeDetector...');
       for (const candidate of barcodeCandidates) {
         const detectorResults = await decodeWithBarcodeDetector(candidate);
-        detectorResults.forEach(r => addUniqueResult(results, r));
+        console.log('🔍 [readBarcode] BarcodeDetector 返回:', detectorResults.length, '个结果');
+        detectorResults.forEach(r => {
+          console.log('🔍 [readBarcode] 添加BarcodeDetector结果:', r.value);
+          addUniqueResult(results, r);
+        });
         if (detectorResults.length > 0) {
           console.log('✅ BarcodeDetector 识别成功:', detectorResults.map(r => r.value));
         }
         if (results.length >= 2) break;
       }
     } catch (error) {
-      console.log('ℹ️ BarcodeDetector 不可用或识别失败');
+      console.log('ℹ️ BarcodeDetector 不可用或识别失败:', error);
     }
     
     // 1. 尝试识别条形码（Code128, EAN等）
     try {
+      console.log('🔍 [readBarcode] 尝试 ZXing...');
       for (const candidate of barcodeCandidates) {
         const decoded = await decodeBarcodeFromBase64(candidate);
         if (decoded) {
+          console.log('🔍 [readBarcode] ZXing 返回:', decoded.text);
           addUniqueResult(results, {
             type: 'barcode',
             value: decoded.text,
@@ -294,29 +306,36 @@ export async function readBarcode(base64Image: string): Promise<BarcodeResult[]>
         if (results.length >= 2) break;
       }
     } catch (error) {
-      console.log('ℹ️ Code128/EAN条形码未找到或识别失败');
+      console.log('ℹ️ Code128/EAN条形码未找到或识别失败:', error);
     }
     
     // 2. 尝试识别 QR 码（优先使用预处理图像，失败则尝试原图）
     try {
+      console.log('🔍 [readBarcode] 尝试 jsQR...');
       let qrResult = await readQRCode(processedImage || normalizedBase64);
       if (!qrResult && processedImage !== normalizedBase64) {
+        console.log('🔍 [readBarcode] jsQR在预处理图像失败，尝试原图...');
         qrResult = await readQRCode(normalizedBase64);
       }
       if (qrResult) {
+        console.log('🔍 [readBarcode] jsQR 返回:', qrResult);
         addUniqueResult(results, {
           type: 'qrcode',
           value: qrResult
         });
         console.log('✅ QR码识别成功:', qrResult);
+      } else {
+        console.log('🔍 [readBarcode] jsQR 无结果');
       }
     } catch (error) {
-      console.log('ℹ️ QR码未找到');
+      console.log('ℹ️ QR码未找到:', error);
     }
     
+    console.log('🔍 [readBarcode] 返回结果数:', results.length, 'results:', results);
     return results;
   } catch (error) {
     console.error('条形码识别错误:', error);
+    console.log('🔍 [readBarcode] 返回空结果数组');
     return results;
   }
 }
