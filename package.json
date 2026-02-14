@@ -6,9 +6,22 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "build:mobile": "vite build && npx cap sync",
+    "ios:build": "npm run build:mobile && npx cap open ios",
+    "android:build": "npm run build:mobile && npx cap open android",
+    "sync:ios": "npx cap sync ios",
+    "sync:android": "npx cap sync android",
+    "sync:both": "npx cap sync"
   },
   "dependencies": {
+    "@capacitor/android": "^8.1.0",
+    "@capacitor/app": "^8.0.1",
+    "@capacitor/camera": "^8.0.1",
+    "@capacitor/cli": "^8.1.0",
+    "@capacitor/core": "^8.1.0",
+    "@capacitor/ios": "^8.1.0",
+    "@capacitor/keyboard": "^8.0.0",
     "@zxing/library": "^0.21.3",
     "jsqr": "^1.4.0",
     "react": "^19.2.4",
