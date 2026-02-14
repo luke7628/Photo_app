@@ -14,7 +14,8 @@ const SearchScreen: React.FC<SearchScreenProps> = ({ printers, onBack, onPreview
 
   const filteredResults = printers.filter(p => {
     const matchesQuery = p.serialNumber.toLowerCase().includes(query.toLowerCase()) || 
-                         p.site.toLowerCase().includes(query.toLowerCase());
+               p.site.toLowerCase().includes(query.toLowerCase()) ||
+               (p.partNumber || '').toLowerCase().includes(query.toLowerCase());
     const matchesFilter = filter === 'ALL' || p.model === filter;
     return matchesQuery && matchesFilter;
   });
@@ -45,7 +46,7 @@ const SearchScreen: React.FC<SearchScreenProps> = ({ printers, onBack, onPreview
             <span className="material-symbols-outlined text-sage text-[24px]">search</span>
             <input 
               className="flex-1 border-none bg-transparent focus:ring-0 text-base font-semibold p-0 placeholder:text-slate-400"
-              placeholder="Search serial, model, or site"
+              placeholder="Search serial, part number, or site"
               value={query}
               onChange={(e) => setQuery(e.target.value)}
               autoFocus
@@ -84,7 +85,7 @@ const SearchScreen: React.FC<SearchScreenProps> = ({ printers, onBack, onPreview
           </div>
           <div className="col-span-3 text-center flex items-center justify-center gap-1.5">
             <span className="material-symbols-outlined text-[10px] text-slate-400">precision_manufacturing</span>
-            <p className="text-slate-400 text-[10px] font-bold uppercase tracking-widest">Model</p>
+            <p className="text-slate-400 text-[10px] font-bold uppercase tracking-widest">Part Number</p>
           </div>
           <div className="col-span-4 text-right flex items-center justify-end gap-1.5">
             <span className="material-symbols-outlined text-[10px] text-slate-400">factory</span>
@@ -114,7 +115,7 @@ const SearchScreen: React.FC<SearchScreenProps> = ({ printers, onBack, onPreview
             </div>
             <div className="col-span-3 text-center">
               <span className="inline-block px-2.5 py-1 rounded-lg bg-slate-100 text-slate-600 text-[10px] font-black uppercase tracking-tighter">
-                {p.model}
+                {p.partNumber || p.model}
               </span>
             </div>
             <div className="col-span-4 text-right flex flex-col items-end">

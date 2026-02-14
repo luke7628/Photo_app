@@ -69,7 +69,7 @@ const PrinterItem = memo(({
           </span>
         </div>
         <div className="flex items-center gap-1.5 mt-1">
-          <span className={`text-[10px] font-medium px-2 py-0.5 bg-gray-100 text-gray-600 rounded-lg transition-colors`}>{printer.model}</span>
+          <span className={`text-[10px] font-medium px-2 py-0.5 bg-gray-100 text-gray-600 rounded-lg transition-colors`}>{printer.partNumber || printer.model}</span>
           {!isLandscape && <span className={`text-[10px] font-medium text-gray-500 truncate opacity-60`}>{printer.site}</span>}
         </div>
       </div>
@@ -118,6 +118,7 @@ const GalleryScreen: React.FC<GalleryScreenProps> = ({
       result = result.filter(p => 
         p.serialNumber.toLowerCase().includes(term) || 
         p.model.toLowerCase().includes(term) ||
+        (p.partNumber || '').toLowerCase().includes(term) ||
         p.site.toLowerCase().includes(term)
       );
     }
@@ -206,7 +207,7 @@ const GalleryScreen: React.FC<GalleryScreenProps> = ({
                 type="text"
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                placeholder="Search by SN, model or site"
+                placeholder="Search by SN, part number or site"
                 className="flex-1 bg-transparent outline-none text-sm font-medium text-gray-700 placeholder:text-gray-400"
               />
               {searchTerm && (

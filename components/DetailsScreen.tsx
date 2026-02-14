@@ -48,7 +48,7 @@ const DetailsScreen: React.FC<DetailsScreenProps> = ({
   const [showUserMenu, setShowUserMenu] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
   const [editSerial, setEditSerial] = useState('');
-  const [editModel, setEditModel] = useState('');
+  const [editPartNumber, setEditPartNumber] = useState('');
 
   // Use printer's actual photos, filling with labels
   const photos: PhotoSetItem[] = printer.photos || Array.from({ length: 12 }, (_, i) => ({
@@ -183,17 +183,20 @@ const DetailsScreen: React.FC<DetailsScreenProps> = ({
 
   const handleOpenEdit = () => {
     setEditSerial(printer.serialNumber);
-    setEditModel(printer.model);
+    setEditPartNumber(printer.partNumber || '');
     setShowEditModal(true);
   };
 
   const handleSaveEdit = () => {
-    if (!editSerial.trim() || !editModel.trim()) {
+    if (!editSerial.trim() || !editPartNumber.trim()) {
       return;
     }
+    const normalizedPart = editPartNumber.trim().toUpperCase();
+    const inferredModel = normalizedPart.includes('ZT421') ? 'ZT421' : 'ZT411';
     onUpdatePrinter?.(printer.id, {
       serialNumber: editSerial.trim(),
-      model: editModel.trim()
+      partNumber: normalizedPart,
+      model: inferredModel
     });
     setShowEditModal(false);
   };
@@ -265,7 +268,7 @@ const DetailsScreen: React.FC<DetailsScreenProps> = ({
           <button
             onClick={handleOpenEdit}
             className="absolute top-2 right-2 size-7 rounded-lg bg-white border border-blue-300 flex items-center justify-center hover:bg-blue-50 transition-all active:scale-95"
-            title="Edit Serial Number & Model"
+            title="Edit Serial Number & Part Number"
           >
             <span className="material-symbols-outlined text-blue-500 text-sm">edit</span>
           </button>
@@ -278,9 +281,9 @@ const DetailsScreen: React.FC<DetailsScreenProps> = ({
               </div>
             </div>
             <div className="flex-shrink-0 flex flex-col">
-              <div className="text-xs font-bold text-blue-600 uppercase tracking-wider h-4 flex items-center">Model Type</div>
+              <div className="text-xs font-bold text-blue-600 uppercase tracking-wider h-4 flex items-center">Part Number</div>
               <div className="text-base font-black text-gray-700 tracking-wide uppercase whitespace-nowrap leading-tight">
-                {printer.model}
+                {printer.partNumber || 'N/A'}
               </div>
             </div>
           </div>
@@ -385,14 +388,14 @@ const DetailsScreen: React.FC<DetailsScreenProps> = ({
 
               <div>
                 <label className="block text-xs font-bold text-gray-600 uppercase tracking-wider mb-2">
-                  Model Type
+                  Part Number
                 </label>
                 <input
                   type="text"
-                  value={editModel}
-                  onChange={(e) => setEditModel(e.target.value.toUpperCase())}
+                  value={editPartNumber}
+                  onChange={(e) => setEditPartNumber(e.target.value.toUpperCase())}
                   className="w-full h-12 px-4 bg-gray-50 border-2 border-gray-200 rounded-xl font-black text-gray-900 uppercase focus:outline-none focus:border-blue-400 transition-colors"
-                  placeholder="Enter model type"
+                  placeholder="Enter part number"
                 />
               </div>
             </div>
@@ -407,7 +410,7 @@ const DetailsScreen: React.FC<DetailsScreenProps> = ({
               <button
                 onClick={handleSaveEdit}
                 className="flex-1 h-12 bg-blue-500 text-white rounded-xl font-black text-sm hover:bg-blue-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                disabled={!editSerial.trim() || !editModel.trim()}
+                disabled={!editSerial.trim() || !editPartNumber.trim()}
               >
                 Save
               </button>

@@ -1,8 +1,6 @@
 
 import React, { useState, useRef, useEffect } from 'react';
 import { PHOTO_LABELS } from '../types';
-import ModelSelector from './ModelSelector';
-import { recordModelUsage } from '../services/modelMemoryService';
 
 interface ReviewScreenProps {
   imageUrl: string;
@@ -27,7 +25,6 @@ const ReviewScreen: React.FC<ReviewScreenProps> = ({ imageUrl, data, isAnalyzing
   // Edit Modal State
   const [showEditModal, setShowEditModal] = useState(false);
   const [editSerial, setEditSerial] = useState('');
-  const [editModel, setEditModel] = useState('');
   const [editPartNumber, setEditPartNumber] = useState('');
 
   // Validation & Animation
@@ -48,12 +45,18 @@ const ReviewScreen: React.FC<ReviewScreenProps> = ({ imageUrl, data, isAnalyzing
     return () => window.removeEventListener('deviceorientation', handleOrientation);
   }, []);
 
-  const hasValidData = !isAnalyzing && data?.serialNumber && data.serialNumber.trim().length > 0 && data?.model && data.model.trim().length > 0;
+  const hasValidData = !isAnalyzing && data?.serialNumber && data.serialNumber.trim().length > 0 && data?.partNumber && data.partNumber.trim().length > 0;
+
+  const inferModelFromPartNumber = (value: string): string => {
+    const upper = value.toUpperCase();
+    if (upper.includes('ZT421')) return 'ZT421';
+    if (upper.includes('ZT411')) return 'ZT411';
+    return 'ZT411';
+  };
 
   const handleOpenEdit = () => {
     if (isAnalyzing) return;
     setEditSerial(data?.serialNumber || '');
-    setEditModel(sessionIndex === 0 ? '' : (data?.model || ''));
     setEditPartNumber(data?.partNumber || '');
     setModalError(false);
     setShowEditModal(true);
@@ -64,12 +67,12 @@ const ReviewScreen: React.FC<ReviewScreenProps> = ({ imageUrl, data, isAnalyzing
       setModalError(true);
       return;
     }
-    if (!editModel) {
+    if (!editPartNumber || !editPartNumber.trim()) {
       setModalError(true);
       return;
     }
-    recordModelUsage(editModel);
-    onUpdateData({ serialNumber: editSerial.toUpperCase(), model: editModel, partNumber: editPartNumber.toUpperCase() });
+    const normalizedPart = editPartNumber.toUpperCase();
+    onUpdateData({ serialNumber: editSerial.toUpperCase(), model: inferModelFromPartNumber(normalizedPart), partNumber: normalizedPart });
     setShowEditModal(false);
   };
 
@@ -195,7 +198,7 @@ const ReviewScreen: React.FC<ReviewScreenProps> = ({ imageUrl, data, isAnalyzing
                </div>
                <div className="flex items-center gap-1 bg-white/60 px-2 py-1 rounded-lg border border-gray-200" style={rotationStyle}>
                   <span className="material-symbols-outlined text-[10px] text-gray-400 leading-none">edit</span>
-                  <span className="text-[10px] font-bold text-gray-900 leading-none uppercase">{data?.model || 'ZT411'}</span>
+                  <span className="text-[10px] font-bold text-gray-900 leading-none uppercase">{data?.partNumber || 'N/A'}</span>
                </div>
             </div>
             
@@ -358,29 +361,19 @@ const ReviewScreen: React.FC<ReviewScreenProps> = ({ imageUrl, data, isAnalyzing
                 </div>
                 
                 <div>
-                  <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest block mb-2">Model Type</label>
-                  <div className={`transition-all ${modalError && editSerial && editSerial.trim() && !editModel ? 'ring-2 ring-red-400 rounded-lg p-2' : ''}`}>
-                    <ModelSelector
-                      standardModels={['ZT411', 'ZT421']}
-                      value={editModel}
-                      onChange={(model) => {
-                        setEditModel(model);
-                        setModalError(false);
-                      }}
-                      onError={(msg) => console.warn(msg)}
-                    />
-                  </div>
-                </div>
-
-                <div>
-                  <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest block mb-2">Part Number (Optional)</label>
+                  <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest block mb-2">Part Number</label>
                   <input 
                     value={editPartNumber}
                     onChange={(e) => {
                       setEditPartNumber(e.target.value.toUpperCase());
+                      setModalError(false);
                     }}
                     placeholder="e.g. ZT41142-T010000Z"
-                    className="w-full h-12 px-4 bg-gray-100 rounded-lg border-2 border-transparent text-base font-black uppercase tracking-widest placeholder:text-gray-400 focus:outline-none focus:border-primary/50 text-gray-800 transition-all"
+                    className={`w-full h-12 px-4 bg-gray-100 rounded-lg border-2 text-base font-black uppercase tracking-widest placeholder:text-gray-400 focus:outline-none transition-all ${
+                      modalError && editSerial && editSerial.trim() && (!editPartNumber || !editPartNumber.trim())
+                        ? 'border-red-400 bg-red-50 text-red-500 animate-pulse'
+                        : 'border-transparent focus:border-primary/50 text-gray-800'
+                    }`}
                   />
                 </div>
               </div>
@@ -391,9 +384,9 @@ const ReviewScreen: React.FC<ReviewScreenProps> = ({ imageUrl, data, isAnalyzing
                 </div>
               )}
               
-              {modalError && editSerial && editSerial.trim() && !editModel && (
+              {modalError && editSerial && editSerial.trim() && (!editPartNumber || !editPartNumber.trim()) && (
                 <div className="mb-3 px-3 py-2 bg-red-50 border border-red-200 rounded-lg">
-                  <p className="text-xs font-bold text-red-600 text-center">Please select Model Type</p>
+                  <p className="text-xs font-bold text-red-600 text-center">Please enter Part Number</p>
                 </div>
               )}
 
@@ -407,7 +400,7 @@ const ReviewScreen: React.FC<ReviewScreenProps> = ({ imageUrl, data, isAnalyzing
                 <button 
                   onClick={handleSaveEdit}
                   className={`flex-[1.5] h-12 rounded-lg font-black uppercase text-[10px] tracking-widest transition-all ${
-                    editModel
+                    editPartNumber && editPartNumber.trim()
                     ? 'bg-blue-500 text-white shadow-lg shadow-blue-500/20 active:scale-95 hover:brightness-105' 
                     : 'bg-gray-300 text-gray-500 cursor-not-allowed'
                   }`}

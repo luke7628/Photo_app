@@ -45,12 +45,22 @@ function getReader() {
  * @param base64Image - Base64 编码的图像
  * @returns 条形码数组
  */
+function normalizeBase64(base64Image: string): string {
+  if (!base64Image) return '';
+  if (base64Image.startsWith('data:')) {
+    const parts = base64Image.split(',');
+    return parts[1] || '';
+  }
+  return base64Image;
+}
+
 export async function readBarcode(base64Image: string): Promise<BarcodeResult[]> {
   const results: BarcodeResult[] = [];
   
   try {
+    const normalizedBase64 = normalizeBase64(base64Image);
     // 预处理图像以提高识别率
-    const processedImage = await preprocessImage(base64Image);
+    const processedImage = await preprocessImage(normalizedBase64);
     
     // 1. 尝试识别条形码（Code128, EAN等）
     try {
@@ -82,9 +92,9 @@ export async function readBarcode(base64Image: string): Promise<BarcodeResult[]>
       console.log('ℹ️ Code128/EAN条形码未找到或识别失败');
     }
     
-    // 2. 尝试识别 QR 码
+    // 2. 尝试识别 QR 码（优先使用预处理图像）
     try {
-      const qrResult = await readQRCode(base64Image);
+      const qrResult = await readQRCode(processedImage || normalizedBase64);
       if (qrResult) {
         results.push({
           type: 'qrcode',
