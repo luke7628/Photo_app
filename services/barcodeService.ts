@@ -74,7 +74,7 @@ function canvasToBase64(canvas: HTMLCanvasElement, quality = 0.9): string {
   return canvas.toDataURL('image/jpeg', quality).split(',')[1] || '';
 }
 
-function cropBandToBase64(source: HTMLCanvasElement, yStartRatio: number, yEndRatio: number, scale = 1): string {
+function cropBandToBase64(source: HTMLCanvasElement, yStartRatio: number, yEndRatio: number, scale = 1, quality = 0.9): string {
   const startY = Math.max(0, Math.floor(source.height * yStartRatio));
   const endY = Math.min(source.height, Math.ceil(source.height * yEndRatio));
   const bandHeight = Math.max(1, endY - startY);
@@ -98,7 +98,7 @@ function cropBandToBase64(source: HTMLCanvasElement, yStartRatio: number, yEndRa
     outCanvas.height
   );
 
-  return canvasToBase64(outCanvas);
+  return canvasToBase64(outCanvas, quality);
 }
 
 async function createBarcodeCandidates(base64Images: string[]): Promise<string[]> {
@@ -109,12 +109,11 @@ async function createBarcodeCandidates(base64Images: string[]): Promise<string[]
 
     const img = await loadImageFromBase64(base64Image);
     console.log('🔍 [createBarcodeCandidates] 原始图像尺寸:', img.width, 'x', img.height);
-    const maxWidth = 2400;
+    const maxWidth = 1920; // 降低到 1920 而不是 2400，更快更有效
     const scale = img.width > maxWidth ? maxWidth / img.width : 1;
 
     const scaledWidth = Math.max(1, Math.round(img.width * scale));
     const scaledHeight = Math.max(1, Math.round(img.height * scale));
-    console.log('🔍 [createBarcodeCandidates] 缩放比例:', scale, '缩放后尺寸:', scaledWidth, 'x', scaledHeight);
 
     const canvas = document.createElement('canvas');
     const ctx = canvas.getContext('2d');
@@ -128,65 +127,43 @@ async function createBarcodeCandidates(base64Images: string[]): Promise<string[]
     ctx.imageSmoothingEnabled = true;
     ctx.drawImage(img, 0, 0, scaledWidth, scaledHeight);
 
-    const full = canvasToBase64(canvas);
-    console.log('🔍 [createBarcodeCandidates] 生成完整图候选，大小:', full.length);
+    // 添加原始和不同 JPEG 质量的版本
+    // JPEG 0.85 质量有时反而能帮助边界检测（JPEG 伪影优势）
+    candidates.push(base64Image); // 原始
+    candidates.push(canvasToBase64(canvas, 0.85));
+    candidates.push(canvasToBase64(canvas, 0.90));
 
-    // Top half (serial number label)
-    const topCanvas = document.createElement('canvas');
-    topCanvas.width = scaledWidth;
-    topCanvas.height = Math.max(1, Math.round(scaledHeight * 0.55));
-    const topCtx = topCanvas.getContext('2d');
-    if (topCtx) {
-      topCtx.drawImage(canvas, 0, 0, scaledWidth, topCanvas.height, 0, 0, scaledWidth, topCanvas.height);
+    // 添加 2x 放大版本用于远距离和小条码
+    const canvas2x = document.createElement('canvas');
+    const ctx2x = canvas2x.getContext('2d');
+    if (ctx2x) {
+      canvas2x.width = scaledWidth * 2;
+      canvas2x.height = scaledHeight * 2;
+      ctx2x.imageSmoothingEnabled = true;
+      ctx2x.drawImage(canvas, 0, 0, scaledWidth, scaledHeight, 0, 0, canvas2x.width, canvas2x.height);
+      candidates.push(canvasToBase64(canvas2x, 0.85));
+      candidates.push(canvasToBase64(canvas2x, 0.90));
     }
-    const top = topCtx ? canvasToBase64(topCanvas) : '';
-    console.log('🔍 [createBarcodeCandidates] 生成顶部候选，尺寸:', topCanvas.width, 'x', topCanvas.height);
 
-    // Bottom half (part number label)
-    const bottomCanvas = document.createElement('canvas');
-    bottomCanvas.width = scaledWidth;
-    bottomCanvas.height = Math.max(1, scaledHeight - topCanvas.height);
-    const bottomCtx = bottomCanvas.getContext('2d');
-    if (bottomCtx) {
-      bottomCtx.drawImage(canvas, 0, topCanvas.height, scaledWidth, bottomCanvas.height, 0, 0, scaledWidth, bottomCanvas.height);
+    // 更多水平条带 - 条码通常在特定高度
+    // 上部区域（SN）：10-35%, 20-45%, 25-50%
+    // 中部区域：40-65%
+    // 下部区域（PN）：50-75%, 55-80%, 60-85%
+    const bandRatios = [
+      [0.10, 0.35], // 上部 1
+      [0.15, 0.40], // 上部 2
+      [0.20, 0.45], // 上部 3
+      [0.40, 0.65], // 中部
+      [0.50, 0.75], // 下部 1
+      [0.55, 0.80], // 下部 2
+      [0.60, 0.85], // 下部 3
+    ];
+
+    for (const [start, end] of bandRatios) {
+      const band = cropBandToBase64(canvas, start, end, 1, 0.85);
+      candidates.push(band);
     }
-    const bottom = bottomCtx ? canvasToBase64(bottomCanvas) : '';
-    console.log('🔍 [createBarcodeCandidates] 生成底部候选，尺寸:', bottomCanvas.width, 'x', bottomCanvas.height);
 
-    const topBand = cropBandToBase64(canvas, 0.18, 0.38, 1);
-    const topBandZoom = cropBandToBase64(canvas, 0.18, 0.38, 2);
-    const bottomBand = cropBandToBase64(canvas, 0.58, 0.78, 1);
-    const bottomBandZoom = cropBandToBase64(canvas, 0.58, 0.78, 2);
-    console.log('🔍 [createBarcodeCandidates] 生成带状候选，共4个');
-
-    // 添加高分辨率缩放版本 - 改进远距离识别（1.5x, 2x, 3x）
-    const upscaleCanvas = (srcCanvas: HTMLCanvasElement, scale: number): string => {
-      const upCanvas = document.createElement('canvas');
-      upCanvas.width = srcCanvas.width * scale;
-      upCanvas.height = srcCanvas.height * scale;
-      const upCtx = upCanvas.getContext('2d');
-      if (upCtx) {
-        upCtx.imageSmoothingEnabled = true;
-        upCtx.drawImage(srcCanvas, 0, 0, srcCanvas.width, srcCanvas.height, 0, 0, upCanvas.width, upCanvas.height);
-      }
-      return canvasToBase64(upCanvas);
-    };
-
-    // 缩放版本用于远距离识别
-    const full1_5x = upscaleCanvas(canvas, 1.5);
-    const full2x = upscaleCanvas(canvas, 2);
-    const full3x = upscaleCanvas(canvas, 3);
-
-    candidates.push(
-      base64Image,      // 原始
-      full,              // 缩放到2400px
-      full1_5x,          // 1.5倍视野
-      full2x,            // 2倍视野
-      full3x,            // 3倍视野（小条码）
-      top, bottom,       // 上下分割
-      topBand, topBandZoom,     // 顶部带状
-      bottomBand, bottomBandZoom // 底部带状
-    );
     console.log('🔍 [createBarcodeCandidates] 总候选数:', candidates.length);
   }
 
