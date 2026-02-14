@@ -34,10 +34,37 @@ function getReader() {
       BarcodeFormat.PDF_417,
       BarcodeFormat.AZTEC
     ]);
+    hints.set(DecodeHintType.TRY_HARDER, true);
+    hints.set(DecodeHintType.ALSO_INVERTED, true);
     // Initialize reader with hints in one step
     barcodeReader = new BrowserMultiFormatReader(hints);
   }
   return barcodeReader;
+}
+
+async function decodeBarcodeFromBase64(base64Image: string): Promise<{ text: string; format?: string } | null> {
+  if (!base64Image) return null;
+
+  const img = new Image();
+  img.src = `data:image/jpeg;base64,${base64Image}`;
+
+  await new Promise((resolve, reject) => {
+    img.onload = resolve;
+    img.onerror = reject;
+  });
+
+  try {
+    const reader = getReader();
+    const result = await reader.decodeFromImageElement(img);
+    const text = result?.getText?.()?.trim();
+    if (!text) return null;
+    return {
+      text,
+      format: result.getBarcodeFormat?.toString() || 'UNKNOWN'
+    };
+  } catch {
+    return null;
+  }
 }
 
 /**
@@ -64,37 +91,27 @@ export async function readBarcode(base64Image: string): Promise<BarcodeResult[]>
     
     // 1. 尝试识别条形码（Code128, EAN等）
     try {
-      const reader = getReader();
-      const imageUrl = `data:image/jpeg;base64,${processedImage}`;
-      
-      const img = new Image();
-      img.src = imageUrl;
-      
-      await new Promise((resolve, reject) => {
-        img.onload = resolve;
-        img.onerror = reject;
-      });
-      
-      const result = await reader.decodeFromImageElement(img);
-      
-      if (result && result.getText()) {
-        const text = result.getText().trim();
-        if (text) {
-          results.push({
-            type: 'barcode',
-            value: text,
-            format: result.getBarcodeFormat?.toString() || 'UNKNOWN'
-          });
-          console.log('✅ 条形码识别成功:', text, '(格式:', result.getBarcodeFormat?.toString(), ')');
-        }
+      const primary = await decodeBarcodeFromBase64(processedImage);
+      const fallback = primary ? null : await decodeBarcodeFromBase64(normalizedBase64);
+      const decoded = primary || fallback;
+      if (decoded) {
+        results.push({
+          type: 'barcode',
+          value: decoded.text,
+          format: decoded.format || 'UNKNOWN'
+        });
+        console.log('✅ 条形码识别成功:', decoded.text, '(格式:', decoded.format, ')');
       }
     } catch (error) {
       console.log('ℹ️ Code128/EAN条形码未找到或识别失败');
     }
     
-    // 2. 尝试识别 QR 码（优先使用预处理图像）
+    // 2. 尝试识别 QR 码（优先使用预处理图像，失败则尝试原图）
     try {
-      const qrResult = await readQRCode(processedImage || normalizedBase64);
+      let qrResult = await readQRCode(processedImage || normalizedBase64);
+      if (!qrResult && processedImage !== normalizedBase64) {
+        qrResult = await readQRCode(normalizedBase64);
+      }
       if (qrResult) {
         results.push({
           type: 'qrcode',
