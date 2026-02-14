@@ -297,22 +297,29 @@ async function decodeBarcodeFromBase64(base64Image: string): Promise<{ text: str
  * 从 Canvas 解码条形码（提供二值化图像）
  */
 async function decodeFromCanvas(base64Image: string): Promise<{ text: string; format?: string } | null> {
-  const img = await loadImageFromBase64(base64Image);
-  
-  // 创建 canvas
-  const canvas = document.createElement('canvas');
-  canvas.width = img.width;
-  canvas.height = img.height;
-  
-  const ctx = canvas.getContext('2d');
-  if (!ctx) return null;
-  
-  ctx.drawImage(img, 0, 0);
-  
   try {
+    console.log('🔍 [decodeFromCanvas] 开始...');
+    const img = await loadImageFromBase64(base64Image);
+    console.log('🔍 [decodeFromCanvas] 图像加载，尺寸:', img.width, 'x', img.height);
+    
+    // 创建 canvas
+    const canvas = document.createElement('canvas');
+    canvas.width = img.width;
+    canvas.height = img.height;
+    
+    const ctx = canvas.getContext('2d');
+    if (!ctx) {
+      console.log('🔍 [decodeFromCanvas] canvas 上下文获取失败');
+      return null;
+    }
+    
+    ctx.drawImage(img, 0, 0);
+    console.log('🔍 [decodeFromCanvas] 图像绘制完成');
+    
     // 获取图像数据并进行二值化处理
     const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
     const data = imageData.data;
+    console.log('🔍 [decodeFromCanvas] 获取像素数据，长度:', data.length);
     
     // 计算平均亮度
     let sum = 0;
@@ -320,6 +327,7 @@ async function decodeFromCanvas(base64Image: string): Promise<{ text: string; fo
       sum += data[i] * 0.299 + data[i + 1] * 0.587 + data[i + 2] * 0.114;
     }
     const avgBrightness = sum / (data.length / 4);
+    console.log('🔍 [decodeFromCanvas] 平均亮度:', avgBrightness);
     
     // 二值化
     for (let i = 0; i < data.length; i += 4) {
@@ -331,14 +339,17 @@ async function decodeFromCanvas(base64Image: string): Promise<{ text: string; fo
     }
     
     ctx.putImageData(imageData, 0, 0);
+    console.log('🔍 [decodeFromCanvas] 二值化完成');
     
     // 使用 ZXing 解码 canvas
     const reader = getReader();
+    console.log('🔍 [decodeFromCanvas] 开始 decodeFromCanvas...');
     const result = await reader.decodeFromCanvas(canvas);
+    console.log('🔍 [decodeFromCanvas] 解码返回:', result);
     
     if (result) {
-      console.log('✅ [decodeFromCanvas] 成功');
       const text = result?.getText?.()?.trim();
+      console.log('✅ [decodeFromCanvas] 成功! 文本:', text);
       
       let format = 'UNKNOWN';
       try {
@@ -354,11 +365,14 @@ async function decodeFromCanvas(base64Image: string): Promise<{ text: string; fo
       return { text, format };
     }
     
+    console.log('🔍 [decodeFromCanvas] 无结果');
     return null;
   } catch (error) {
-    console.log('ℹ️ [decodeFromCanvas] 失败:', error);
+    console.log('❌ [decodeFromCanvas] 异常:', error);
     return null;
   }
+}
+
 
 /**
  * 从图像中识别条形码（支持多种格式）

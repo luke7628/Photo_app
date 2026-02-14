@@ -91,7 +91,7 @@ export async function preprocessImage(base64Image: string): Promise<string> {
 }
 
 /**
- * 应用强锐化滤镜
+ * 应用锐化滤镜
  */
 function applyStrongSharpen(imageData: ImageData): ImageData {
   const data = imageData.data;
@@ -133,90 +133,3 @@ function applyStrongSharpen(imageData: ImageData): ImageData {
   return output;
 }
 
-/**
- * 应用自适应二值化（局部阈值）
- */
-function applyAdaptiveBinarization(imageData: ImageData): ImageData {
-  const data = imageData.data;
-  const width = imageData.width;
-  const height = imageData.height;
-  const output = new ImageData(width, height);
-  
-  const windowSize = 35;
-  const halfWindow = Math.floor(windowSize / 2);
-  const threshold = -15; // 自适应阈值的偏移
-  
-  for (let y = 0; y < height; y++) {
-    for (let x = 0; x < width; x++) {
-      // 计算局部平均
-      let sum = 0;
-      let count = 0;
-      
-      for (let wy = Math.max(0, y - halfWindow); wy < Math.min(height, y + halfWindow); wy++) {
-        for (let wx = Math.max(0, x - halfWindow); wx < Math.min(width, x + halfWindow); wx++) {
-          const idx = (wy * width + wx) * 4;
-          sum += data[idx]; // R 分量（已经是灰度值）
-          count++;
-        }
-      }
-      
-      const localMean = sum / count;
-      const currentIdx = (y * width + x) * 4;
-      const currentGray = data[currentIdx];
-      
-      // 二值化
-      const value = currentGray < (localMean + threshold) ? 0 : 255;
-      
-      const outIdx = (y * width + x) * 4;
-      output.data[outIdx] = value;
-      output.data[outIdx + 1] = value;
-      output.data[outIdx + 2] = value;
-      output.data[outIdx + 3] = 255;
-    }
-  }
-  
-  return output;
-}
-
-/**
- * 应用锐化滤镜
- */
-function applyStrongSharpen(imageData: ImageData): ImageData {
-  const data = imageData.data;
-  const width = imageData.width;
-  const height = imageData.height;
-  const output = new ImageData(width, height);
-  
-  // 锐化核
-  const kernel = [
-    0, -1, 0,
-    -1, 5, -1,
-    0, -1, 0
-  ];
-  
-  for (let y = 1; y < height - 1; y++) {
-    for (let x = 1; x < width - 1; x++) {
-      let r = 0, g = 0, b = 0;
-      
-      for (let ky = -1; ky <= 1; ky++) {
-        for (let kx = -1; kx <= 1; kx++) {
-          const idx = ((y + ky) * width + (x + kx)) * 4;
-          const ki = (ky + 1) * 3 + (kx + 1);
-          const weight = kernel[ki];
-          
-          r += data[idx] * weight;
-          g += data[idx + 1] * weight;
-          b += data[idx + 2] * weight;
-        }
-      }
-      
-      const outIdx = (y * width + x) * 4;
-      output.data[outIdx] = Math.min(255, Math.max(0, r));
-      output.data[outIdx + 1] = Math.min(255, Math.max(0, g));
-      output.data[outIdx + 2] = Math.min(255, Math.max(0, b));
-      output.data[outIdx + 3] = 255;
-    }
-  }
-  
-  return output;
-}
