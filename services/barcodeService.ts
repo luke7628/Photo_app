@@ -321,14 +321,13 @@ async function decodeFromCanvas(base64Image: string): Promise<{ text: string; fo
     const data = imageData.data;
     console.log('🔍 [decodeFromCanvas] 获取像素数据，长度:', data.length);
     
-    // 只做温和的对比度增强，不做激进的二值化
-    // 这样保留更多条码细节
+    // 对比度增强 - 更强的倍数来改善 ZXing 识别
     for (let i = 0; i < data.length; i += 4) {
       // 计算灰度值
       const gray = data[i] * 0.299 + data[i + 1] * 0.587 + data[i + 2] * 0.114;
       
-      // 温和的对比度增强（2.5倍而不是3倍）
-      const enhanced = Math.min(255, Math.max(0, (gray - 128) * 2.5 + 128));
+      // 更强的对比度增强（3.5倍）以帮助 ZXing 识别
+      const enhanced = Math.min(255, Math.max(0, (gray - 128) * 3.5 + 128));
       
       data[i] = enhanced;
       data[i + 1] = enhanced;
@@ -336,10 +335,10 @@ async function decodeFromCanvas(base64Image: string): Promise<{ text: string; fo
     }
     
     ctx.putImageData(imageData, 0, 0);
-    console.log('🔍 [decodeFromCanvas] 对比度增强完成');
+    console.log('🔍 [decodeFromCanvas] 对比度增强完成 (3.5x)');
     
-    // 将 Canvas 转换为 base64 图像
-    const enhancedBase64 = canvas.toDataURL('image/jpeg', 0.95).split(',')[1];
+    // 将 Canvas 转换为 base64 图像 - 使用最高质量避免 JPEG 损失
+    const enhancedBase64 = canvas.toDataURL('image/jpeg', 1.0).split(',')[1];
     console.log('🔍 [decodeFromCanvas] 转换为 base64，长度:', enhancedBase64.length);
     
     // 使用 ZXing 解码增强后的图像

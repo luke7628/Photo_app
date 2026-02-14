@@ -14,80 +14,10 @@
  * @returns 处理后的 base64 图像（强处理）
  */
 export async function preprocessImage(base64Image: string): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const img = new Image();
-    img.crossOrigin = 'anonymous';
-    
-    img.onload = () => {
-      try {
-        console.log('🔍 [preprocessImage] 开始强预处理');
-        // 创建 canvas
-        const canvas = document.createElement('canvas');
-        const ctx = canvas.getContext('2d');
-        
-        if (!ctx) {
-          console.log('🔍 [preprocessImage] canvas 失败，返回原图');
-          resolve(base64Image); // 如果失败，返回原图
-          return;
-        }
-        
-        // 设置画布大小（保持原始尺寸）
-        canvas.width = img.width;
-        canvas.height = img.height;
-        
-        // 绘制原图
-        ctx.drawImage(img, 0, 0);
-        
-        // 获取图像数据
-        const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-        const data = imageData.data;
-        
-        console.log('🔍 [preprocessImage] 开始强对比度处理...');
-        
-        // 1. 灰度化 + 强对比度增强
-        for (let i = 0; i < data.length; i += 4) {
-          // 灰度化
-          const gray = data[i] * 0.299 + data[i + 1] * 0.587 + data[i + 2] * 0.114;
-          
-          // 强对比度增强（3.0 倍而非 1.5）
-          const enhanced = Math.min(255, Math.max(0, (gray - 128) * 3.0 + 128));
-          
-          data[i] = enhanced;     // R
-          data[i + 1] = enhanced; // G
-          data[i + 2] = enhanced; // B
-          // data[i + 3] 保持不变（alpha）
-        }
-        
-        console.log('🔍 [preprocessImage] 应用强锐化滤镜...');
-        
-        // 2. 锐化（强锐化滤镜）
-        const sharpened = applyStrongSharpen(imageData);
-        ctx.putImageData(sharpened, 0, 0);
-        
-        console.log('🔍 [preprocessImage] 应用自适应二值化...');
-        
-        // 3. 自适应二值化
-        const binarized = applyAdaptiveBinarization(ctx.getImageData(0, 0, canvas.width, canvas.height));
-        ctx.putImageData(binarized, 0, 0);
-        
-        // 转换为 base64
-        const processedBase64 = canvas.toDataURL('image/jpeg', 0.98);
-        const result = processedBase64.split(',')[1];
-        console.log('🔍 [preprocessImage] 返回处理后图像，大小:', result.length);
-        resolve(result);
-      } catch (error) {
-        console.error('🔍 [preprocessImage] 预处理失败:', error);
-        resolve(base64Image); // 失败时返回原图
-      }
-    };
-    
-    img.onerror = () => {
-      console.error('🔍 [preprocessImage] 图像加载失败');
-      resolve(base64Image); // 失败时返回原图
-    };
-    
-    img.src = `data:image/jpeg;base64,${base64Image}`;
-  });
+  // 简化策略：直接返回原始图像
+  // 复杂的预处理（对比度、锐化、二值化）在decodeFromCanvas中进行
+  console.log('🔍 [preprocessImage] 直接返回原始图像（预处理在Canvas中进行）');
+  return base64Image;
 }
 
 /**
