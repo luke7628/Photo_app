@@ -84,21 +84,16 @@ const CameraScreen: React.FC<CameraScreenProps> = ({
 
         let newStream: MediaStream | null = null;
         
-        // 尝试多个constraints配置，从宽松到严格
+        // 尝试多个constraints配置，优先使用后置摄像头
         const constraintsList: MediaStreamConstraints[] = [
-          // 最宽松的配置 - 任何摄像头，任何分辨率
-          {
-            video: true,
-            audio: false
-          },
-          // 后置摄像头，宽松分辨率
+          // 强制后置摄像头，必须满足
           {
             video: {
-              facingMode: { ideal: 'environment' }
+              facingMode: { exact: 'environment' }
             },
             audio: false
           },
-          // 指定分辨率
+          // 后置摄像头，宽松分辨率
           {
             video: {
               facingMode: { ideal: 'environment' },
@@ -107,14 +102,24 @@ const CameraScreen: React.FC<CameraScreenProps> = ({
             },
             audio: false
           },
-          // 原始配置
+          // 后置摄像头，不指定分辨率
           {
             video: {
-              facingMode: { ideal: 'environment' },
-              width: { ideal: 1920 },
-              height: { ideal: 1080 },
-              aspectRatio: { ideal: 16 / 9 }
+              facingMode: { ideal: 'environment' }
             },
+            audio: false
+          },
+          // 任何摄像头，宽松分辨率
+          {
+            video: {
+              width: { ideal: 1280 },
+              height: { ideal: 720 }
+            },
+            audio: false
+          },
+          // 最宽松的配置 - 任何摄像头，任何分辨率
+          {
+            video: true,
             audio: false
           }
         ];
@@ -342,7 +347,7 @@ const CameraScreen: React.FC<CameraScreenProps> = ({
   };
 
   return (
-    <div className="absolute inset-0 z-50 bg-black flex flex-col overflow-hidden touch-none">
+    <div className="fixed inset-0 z-50 bg-black flex flex-col overflow-hidden touch-none safe-area-inset">
       <div className="relative flex-1 bg-black overflow-hidden flex items-center justify-center">
         {/* 摄像头错误提示 */}
         {cameraError && (
