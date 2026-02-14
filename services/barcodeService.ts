@@ -42,6 +42,56 @@ function getReader() {
   return barcodeReader;
 }
 
+function addUniqueResult(results: BarcodeResult[], next: BarcodeResult) {
+  if (!next.value) return;
+  if (results.some(r => r.type === next.type && r.value === next.value)) return;
+  results.push(next);
+}
+
+async function decodeWithBarcodeDetector(base64Image: string): Promise<BarcodeResult[]> {
+  const detected: BarcodeResult[] = [];
+  const BarcodeDetectorCtor = (window as any).BarcodeDetector;
+  if (!BarcodeDetectorCtor || !base64Image) return detected;
+
+  const img = new Image();
+  img.src = `data:image/jpeg;base64,${base64Image}`;
+
+  await new Promise((resolve, reject) => {
+    img.onload = resolve;
+    img.onerror = reject;
+  });
+
+  const detector = new BarcodeDetectorCtor({
+    formats: [
+      'qr_code',
+      'code_128',
+      'code_39',
+      'code_93',
+      'ean_13',
+      'ean_8',
+      'upc_a',
+      'upc_e',
+      'itf',
+      'pdf417',
+      'data_matrix',
+      'aztec'
+    ]
+  });
+
+  const results = await detector.detect(img);
+  results.forEach((r: any) => {
+    const rawValue = (r.rawValue || '').trim();
+    if (!rawValue) return;
+    detected.push({
+      type: r.format === 'qr_code' ? 'qrcode' : 'barcode',
+      value: rawValue,
+      format: (r.format || '').toUpperCase()
+    });
+  });
+
+  return detected;
+}
+
 async function decodeBarcodeFromBase64(base64Image: string): Promise<{ text: string; format?: string } | null> {
   if (!base64Image) return null;
 
@@ -88,6 +138,21 @@ export async function readBarcode(base64Image: string): Promise<BarcodeResult[]>
     const normalizedBase64 = normalizeBase64(base64Image);
     // 预处理图像以提高识别率
     const processedImage = await preprocessImage(normalizedBase64);
+
+    // 0. 尝试原生 BarcodeDetector（部分移动端更稳定）
+    try {
+      const detectorResults = await decodeWithBarcodeDetector(processedImage || normalizedBase64);
+      if (detectorResults.length === 0 && processedImage !== normalizedBase64) {
+        const fallbackDetector = await decodeWithBarcodeDetector(normalizedBase64);
+        fallbackDetector.forEach(r => addUniqueResult(results, r));
+      }
+      detectorResults.forEach(r => addUniqueResult(results, r));
+      if (detectorResults.length > 0) {
+        console.log('✅ BarcodeDetector 识别成功:', detectorResults.map(r => r.value));
+      }
+    } catch (error) {
+      console.log('ℹ️ BarcodeDetector 不可用或识别失败');
+    }
     
     // 1. 尝试识别条形码（Code128, EAN等）
     try {
@@ -95,7 +160,7 @@ export async function readBarcode(base64Image: string): Promise<BarcodeResult[]>
       const fallback = primary ? null : await decodeBarcodeFromBase64(normalizedBase64);
       const decoded = primary || fallback;
       if (decoded) {
-        results.push({
+        addUniqueResult(results, {
           type: 'barcode',
           value: decoded.text,
           format: decoded.format || 'UNKNOWN'
@@ -113,7 +178,7 @@ export async function readBarcode(base64Image: string): Promise<BarcodeResult[]>
         qrResult = await readQRCode(normalizedBase64);
       }
       if (qrResult) {
-        results.push({
+        addUniqueResult(results, {
           type: 'qrcode',
           value: qrResult
         });
