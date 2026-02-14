@@ -19,7 +19,7 @@
       "type": "image/png"
     }
   ],
-  "start_url": ".",
+  "start_url": "/Photo_app/",
   "display": "standalone",
   "theme_color": "#ffffff",
   "background_color": "#ffffff",
