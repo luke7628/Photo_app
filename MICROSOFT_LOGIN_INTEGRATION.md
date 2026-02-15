@@ -1,16 +1,15 @@
 # Microsoft Login Integration Summary
 
 ## Overview
-Successfully replaced Google login with Microsoft login throughout the Photo Suite application. All Google authentication code has been removed and replaced with Microsoft Azure AD authentication.
+Microsoft login is used throughout the Photo Suite application with Azure AD authentication.
 
 ## Changes Made
 
 ### 1. Type Definitions (`types.ts`)
-- Renamed `GoogleUser` interface to `MicrosoftUser`
-- Updated all type references throughout the codebase
+- Uses `MicrosoftUser` for authenticated profiles
 
 ### 2. Main Application (`App.tsx`)
-- **Removed**: Google OAuth2 initialization code
+- **Updated**: Authentication flow uses Microsoft Azure AD only
 - **Updated**: `handleLogin` function now uses Microsoft authentication
 - **Removed**: `handleMicrosoftLogin` (merged into `handleLogin`)
 - **Updated**: Default `cloudProvider` setting to `'onedrive'`
@@ -21,13 +20,13 @@ Successfully replaced Google login with Microsoft login throughout the Photo Sui
 - **DetailsScreen.tsx**: Updated imports and user type
 - **GalleryScreen.tsx**: Updated imports, user type, and login button text to "Microsoft"
 - **ProjectListScreen.tsx**: Updated imports, user type, and login button to show cloud icon + "Microsoft"
-- **SettingsScreen.tsx**: Added cloud provider selector with options: None, OneDrive, Drive
+- **SettingsScreen.tsx**: Cloud provider selector with options: None, OneDrive
 
 ### 4. Service Layer (`storageService.ts`)
 - Updated type definitions for user storage functions
 
 ### 5. UI/UX Changes
-- Login buttons now display "Microsoft" instead of "Sign In" or "Sign in with Google"
+- Login buttons display "Microsoft"
 - Settings screen includes cloud provider selection
 - Storage path display dynamically shows selected cloud service name
 
@@ -47,7 +46,6 @@ Successfully replaced Google login with Microsoft login throughout the Photo Sui
 
 ## Benefits
 - **Unified Authentication**: Single Microsoft login for both user auth and OneDrive access
-- **Simplified Setup**: No need to configure separate Google Cloud Console
 - **Better Integration**: Native Microsoft Graph API integration
 - **Enterprise Ready**: Supports Azure AD authentication
 
@@ -59,12 +57,11 @@ Successfully replaced Google login with Microsoft login throughout the Photo Sui
 - ✅ Default settings prefer OneDrive
 
 ## Configuration Required
-To enable Microsoft login, configure these constants in `App.tsx`:
-```typescript
-const MICROSOFT_CLIENT_ID = "YOUR_MICROSOFT_CLIENT_ID";
-const MICROSOFT_TENANT_ID = "common";
-const MICROSOFT_CLIENT_SECRET = "YOUR_MICROSOFT_CLIENT_SECRET";
-const MICROSOFT_REDIRECT_URI = "http://localhost:3000/auth/callback";
+To enable Microsoft login, configure Vite env vars:
+```env
+VITE_MICROSOFT_CLIENT_ID=your_client_id_here
+VITE_MICROSOFT_TENANT_ID=your_tenant_id_here
+VITE_MICROSOFT_REDIRECT_URI=http://localhost:3000/Photo_app/auth-callback.html
 ```
 
 See `MICROSOFT_SETUP.md` for detailed Azure AD configuration instructions.</content>

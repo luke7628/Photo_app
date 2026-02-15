@@ -34,7 +34,7 @@
 - Android Studio 2021.1 或更高版本
 - Android SDK (API level 31+)
 - Android NDK (可选，但某些插件可能需要)
-- Google Play 开发者账户 (用于发布)
+- Android 应用商店开发者账户 (用于发布)
 
 ---
 
@@ -258,7 +258,7 @@ cd android
 ./gradlew assembleRelease
 ```
 
-或 Bundle (推荐用于 Google Play)：
+或 Bundle (推荐用于应用商店发布)：
 
 ```bash
 ./gradlew bundleRelease
@@ -268,15 +268,14 @@ cd android
 - APK: `app/build/outputs/apk/release/app-release.apk`
 - Bundle: `app/build/outputs/bundle/release/app-release.aab`
 
-#### 6.4 上传到 Google Play
+#### 6.4 上传到应用商店
 
-1. 登录 [Google Play Console](https://play.google.com/console)
+1. 登录你的 Android 应用商店后台
 2. 创建新应用或选择现有应用
-3. 进入 `Build > App releases`
-4. 点击 `Create release`
-5. 上传你的 AAB 文件
-6. 填写 Release notes
-7. 检查并提交审核
+3. 进入发布/版本管理页面
+4. 上传你的 AAB 文件
+5. 填写 Release notes
+6. 检查并提交审核
 
 ### 需要的 Android 权限
 

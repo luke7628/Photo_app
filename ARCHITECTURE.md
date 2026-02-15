@@ -21,8 +21,8 @@
 │  ┌──────────────────────────────────────────┐                          │
 │  │          App.tsx (State Management)      │                          │
 │  ├──────────────────────────────────────────┤                          │
-│  │ • user (GoogleUser | MicrosoftUser)     │                          │
-│  │ • cloudProvider = 'drive' | 'onedrive'  │                          │
+│  │ • user (MicrosoftUser)                  │                          │
+│  │ • cloudProvider = 'none' | 'onedrive'   │                          │
 │  │ • handleLogin()                          │                          │
 │  │ • handleMicrosoftLogin()                 │                          │
 │  │ • performSyncCycle()                     │                          │
@@ -36,17 +36,17 @@
    │            Service Layer                              │
    ├───────────────────────────────────────────────────────┤
    │                                                         │
-   │  ┌─────────────────────┐    ┌─────────────────────┐   │
-   │  │ googleDriveService  │    │ oneDriveService     │   │
-   │  ├─────────────────────┤    ├─────────────────────┤   │
-   │  │ • accessToken       │    │ • accessToken       │   │
-   │  │ • findFolder()      │    │ • findFolder()      │   │
-   │  │ • ensureFolder()    │    │ • ensureFolder()    │   │
-   │  │ • uploadImage()     │    │ • uploadImage()     │   │
-   │  │ • getRootInfo()     │    │ • getRootInfo()     │   │
-   │  └──────────┬──────────┘    └──────────┬──────────┘   │
-   │             │                          │               │
-   │  ┌─────────────────────┐    ┌─────────────────────┐   │
+       │  ┌─────────────────────┐    ┌─────────────────────┐   │
+       │  │ oneDriveService     │    │ microsoftAuthService│   │
+       │  ├─────────────────────┤    ├─────────────────────┤   │
+       │  │ • accessToken       │    │ • accessToken       │   │
+       │  │ • findFolder()      │    │ • getLoginUrl()     │   │
+       │  │ • ensureFolder()    │    │ • exchangeCode()    │   │
+       │  │ • uploadImage()     │    │ • refreshToken()    │   │
+       │  │ • getRootInfo()     │    │ • getUserInfo()     │   │
+       │  └──────────┬──────────┘    └──────────┬──────────┘   │
+       │             │                          │               │
+       │  ┌─────────────────────┐                              │
    │  │ microsoftAuthService│    │ barcodeService      │   │
    │  ├─────────────────────┤    ├─────────────────────┤   │
    │  │ • accessToken       │    │ • readBarcode()     │   │
@@ -64,19 +64,19 @@
    │         External APIs / Storage                        │
    ├───────────────────────────────────────────────────────┤
    │                                                         │
-   │  ┌─────────────────────┐    ┌─────────────────────┐   │
-   │  │  Microsoft         │    │  Google Drive       │   │
-   │  │  Azure AD (OAuth)  │    │  (OAuth)            │   │
-   │  │  login.microsoft   │    │  accounts.google    │   │
-   │  │  .com              │    │  .com               │   │
-   │  └─────────────────────┘    └─────────────────────┘   │
-   │                                                       │
-   │  ┌─────────────────────┐    ┌─────────────────────┐   │
-   │  │  OneDrive          │    │  Google Drive       │   │
-   │  │  graph.microsoft   │    │  graph.google       │   │
-   │  │  .com              │    │  .com               │   │
-   │  │  (Files REST API)  │    │  (Files REST API)   │   │
-   │  └─────────────────────┘    └─────────────────────┘   │
+       │  ┌─────────────────────┐                              │
+       │  │  Microsoft         │                              │
+       │  │  Azure AD (OAuth)  │                              │
+       │  │  login.microsoft   │                              │
+       │  │  .com              │                              │
+       │  └─────────────────────┘                              │
+       │                                                       │
+       │  ┌─────────────────────┐                              │
+       │  │  OneDrive          │                              │
+       │  │  graph.microsoft   │                              │
+       │  │  .com              │                              │
+       │  │  (Files REST API)  │                              │
+       │  └─────────────────────┘                              │
    │                                                         │
    └───────────────────────────────────────────────────────┘
 ```
@@ -189,15 +189,15 @@
   │ Check CloudProvider setting    │
   └───┬──────────────────────┬─────┘
       │                      │
-   "drive"              "onedrive"
-      │                      │
-      ▼                      ▼
- ┌────────────┐     ┌─────────────────┐
- │Google Drive│     │ Microsoft Graph │
- │Service     │     │ (OneDrive API)  │
- └────┬───────┘     └────────┬────────┘
-      │                      │
-      ▼                      ▼
+       "onedrive"
+              │
+              ▼
+ ┌─────────────────┐
+ │ Microsoft Graph │
+ │ (OneDrive API)  │
+ └────────┬────────┘
+                      │
+                      ▼
 ┌─────────────────────────────────────┐
 │ 1. Ensure Folder Structure:         │
 │    /Dematic/FieldPhotos/            │
@@ -234,7 +234,7 @@
 ├─────────────────────────────────────────────────────────┤
 │                                                           │
 │  Local Storage (Key-Value Pairs)                        │
-│  ├─ 'user'                      → GoogleUser object     │
+│  ├─ 'user'                      → MicrosoftUser object  │
 │  ├─ 'microsoft_access_token'     → Token string        │
 │  ├─ 'microsoft_id_token'         → ID token           │
 │  ├─ 'microsoft_refresh_token'    → Refresh token      │
@@ -245,7 +245,6 @@
 │  Memory (JavaScript Variables)                         │
 │  ├─ microsoftAuthService.accessToken → Current token  │
 │  ├─ oneDriveService.accessToken      → Current token  │
-│  ├─ googleDriveService.accessToken   → Current token  │
 │  │                                                     │
 │  IndexedDB (Larger Data)                              │
 │  ├─ 'printers' store → Printer photos (Base64)       │
@@ -258,7 +257,7 @@
                           ↓
 
 ┌─────────────────────────────────────────────────────────┐
-│          Cloud Storage (OneDrive / Google Drive)         │
+│              Cloud Storage (OneDrive)                   │
 ├─────────────────────────────────────────────────────────┤
 │                                                           │
 │  OneDrive Folder Structure:                            │
@@ -273,12 +272,6 @@
 │        └─ 99J2037011109/         (Another printer)    │
 │           └─ ...                                       │
 │                                                         │
-│  Google Drive Folder Structure:                        │
-│  Dematic Field Photos/           (same logic)          │
-│  └─ Project Alpha/                                     │
-│     └─ 99J2037011108/                                  │
-│        └─ photos...                                    │
-│                                                        │
 └─────────────────────────────────────────────────────────┘
 ```
 
@@ -292,46 +285,36 @@
                            │
                            │ Click "Login"
                            │
-        ┌──────────────────┼──────────────────┐
-        │                  │                  │
-        ▼                  ▼                  ▼
-   ┌─────────┐      ┌─────────────────┐    ┌──────────────┐
-   │ Google  │      │ Microsoft Auth  │    │   Cancel     │
-   │ Login   │      │ Window Opens    │    │   Auth       │
-   └────┬────┘      └────────┬────────┘    └──────────────┘
-        │                    │                    │
-        │ Grant             │ Grant             │ Deny
-        │ Permission        │ Permission        │
-        │                   │                   │
-        └───────────┬───────┴────────┬──────────┘
-                    │                │
-                    ▼                ▼
+       ┌────────────────────────────┐
+       │ Microsoft Auth Window Opens│
+       └──────────────┬─────────────┘
+                     │
+                     │ Grant Permission
+                     │
+                     ▼
             ┌──────────────────────────────┐
             │   ✅ User Logged In          │
             │  (cloudProvider selected)    │
             └──────────────┬───────────────┘
                            │
-                    ┌──────┴──────┐
-                    │             │
-                    ▼             ▼
-            ┌──────────┐    ┌──────────┐
-            │  Google  │    │Microsoft │
-            │  Drive   │    │ OneDrive │
-            │ Syncing  │    │ Syncing  │
-            └────┬─────┘    └────┬─────┘
-                 │               │
-        ┌────────┴───────┐       │
-        │                │       │
-  ┌─────▼──────┐  ┌──────▼────┐  │
-  │Photos      │  │ Photos    │  │
-  │Synced ✅   │  │Uploading  │  │
-  └────────────┘  └───────────┘  │
-                                  │
-              Click "Logout"       │
-                │                 │
-                ├────────┬────────┘
-                │        │
-                ▼        ▼
+                         │
+                         ▼
+                  ┌──────────┐
+                  │Microsoft │
+                  │ OneDrive │
+                  │ Syncing  │
+                  └────┬─────┘
+                      │
+              ┌────────┴───────┐
+              │                │
+         ┌─────▼──────┐  ┌──────▼────┐
+         │Photos      │  │ Photos    │
+         │Synced ✅   │  │Uploading  │
+         └────────────┘  └───────────┘
+
+             Click "Logout"
+              │
+              ▼
             ┌──────────────────┐
             │ Clear tokens     │
             │ SignOut user     │

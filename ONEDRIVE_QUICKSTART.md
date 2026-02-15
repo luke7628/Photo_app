@@ -82,9 +82,6 @@ npm run dev
 
 ## 常见问题
 
-### Q: 如何切换回 Google Drive？
-A: Settings → Cloud Provider → Google Drive（需要事先配置 Google OAuth）
-
 ### Q: 如何同时使用两个云服务？
 A: 目前应用只能选择一个，但代码已支持同时使用。可在 `performSyncCycle` 函数中修改逻辑。
 

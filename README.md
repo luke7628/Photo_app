@@ -9,8 +9,7 @@ A modern web application for capturing and managing printer documentation photos
 - Automatic recognition of Serial Number, Model, and Part Number
 - One-click manual edit and correction
 
-☁️ **Dual Cloud Storage Support**:
-- **Google Drive** - Official Google Cloud Storage integration
+☁️ **Cloud Storage Support**:
 - **Microsoft OneDrive** - Microsoft OneDrive integration with enterprise account support
 
 📸 **12-Photo Documentation**: Structured photo capture workflow for complete printer documentation
@@ -57,13 +56,10 @@ npm install
 
 ### 2. Configure Cloud Provider (Optional)
 
-You can choose to use Microsoft OneDrive or Google Drive (or neither for local-only storage).
+Use Microsoft OneDrive (or choose local-only storage).
 
-#### Option A: Microsoft OneDrive (Recommended)
+#### Microsoft OneDrive (Recommended)
 - **See [MICROSOFT_SETUP.md](./MICROSOFT_SETUP.md)**
-
-#### Option B: Google Drive
-- See Google Drive configuration steps in [MICROSOFT_SETUP.md](./MICROSOFT_SETUP.md)
 
 ### 3. Run Development Server
 
@@ -132,14 +128,12 @@ npm run sync:both       # Sync to both platforms
 
 The app supports selecting a cloud provider in **Settings**:
 - **None** - Local storage only, no cloud sync
-- **Google Drive** - Requires Google OAuth configuration
 - **Microsoft OneDrive** - Requires Azure AD app registration
 
 After selection, the app will automatically upload photos to the chosen provider.
 
 ### Cloud Provider Documentation
 
-- **Google Drive**: See [MICROSOFT_SETUP.md](./MICROSOFT_SETUP.md)
 - **Microsoft OneDrive**: See [MICROSOFT_SETUP.md](./MICROSOFT_SETUP.md) and [ONEDRIVE_QUICKSTART.md](./ONEDRIVE_QUICKSTART.md)
 
 ## Usage
@@ -236,7 +230,6 @@ If barcode recognition fails, you can always manually enter the information:
   - **BarcodeDetector API** - Native barcode/QR code reader
   - **ZXing** - Barcode/QR code library (fallback)
   - Custom image processing for optimal recognition
-- **Google Drive API** - Cloud storage
 - **Microsoft Graph API** - OneDrive integration
 - **Capacitor** - Cross-platform mobile framework
 - **IndexedDB** - Local data persistence

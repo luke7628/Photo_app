@@ -15,7 +15,7 @@ export interface UserPreferences {
   drivePath: string;
   useSubfoldersBySN: boolean;
   imageQuality: 'original' | 'compressed';
-  cloudProvider?: 'none' | 'drive' | 'onedrive'; // 云盘供应商
+  cloudProvider?: 'none' | 'onedrive'; // 云盘供应商
 }
 
 export interface MicrosoftUser {
