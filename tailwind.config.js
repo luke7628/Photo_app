@@ -21,11 +21,16 @@ export default {
       animation: {
         'shimmer': 'shimmer 2s infinite',
         'fadeIn': 'fadeIn 0.2s ease-in',
+        'slideDown': 'slideDown 0.3s ease-out',
       },
       keyframes: {
         fadeIn: {
           '0%': { opacity: '0' },
           '100%': { opacity: '1' },
+        },
+        slideDown: {
+          '0%': { opacity: '0', transform: 'translateY(-20px)' },
+          '100%': { opacity: '1', transform: 'translateY(0)' },
         },
       },
     },

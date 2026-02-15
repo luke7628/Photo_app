@@ -62,6 +62,16 @@ const App: React.FC = () => {
   const [previewPhotos, setPreviewPhotos] = useState<PhotoSetItem[]>([]);
   const [previewIndex, setPreviewIndex] = useState<number>(0);
   const [capturedImage, setCapturedImage] = useState<string | null>(null);
+  const [toastMessage, setToastMessage] = useState<string>('');
+  const [showToast, setShowToast] = useState<boolean>(false);
+
+  // Toast notification helper
+  const displayToast = (message: string, duration = 3000) => {
+    console.log('📢 Toast:', message);
+    setToastMessage(message);
+    setShowToast(true);
+    setTimeout(() => setShowToast(false), duration);
+  };
 
   // Initialize Microsoft Auth
   useEffect(() => {
@@ -551,6 +561,9 @@ const App: React.FC = () => {
         analyzeWithBarcode(cleanBase64)
           .then(result => { 
             console.log('📸 [handleCapture] 分析成功，结果:', result);
+            if (!result.serialNumber && !result.partNumber) {
+              displayToast('⚠️ No barcode detected. Please enter manually or retake.', 4000);
+            }
             setBaseSerialNumber(result.serialNumber);
             setBasePartNumber(result.partNumber || '');
             setSessionData({ serialNumber: result.serialNumber, model: result.model, partNumber: result.partNumber });
@@ -563,6 +576,7 @@ const App: React.FC = () => {
           })
           .catch((error) => { 
             console.error('📸 [handleCapture] 分析失败:', error);
+            displayToast('❌ Barcode recognition failed. Please enter manually.', 4000);
             const fallbackData = { serialNumber: "", model: "ZT411", partNumber: "" };
             setBaseSerialNumber("");
             setBasePartNumber("");
@@ -596,6 +610,9 @@ const App: React.FC = () => {
         analyzeWithBarcode(cleanBase64)
           .then(result => { 
             console.log('📸 [handleCapture] 分析成功，设置sessionData:', result);
+            if (!result.serialNumber && !result.partNumber) {
+              displayToast('⚠️ No barcode detected. Please enter manually or retake.', 4000);
+            }
             setBaseSerialNumber(result.serialNumber);
             setBasePartNumber(result.partNumber || '');
             setSessionData({ serialNumber: result.serialNumber, model: result.model, partNumber: result.partNumber });
@@ -698,6 +715,16 @@ const App: React.FC = () => {
         {currentScreen === AppScreen.SETTINGS && <SettingsScreen settings={settings} onUpdate={setSettings} activeProject={activeProject} onBack={() => setCurrentScreen(activeProjectId ? AppScreen.GALLERY : AppScreen.PROJECT_LIST)} />}
         {currentScreen === AppScreen.SEARCH && <SearchScreen printers={printers} onBack={() => setCurrentScreen(AppScreen.GALLERY)} onPreviewImage={(url) => { setPreviewPhotos([{url, label: 'Search', filename: 's.jpg'}]); setPreviewIndex(0); setLastScreen(AppScreen.SEARCH); setCurrentScreen(AppScreen.PREVIEW); }} />}
       </div>
+
+      {/* Toast Notification */}
+      {showToast && (
+        <div className="fixed top-20 left-1/2 transform -translate-x-1/2 z-[9999] animate-slideDown">
+          <div className="bg-gray-900/95 backdrop-blur-md text-white px-6 py-4 rounded-xl shadow-2xl border border-gray-700 flex items-center gap-3 max-w-sm">
+            <span className="material-symbols-outlined text-yellow-400 text-2xl">info</span>
+            <p className="text-sm font-medium leading-snug">{toastMessage}</p>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
