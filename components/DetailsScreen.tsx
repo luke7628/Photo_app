@@ -1,6 +1,7 @@
 
 import React, { useState } from 'react';
 import { Printer, PHOTO_LABELS, PhotoSetItem, MicrosoftUser, ViewMode } from '../types';
+import { UserAvatar } from './UserAvatar';
 
 interface DetailsScreenProps {
   printer: Printer;
@@ -45,7 +46,6 @@ const DetailsScreen: React.FC<DetailsScreenProps> = ({
   onLogin,
   onLogout
 }) => {
-  const [showUserMenu, setShowUserMenu] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
   const [editSerial, setEditSerial] = useState('');
   const [editPartNumber, setEditPartNumber] = useState('');
@@ -232,26 +232,7 @@ const DetailsScreen: React.FC<DetailsScreenProps> = ({
           <div className="flex items-center gap-1.5">
             {user ? (
               <>
-                <div className="relative">
-                  <button 
-                    onClick={() => setShowUserMenu(!showUserMenu)}
-                    className="size-10 rounded-full bg-blue-500 flex items-center justify-center text-white text-sm font-bold active:scale-90 transition-transform"
-                  >
-                    {user.name.charAt(0).toUpperCase()}
-                  </button>
-                  {showUserMenu && (
-                    <div className="absolute top-12 right-0 w-48 bg-white shadow-2xl rounded-2xl border border-gray-100 overflow-hidden z-50 animate-in fade-in zoom-in-95 duration-200 origin-top-right">
-                      <div className="px-4 py-3 border-b border-gray-50">
-                        <p className="text-[11px] font-black text-gray-900 truncate leading-none mb-1">{user.name}</p>
-                        <p className="text-[9px] font-bold text-gray-400 truncate leading-none">{user.email}</p>
-                      </div>
-                      <button onClick={() => { onLogout(); setShowUserMenu(false); }} className="w-full px-4 py-3 text-left flex items-center gap-2 hover:bg-red-50 text-red-500 transition-colors">
-                        <span className="material-symbols-outlined text-[18px]">logout</span>
-                        <span className="text-xs font-bold uppercase tracking-widest">Sign Out</span>
-                      </button>
-                    </div>
-                  )}
-                </div>
+                <UserAvatar user={user} onLogout={onLogout} variant="mobile" />
                 <button 
                   onClick={onManualSync}
                   className={`size-10 flex items-center justify-center rounded-xl transition-all ${isSyncing ? 'text-primary bg-background-dark/10' : 'bg-gray-50 text-gray-400 hover:text-sage'}`}

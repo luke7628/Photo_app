@@ -2,6 +2,7 @@
 import React, { useState, useMemo } from 'react';
 import { Project, MicrosoftUser, Printer } from '../types';
 import { getProjectThumbnail, getProjectStats } from '../services/projectUtils';
+import { UserAvatar } from './UserAvatar';
 
 interface ProjectListScreenProps {
   projects: Project[];
@@ -25,7 +26,6 @@ const ProjectListScreen: React.FC<ProjectListScreenProps> = ({
   const [siteName, setSiteName] = useState('');
   const [batch, setBatch] = useState('');
   const [auditorName, setAuditorName] = useState('');
-  const [showUserMenu, setShowUserMenu] = useState(false);
   
   // 计算项目缩略图和统计信息
   const projectsWithMeta = useMemo(() => {
@@ -52,42 +52,7 @@ const ProjectListScreen: React.FC<ProjectListScreenProps> = ({
 
         <div className="flex items-center gap-0.5 sm:gap-3 flex-shrink-0 relative">
           {user ? (
-            <div className="relative">
-              <button 
-                onClick={() => setShowUserMenu(!showUserMenu)}
-                title={user.name}
-                className="flex items-center gap-0.5 sm:gap-2 bg-gray-100 hover:bg-gray-200 px-1.5 sm:px-4 py-1 sm:py-2 rounded-lg transition-colors active:scale-95 h-8 sm:h-10"
-              >
-                <div className="w-5 h-5 sm:w-6 sm:h-6 rounded-full bg-blue-500 flex items-center justify-center text-white text-xs font-bold flex-shrink-0">
-                  {user.name.charAt(0).toUpperCase()}
-                </div>
-                <span className="hidden sm:inline text-xs font-semibold text-gray-700 truncate max-w-[80px]">{user.name.split(' ')[0]}</span>
-                <span className="material-symbols-outlined text-sm text-gray-600">expand_more</span>
-              </button>
-
-              {/* User Menu */}
-              {showUserMenu && (
-                <div className="absolute top-full right-0 mt-1 w-48 bg-white shadow-xl rounded-lg border border-gray-200 overflow-hidden z-50 animate-fadeIn">
-                  {/* User Info */}
-                  <div className="px-4 py-3 border-b border-gray-100 bg-gray-50">
-                    <p className="text-xs font-semibold text-gray-900">{user.name}</p>
-                    <p className="text-xs text-gray-500 truncate mt-0.5">{user.email}</p>
-                  </div>
-
-                  {/* Menu Items */}
-                  <button
-                    onClick={() => {
-                      setShowUserMenu(false);
-                      onLogout();
-                    }}
-                    className="w-full px-4 py-2.5 flex items-center gap-2 text-left text-xs font-medium text-gray-700 hover:bg-gray-50 transition-colors active:bg-gray-100"
-                  >
-                    <span className="material-symbols-outlined text-base">logout</span>
-                    <span>Sign Out</span>
-                  </button>
-                </div>
-              )}
-            </div>
+            <UserAvatar user={user} onLogout={onLogout} variant="desktop" />
           ) : (
             <button 
               onClick={onLogin}
