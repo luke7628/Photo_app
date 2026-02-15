@@ -45,7 +45,7 @@ const App: React.FC = () => {
   const [settings, setSettings] = useState<UserPreferences>({
     defaultFlash: 'auto',
     skipReview: false,
-    autoUpload: true,
+    autoUpload: false,  // Disabled by default for personal accounts without SPO license
     drivePath: '/Dematic/FieldPhotos/',
     useSubfoldersBySN: true,
     imageQuality: 'original',
