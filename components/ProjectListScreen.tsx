@@ -79,8 +79,8 @@ const ProjectListScreen: React.FC<ProjectListScreenProps> = ({
       </header>
 
       {/* Projects Grid */}
-      <main className="flex-1 overflow-y-auto px-2 sm:px-6 py-3 sm:py-6 custom-scrollbar">
-        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-2 sm:gap-4">
+      <main className="flex-1 overflow-y-auto px-2 sm:px-6 pt-3 sm:pt-6 custom-scrollbar">
+        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-2 sm:gap-4 pb-6">
           
           {/* Create New Project Card */}
           <button 
