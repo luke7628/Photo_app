@@ -214,44 +214,39 @@ input, textarea {
   }
 }
 
-/* Safe area support for notch devices - ONLY enabled in PWA standalone mode */
-@media (display-mode: standalone) {
+/* Safe area utilities - disabled in PWA standalone mode since #root handles offset */
+/* In standalone mode, these classes do nothing to avoid double padding */
+@media not all and (display-mode: standalone) {
   .safe-pt {
-    padding-top: env(safe-area-inset-top);
-    padding-top: max(16px, env(safe-area-inset-top));
+    padding-top: env(safe-area-inset-top, 0px);
   }
 
   .safe-pb {
-    padding-bottom: env(safe-area-inset-bottom);
-    padding-bottom: max(16px, env(safe-area-inset-bottom));
+    padding-bottom: env(safe-area-inset-bottom, 0px);
   }
 
   .pb-safe {
-    padding-bottom: env(safe-area-inset-bottom);
+    padding-bottom: env(safe-area-inset-bottom, 0px);
   }
 
   .safe-px {
-    padding-left: env(safe-area-inset-left);
-    padding-right: env(safe-area-inset-right);
-    padding-left: max(16px, env(safe-area-inset-left));
-    padding-right: max(16px, env(safe-area-inset-right));
+    padding-left: env(safe-area-inset-left, 0px);
+    padding-right: env(safe-area-inset-right, 0px);
   }
 
   .safe-pl {
-    padding-left: env(safe-area-inset-left);
-    padding-left: max(16px, env(safe-area-inset-left));
+    padding-left: env(safe-area-inset-left, 0px);
   }
 
   .safe-pr {
-    padding-right: env(safe-area-inset-right);
-    padding-right: max(16px, env(safe-area-inset-right));
+    padding-right: env(safe-area-inset-right, 0px);
   }
 
   .safe-area-inset {
-    padding-top: env(safe-area-inset-top);
-    padding-left: env(safe-area-inset-left);
-    padding-right: env(safe-area-inset-right);
-    padding-bottom: env(safe-area-inset-bottom);
+    padding-top: env(safe-area-inset-top, 0px);
+    padding-left: env(safe-area-inset-left, 0px);
+    padding-right: env(safe-area-inset-right, 0px);
+    padding-bottom: env(safe-area-inset-bottom, 0px);
   }
 }
 

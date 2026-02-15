@@ -67,7 +67,7 @@
       width: 100%;
       margin: 0;
       padding: 0;
-      background: transparent;
+      background: #ffffff;
       overflow: hidden;
       overscroll-behavior: none;
       font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', sans-serif;
@@ -89,6 +89,14 @@
       box-sizing: border-box;
       display: flex;
       flex-direction: column;
+    }
+    
+    /* In PWA standalone mode, offset #root by safe area to avoid overlap */
+    @media (display-mode: standalone) {
+      #root {
+        top: env(safe-area-inset-top, 0px);
+        bottom: env(safe-area-inset-bottom, 0px);
+      }
     }
     
     /* Only apply safe area padding in NON-standalone mode (regular browser) */
