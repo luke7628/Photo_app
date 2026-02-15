@@ -20,6 +20,13 @@ export default {
       },
       animation: {
         'shimmer': 'shimmer 2s infinite',
+        'fadeIn': 'fadeIn 0.2s ease-in',
+      },
+      keyframes: {
+        fadeIn: {
+          '0%': { opacity: '0' },
+          '100%': { opacity: '1' },
+        },
       },
     },
   },
