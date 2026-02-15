@@ -235,9 +235,9 @@ const DetailsScreen: React.FC<DetailsScreenProps> = ({
                 <div className="relative">
                   <button 
                     onClick={() => setShowUserMenu(!showUserMenu)}
-                    className="size-10 rounded-full border-2 border-primary/20 p-0.5 overflow-hidden active:scale-90 transition-transform"
+                    className="size-10 rounded-full bg-blue-500 flex items-center justify-center text-white text-sm font-bold active:scale-90 transition-transform"
                   >
-                    <img src={user.photoUrl} className="size-full rounded-full object-cover" alt="User" />
+                    {user.name.charAt(0).toUpperCase()}
                   </button>
                   {showUserMenu && (
                     <div className="absolute top-12 right-0 w-48 bg-white shadow-2xl rounded-2xl border border-gray-100 overflow-hidden z-50 animate-in fade-in zoom-in-95 duration-200 origin-top-right">
@@ -264,10 +264,10 @@ const DetailsScreen: React.FC<DetailsScreenProps> = ({
             ) : (
               <button 
                 onClick={onLogin}
-                className="h-10 px-3 bg-blue-500 hover:bg-blue-600 text-white rounded-xl flex items-center gap-2 text-xs font-semibold transition-colors active:scale-95"
+                className="h-8 sm:h-10 px-1.5 sm:px-3 bg-blue-500 hover:bg-blue-600 text-white rounded-lg flex items-center gap-0.5 sm:gap-1.5 text-[10px] sm:text-xs font-semibold transition-colors active:scale-95 flex-shrink-0"
               >
-                <span className="material-symbols-outlined text-sm">cloud</span>
-                <span>Microsoft</span>
+                <span className="material-symbols-outlined text-sm sm:text-base flex-shrink-0">cloud</span>
+                <span className="hidden xs:inline">Microsoft</span>
               </button>
             )}
           </div>
