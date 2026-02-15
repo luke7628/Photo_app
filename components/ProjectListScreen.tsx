@@ -26,6 +26,7 @@ const ProjectListScreen: React.FC<ProjectListScreenProps> = ({
   const [siteName, setSiteName] = useState('');
   const [batch, setBatch] = useState('');
   const [auditorName, setAuditorName] = useState('');
+  const [isKeyboardVisible, setIsKeyboardVisible] = useState(false);
   
   // 计算项目缩略图和统计信息
   const projectsWithMeta = useMemo(() => {
@@ -166,7 +167,9 @@ const ProjectListScreen: React.FC<ProjectListScreenProps> = ({
 
       {/* Create Modal */}
       {showCreateModal && (
-        <div className="fixed inset-0 z-[100] bg-black/40 backdrop-blur-sm flex items-center justify-center p-2 sm:p-4">
+        <div className={`fixed inset-0 z-[100] bg-black/40 backdrop-blur-sm flex p-2 sm:p-4 transition-all duration-300 ${
+          isKeyboardVisible ? 'items-start pt-8' : 'items-center justify-center'
+        }`}>
            <div className="w-full max-w-sm bg-white rounded-lg sm:rounded-2xl p-4 sm:p-8 shadow-xl animate-slideUp">
               <h2 className="text-lg sm:text-2xl font-bold text-gray-900 mb-1 sm:mb-2">New Project</h2>
               <p className="text-xs sm:text-sm text-gray-500 mb-3 sm:mb-6">Enter project details</p>
@@ -178,6 +181,8 @@ const ProjectListScreen: React.FC<ProjectListScreenProps> = ({
                     autoFocus
                     value={siteName}
                     onChange={(e) => setSiteName(e.target.value)}
+                    onFocus={() => setIsKeyboardVisible(true)}
+                    onBlur={() => setTimeout(() => setIsKeyboardVisible(false), 100)}
                     placeholder="e.g., Ardc/Modc/"
                     className="w-full h-10 sm:h-12 px-3 sm:px-4 bg-gray-100 rounded-lg border border-transparent focus:border-blue-500 focus:outline-none text-sm font-medium placeholder-gray-500"
                     onKeyDown={(e) => {
@@ -193,6 +198,8 @@ const ProjectListScreen: React.FC<ProjectListScreenProps> = ({
                   <input 
                     value={batch}
                     onChange={(e) => setBatch(e.target.value)}
+                    onFocus={() => setIsKeyboardVisible(true)}
+                    onBlur={() => setTimeout(() => setIsKeyboardVisible(false), 100)}
                     placeholder="e.g., 2026P1"
                     className="w-full h-10 sm:h-12 px-3 sm:px-4 bg-gray-100 rounded-lg border border-transparent focus:border-blue-500 focus:outline-none text-sm font-medium placeholder-gray-500"
                     onKeyDown={(e) => {
@@ -208,6 +215,8 @@ const ProjectListScreen: React.FC<ProjectListScreenProps> = ({
                   <input 
                     value={auditorName}
                     onChange={(e) => setAuditorName(e.target.value)}
+                    onFocus={() => setIsKeyboardVisible(true)}
+                    onBlur={() => setTimeout(() => setIsKeyboardVisible(false), 100)}
                     placeholder="e.g., John Doe"
                     className="w-full h-10 sm:h-12 px-3 sm:px-4 bg-gray-100 rounded-lg border border-transparent focus:border-blue-500 focus:outline-none text-sm font-medium placeholder-gray-500"
                     onKeyDown={(e) => {
