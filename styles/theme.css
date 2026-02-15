@@ -207,17 +207,10 @@ input, textarea {
 /* iOS PWA specific fixes */
 @supports (padding: max(0px)) {
   @media (display-mode: standalone) {
-    html {
-      height: 100vh;
-      height: 100dvh; /* Dynamic viewport height for iOS */
-    }
-    
+    html,
     body {
-      height: 100vh;
-      height: 100dvh;
+      height: 100%;
     }
-    
-    /* #root height is auto-calculated from top/bottom, no explicit height needed */
   }
 }
 

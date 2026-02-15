@@ -38,12 +38,8 @@
 - **Application (client) ID** ← 复制这个
 - **Directory (tenant) ID** ← 复制这个
 
-在左侧菜单中，选择 **Certificates & secrets**（证书和密码）：
-- 点击 **+ New client secret**
-- 设置过期时间（建议 12 个月或更长）
-- 复制显示的 **Value**（密码值）
-
-> ⚠️ **重要**：立即保存这些值，刷新页面后将无法再看到密码。
+> ✅ 本应用使用 **PKCE (公共客户端)** 登录流程，**不需要** client secret。
+> 只有在你自己搭建后端进行授权码换取 Token 时，才需要在 **Certificates & secrets** 创建 client secret。
 
 ## 第二步：配置 API 权限
 
@@ -72,27 +68,7 @@
 
 ## 第三步：配置应用
 
-### 更新 App.tsx 中的常数
-
-在 [App.tsx](../App.tsx) 中，找到以下行并替换为你的值：
-
-```typescript
-// MICROSOFT OneDrive SETUP
-const MICROSOFT_CLIENT_ID = "YOUR_MICROSOFT_CLIENT_ID";           // 替换为你的 Client ID
-const MICROSOFT_TENANT_ID = "YOUR_TENANT_ID";                     // 替换为你的 Tenant ID
-const MICROSOFT_CLIENT_SECRET = "YOUR_MICROSOFT_CLIENT_SECRET";   // 替换为你的 Client Secret
-const MICROSOFT_REDIRECT_URI = "http://localhost:3000/Photo_app/auth-callback.html";
-```
-
-**示例：**
-```typescript
-const MICROSOFT_CLIENT_ID = "a1b2c3d4-e5f6-7g8h-9i0j-k1l2m3n4o5p6";
-const MICROSOFT_TENANT_ID = "x1y2z3a4-b5c6-7d8e-9f0g-h1i2j3k4l5m6";
-const MICROSOFT_CLIENT_SECRET = "ns.7Q~abc...xyz_DEF~abc";
-const MICROSOFT_REDIRECT_URI = "http://localhost:3000/Photo_app/public/auth-callback.html";
-```
-
-### 环境变量配置（可选）
+### 环境变量配置（推荐）
 
 如不想在代码中硬编码敏感信息，可以使用环境变量：
 
@@ -106,7 +82,7 @@ VITE_MICROSOFT_TENANT_ID=your_tenant_id_here
 VITE_MICROSOFT_REDIRECT_URI=http://localhost:3000/Photo_app/auth-callback.html
 ```
 
-> ⚠️ **注意**：`VITE_` 前缀是必需的（Vite 约定），客户端密码应该在后端安全存储，不应在前端暴露。
+> ⚠️ **注意**：`VITE_` 前缀是必需的（Vite 约定）。本应用使用 PKCE，不需要 client secret。
 
 #### 更新 vite.config.ts
 

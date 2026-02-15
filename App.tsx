@@ -23,9 +23,10 @@ import ProjectListScreen from './components/ProjectListScreen';
 // Do NOT hardcode secrets in source.
 const MICROSOFT_CLIENT_ID = import.meta.env.VITE_MICROSOFT_CLIENT_ID || "";
 const MICROSOFT_TENANT_ID = import.meta.env.VITE_MICROSOFT_TENANT_ID || "common";
-const MICROSOFT_CLIENT_SECRET = import.meta.env.VITE_MICROSOFT_CLIENT_SECRET || "";
 const MICROSOFT_REDIRECT_URI = import.meta.env.VITE_MICROSOFT_REDIRECT_URI ||
   `${window.location.origin}${import.meta.env.BASE_URL}auth-callback.html`;
+const MICROSOFT_PKCE_VERIFIER_KEY = 'microsoft_code_verifier';
+const MICROSOFT_AUTH_CODE_KEY = 'microsoft_auth_code';
 
 // GOOGLE DRIVE SETUP (ALTERNATIVE):
 // 1. Go to Google Cloud Console (https://console.cloud.google.com)
@@ -93,7 +94,41 @@ const App: React.FC = () => {
     initMicrosoft();
   }, []);
 
-  const handleLogin = useCallback(() => {
+  const exchangeAuthCode = useCallback(async (code: string) => {
+    const codeVerifier = sessionStorage.getItem(MICROSOFT_PKCE_VERIFIER_KEY);
+    if (!codeVerifier) {
+      console.warn('Missing PKCE code verifier. Please try logging in again.');
+      return;
+    }
+
+    const success = await microsoftAuthService.exchangeCodeForToken(
+      code,
+      MICROSOFT_CLIENT_ID,
+      MICROSOFT_REDIRECT_URI,
+      codeVerifier
+    );
+
+    if (success && microsoftAuthService.accessToken) {
+      oneDriveService.setToken(microsoftAuthService.accessToken);
+
+      const userInfo = await microsoftAuthService.getUserInfo();
+      if (userInfo) {
+        setUser(userInfo as any);
+        storageService.saveUser(userInfo as any);
+        setSettings(prev => ({ ...prev, cloudProvider: 'onedrive' }));
+      }
+    }
+  }, []);
+
+  useEffect(() => {
+    const storedCode = localStorage.getItem(MICROSOFT_AUTH_CODE_KEY);
+    if (storedCode) {
+      localStorage.removeItem(MICROSOFT_AUTH_CODE_KEY);
+      exchangeAuthCode(storedCode);
+    }
+  }, [exchangeAuthCode]);
+
+  const handleLogin = useCallback(async () => {
     if (!MICROSOFT_CLIENT_ID) {
       // Show a user-friendly message in the UI instead of an alert
       const message = "Microsoft Login is not configured.\n\n" +
@@ -110,12 +145,17 @@ const App: React.FC = () => {
       }
       return;
     }
+
+    const { verifier, challenge } = await microsoftAuthService.createPkcePair();
+    sessionStorage.setItem(MICROSOFT_PKCE_VERIFIER_KEY, verifier);
+    localStorage.removeItem(MICROSOFT_AUTH_CODE_KEY);
     
     // Generate login URL and redirect
     const loginUrl = microsoftAuthService.getLoginUrl(
       MICROSOFT_CLIENT_ID,
       MICROSOFT_REDIRECT_URI,
-      MICROSOFT_TENANT_ID
+      MICROSOFT_TENANT_ID,
+      challenge
     );
     
     // 在新窗口打开登录页面（也可以直接重定向）
@@ -123,43 +163,26 @@ const App: React.FC = () => {
     
     // 或者在新窗口打开，保持当前应用继续运行
     const authWindow = window.open(loginUrl, 'microsoft_auth', 'width=500,height=600');
+    if (!authWindow) {
+      window.location.href = loginUrl;
+      return;
+    }
     
     // 监听来自回调页面的消息
-    window.addEventListener('message', async (event) => {
+    const handleAuthMessage = async (event: MessageEvent) => {
       if (event.origin !== window.location.origin) return;
       
       if (event.data.type === 'microsoft_auth_success') {
         const { code } = event.data;
-        
-        // 使用授权码交换 token
-        if (!MICROSOFT_CLIENT_SECRET) {
-          console.warn('Microsoft client secret is missing. Token exchange requires a backend or a secret in env.');
-          return;
-        }
+        await exchangeAuthCode(code);
 
-        const success = await microsoftAuthService.exchangeCodeForToken(
-          code,
-          MICROSOFT_CLIENT_ID,
-          MICROSOFT_CLIENT_SECRET,
-          MICROSOFT_REDIRECT_URI
-        );
-        
-        if (success && microsoftAuthService.accessToken) {
-          oneDriveService.setToken(microsoftAuthService.accessToken);
-          
-          // 获取用户信息
-          const userInfo = await microsoftAuthService.getUserInfo();
-          if (userInfo) {
-            setUser(userInfo as any);
-            storageService.saveUser(userInfo as any);
-            setSettings(prev => ({ ...prev, cloudProvider: 'onedrive' }));
-            
-            if (authWindow) authWindow.close();
-          }
-        }
+        if (authWindow) authWindow.close();
+        window.removeEventListener('message', handleAuthMessage);
       }
-    });
-  }, []);
+    };
+
+    window.addEventListener('message', handleAuthMessage);
+  }, [exchangeAuthCode]);
 
 
 
@@ -634,7 +657,7 @@ const App: React.FC = () => {
   const activePrinters = useMemo(() => printers.filter(p => p.projectId === activeProjectId), [printers, activeProjectId]);
 
   return (
-    <div className="app-container w-full h-full bg-white overflow-hidden flex flex-col">
+    <div className="app-container w-full h-full bg-transparent overflow-hidden flex flex-col">
       <div key={currentScreen} className="w-full h-full screen-enter flex flex-col overflow-hidden">
         {currentScreen === AppScreen.SPLASH && <SplashScreen />}
         {currentScreen === AppScreen.PROJECT_LIST && <ProjectListScreen projects={projects} printers={printers} onSelectProject={(id) => { setActiveProjectId(id); setCurrentScreen(AppScreen.GALLERY); }} onCreateProject={(name) => setProjects([{ id: `p-${Date.now()}`, name, printerIds: [], createdAt: new Date().toISOString() }, ...projects])} onRenameProject={(id, newName) => setProjects(prev => prev.map(p => p.id === id ? { ...p, name: newName } : p))} onDeleteProject={(id) => { setProjects(prev => prev.filter(p => p.id !== id)); setPrinters(prev => prev.filter(p => p.projectId !== id)); }} onOpenSettings={() => setCurrentScreen(AppScreen.SETTINGS)} user={user} onLogin={handleLogin} onLogout={handleLogout} />}
