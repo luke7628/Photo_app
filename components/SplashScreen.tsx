@@ -11,9 +11,7 @@ const SplashScreen: React.FC = () => {
         </div>
       </div>
 
-      <div className="h-16 w-full"></div>
-
-      <div className="flex flex-col items-center justify-center flex-1 z-10 px-6">
+      <div className="flex flex-col items-center justify-center flex-1 z-10 px-6 py-8">
         {/* Enhanced Logo Container with Apple-style animation */}
         <div className="relative mb-10 animate-scaleIn">
           {/* Glow effect */}
@@ -78,7 +76,7 @@ const SplashScreen: React.FC = () => {
       </div>
 
       {/* Bottom text with fade in */}
-      <div className="safe-pb h-20 flex items-center justify-center text-center px-6 animate-fadeIn" style={{animationDelay: '600ms'}}>
+      <div className="pb-4 py-4 flex items-center justify-center text-center px-6 animate-fadeIn" style={{animationDelay: '600ms'}}>
         <p className="text-sm text-gray-500 font-medium tracking-wide">Ready to use</p>
       </div>
     </div>
