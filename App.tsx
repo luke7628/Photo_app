@@ -3,7 +3,6 @@ import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { AppScreen, Printer, Project, PHOTO_LABELS, PhotoSetItem, UserPreferences, MicrosoftUser, ViewMode } from './types';
 import { MOCK_PRINTERS, MOCK_PROJECTS } from './constants';
 import { storageService } from './services/storageService';
-import { googleDriveService } from './services/googleDriveService';
 import { oneDriveService } from './services/oneDriveService';
 import { microsoftAuthService } from './services/microsoftAuthService';
 import { readBarcode } from './services/barcodeService';
@@ -21,6 +20,7 @@ import ProjectListScreen from './components/ProjectListScreen';
 // MICROSOFT OneDrive SETUP (RECOMMENDED):
 // Configure these in .env.local (Vite env vars).
 // Do NOT hardcode secrets in source.
+// Environment variables injected via GitHub Actions for production deployment
 const MICROSOFT_CLIENT_ID = import.meta.env.VITE_MICROSOFT_CLIENT_ID || "";
 const MICROSOFT_TENANT_ID = import.meta.env.VITE_MICROSOFT_TENANT_ID || "common";
 const MICROSOFT_REDIRECT_URI = import.meta.env.VITE_MICROSOFT_REDIRECT_URI ||
@@ -28,15 +28,6 @@ const MICROSOFT_REDIRECT_URI = import.meta.env.VITE_MICROSOFT_REDIRECT_URI ||
 const MICROSOFT_PKCE_VERIFIER_KEY = 'microsoft_code_verifier';
 const MICROSOFT_AUTH_CODE_KEY = 'microsoft_auth_code';
 
-// GOOGLE DRIVE SETUP (ALTERNATIVE):
-// 1. Go to Google Cloud Console (https://console.cloud.google.com)
-// 2. Create a project or select existing one
-// 3. Enable "Google Drive API" in "APIs & Services" -> "Library"
-// 4. Go to "Credentials", create "OAuth client ID" (Web application)
-// 5. Add "http://localhost:3000" (or your domain) to "Authorized JavaScript origins"
-// 6. Paste the Client ID below:
-const GOOGLE_CLIENT_ID = "YOUR_CLIENT_ID.apps.googleusercontent.com";
- 
 
 const App: React.FC = () => {
   const [currentScreen, setCurrentScreen] = useState<AppScreen>(AppScreen.SPLASH);
@@ -212,6 +203,9 @@ const App: React.FC = () => {
       const savedPrinters = await storageService.loadPrinters(); // Async IDB
       const savedUser = storageService.loadUser();
       const savedSettings = storageService.loadSettings();
+      const normalizedSettings = savedSettings?.cloudProvider === 'drive'
+        ? { ...savedSettings, cloudProvider: 'onedrive' }
+        : savedSettings;
       
       // 合并MOCK数据，确保测试项目存在
       let finalProjects = savedProjects || [];
@@ -237,7 +231,7 @@ const App: React.FC = () => {
       setProjects(finalProjects);
       setPrinters(finalPrinters);
       if (savedUser) setUser(savedUser);
-      if (savedSettings) setSettings(savedSettings);
+      if (normalizedSettings) setSettings(normalizedSettings);
 
       const timer = setTimeout(() => setCurrentScreen(AppScreen.PROJECT_LIST), 2500);
       return () => { clearTimeout(timer); };
@@ -257,13 +251,12 @@ const App: React.FC = () => {
   useEffect(() => { storageService.saveProjects(projects); }, [projects]);
   useEffect(() => { storageService.saveSettings(settings); }, [settings]);
 
-  // Real Sync Cycle to Google Drive
+  // Real Sync Cycle to OneDrive
   const performSyncCycle = useCallback(async () => {
     // 需要：自动上传开启、用户已登录、有访问令牌
-    const hasGoogleToken = googleDriveService.accessToken;
     const hasMicrosoftToken = oneDriveService.accessToken;
     
-    if (!settings.autoUpload || !user || (!hasGoogleToken && !hasMicrosoftToken)) return;
+    if (!settings.autoUpload || settings.cloudProvider !== 'onedrive' || !user || !hasMicrosoftToken) return;
     
     // 查找有未同步照片且当前未同步的打印机
     const targetPrinter = printers.find(p => {
@@ -282,60 +275,39 @@ const App: React.FC = () => {
     try {
       let targetFolderId: string | null = null;
 
-      // 根据当前配置选择云服务
-      if (settings.cloudProvider === 'onedrive' && hasMicrosoftToken) {
-        // ==================== OneDrive 同步流程 ====================
-        // 1. 确保根文件夹"Dematic/FieldPhotos"存在
-        const drivePath = settings.drivePath || '/Dematic/FieldPhotos/';
-        let rootFolderId = await oneDriveService.findFolder(drivePath);
-        
-        if (!rootFolderId) {
-          rootFolderId = await oneDriveService.ensureFolder(drivePath);
-        }
-        
-        if (!rootFolderId) throw new Error("Could not create/find root folder in OneDrive");
+      // ==================== OneDrive 同步流程 ====================
+      // 1. 确保根文件夹"Dematic/FieldPhotos"存在
+      const drivePath = settings.drivePath || '/Dematic/FieldPhotos/';
+      let rootFolderId = await oneDriveService.findFolder(drivePath);
+      
+      if (!rootFolderId) {
+        rootFolderId = await oneDriveService.ensureFolder(drivePath);
+      }
+      
+      if (!rootFolderId) throw new Error("Could not create/find root folder in OneDrive");
 
-        // 2. 确保项目文件夹存在
-        const project = projects.find(p => p.id === targetPrinter.projectId);
-        const projectName = project ? project.name : 'Unassigned Project';
-        const projectPath = `${settings.drivePath}${projectName}`;
-        let projectFolderId = await oneDriveService.findFolder(projectPath);
+      // 2. 确保项目文件夹存在
+      const project = projects.find(p => p.id === targetPrinter.projectId);
+      const projectName = project ? project.name : 'Unassigned Project';
+      const projectPath = `${settings.drivePath}${projectName}`;
+      let projectFolderId = await oneDriveService.findFolder(projectPath);
+      
+      if (!projectFolderId) {
+        projectFolderId = await oneDriveService.ensureFolder(projectPath);
+      }
+      
+      if (!projectFolderId) throw new Error("Could not create/find project folder");
+
+      // 3. 如果启用了按序列号分文件夹
+      if (settings.useSubfoldersBySN) {
+        const snPath = `${projectPath}/${targetPrinter.serialNumber}`;
+        targetFolderId = await oneDriveService.findFolder(snPath);
         
-        if (!projectFolderId) {
-          projectFolderId = await oneDriveService.ensureFolder(projectPath);
+        if (!targetFolderId) {
+          targetFolderId = await oneDriveService.ensureFolder(snPath);
         }
-        
-        if (!projectFolderId) throw new Error("Could not create/find project folder");
-
-        // 3. 如果启用了按序列号分文件夹
-        if (settings.useSubfoldersBySN) {
-          const snPath = `${projectPath}/${targetPrinter.serialNumber}`;
-          targetFolderId = await oneDriveService.findFolder(snPath);
-          
-          if (!targetFolderId) {
-            targetFolderId = await oneDriveService.ensureFolder(snPath);
-          }
-        } else {
-          targetFolderId = projectFolderId;
-        }
-      } else if (settings.cloudProvider === 'drive' || (!hasGoogleToken && hasGoogleToken)) {
-        // ==================== Google Drive 同步流程 ====================
-        // 1. 确保根文件夹"Dematic Field Photos"
-        const rootFolderId = await googleDriveService.ensureFolder('Dematic Field Photos');
-        if (!rootFolderId) throw new Error("Could not create/find root folder");
-
-        // 2. 确保项目文件夹
-        const project = projects.find(p => p.id === targetPrinter.projectId);
-        const projectName = project ? project.name : 'Unassigned Project';
-        const projectFolderId = await googleDriveService.ensureFolder(projectName, rootFolderId);
-        if (!projectFolderId) throw new Error("Could not create/find project folder");
-
-        // 3. 确保序列号文件夹（如果启用）
-        if (settings.useSubfoldersBySN) {
-          targetFolderId = await googleDriveService.ensureFolder(targetPrinter.serialNumber, projectFolderId);
-        } else {
-          targetFolderId = projectFolderId;
-        }
+      } else {
+        targetFolderId = projectFolderId;
       }
 
       if (!targetFolderId) throw new Error("Could not determine target folder");
@@ -349,11 +321,7 @@ const App: React.FC = () => {
         const photo = updatedPhotos[i];
         if (photo.url && !photo.isSynced) {
           try {
-            if (settings.cloudProvider === 'onedrive' && hasMicrosoftToken) {
-              await oneDriveService.uploadImage(photo.url, photo.filename, targetFolderId);
-            } else {
-              await googleDriveService.uploadImage(photo.url, photo.filename, targetFolderId);
-            }
+            await oneDriveService.uploadImage(photo.url, photo.filename, targetFolderId);
             updatedPhotos[i] = { ...photo, isSynced: true };
             hasChanges = true;
           } catch (uploadError) {
@@ -400,11 +368,8 @@ const App: React.FC = () => {
   useEffect(() => {
     let interval: number;
     // Run sync cycle every 5 seconds if conditions met
-    const hasGoogleToken = googleDriveService.accessToken;
     const hasMicrosoftToken = microsoftAuthService.accessToken;
-    const hasValidToken = (settings.cloudProvider === 'drive' && hasGoogleToken) || 
-                         (settings.cloudProvider === 'onedrive' && hasMicrosoftToken) ||
-                         (settings.cloudProvider === 'none' && (hasGoogleToken || hasMicrosoftToken));
+    const hasValidToken = settings.cloudProvider === 'onedrive' && hasMicrosoftToken;
     
     if (settings.autoUpload && hasValidToken) {
       interval = window.setInterval(performSyncCycle, 5000); 
