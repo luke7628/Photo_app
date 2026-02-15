@@ -282,6 +282,13 @@ input, textarea {
       height: 100dvh;
       width: 100%;
     }
+    
+    /* Ensure app container respects safe areas in PWA mode */
+    .app-container {
+      top: env(safe-area-inset-top) !important;
+      bottom: env(safe-area-inset-bottom) !important;
+      height: auto !important;
+    }
   }
 }
 
