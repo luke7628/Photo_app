@@ -109,6 +109,12 @@ const DetailsScreen: React.FC<DetailsScreenProps> = ({
                       <div className="absolute top-2 right-2 bg-background-dark/80 backdrop-blur-md px-2 py-1 rounded-full border border-white/10">
                         <p className="text-[9px] font-black text-primary uppercase tracking-widest leading-none">{index + 1} / 12</p>
                       </div>
+                      {/* Photo label overlay at bottom */}
+                      <div className="absolute bottom-0 left-0 right-0 bg-black/50 backdrop-blur-sm px-3 py-1.5">
+                        <p className="text-xs font-bold text-white uppercase tracking-wide text-center">
+                          {photo.label}
+                        </p>
+                      </div>
                     </>
                   ) : (
                     <div className="flex flex-col items-center gap-1 text-gray-300">
@@ -119,8 +125,7 @@ const DetailsScreen: React.FC<DetailsScreenProps> = ({
                 </div>
                 <div className="px-2 flex justify-between items-start gap-2">
                   <div className="min-w-0 flex-1">
-                    <p className={`text-sm font-black tracking-tight leading-none ${photo.url ? 'text-gray-900' : 'text-gray-400'}`}>{photo.label}</p>
-                    <p className="text-[8px] font-bold text-gray-400 mt-1 uppercase tracking-widest leading-none">
+                    <p className="text-[8px] font-bold text-gray-400 uppercase tracking-widest leading-none">
                       {photo.filename}
                     </p>
                   </div>
@@ -158,6 +163,12 @@ const DetailsScreen: React.FC<DetailsScreenProps> = ({
                       <div className="absolute top-1.5 right-1.5 bg-black/40 backdrop-blur-sm px-1.5 py-0.5 rounded-full border border-white/20">
                         <p className="text-[8px] font-semibold text-white leading-none\">{index + 1}/12</p>
                       </div>
+                      {/* Photo label overlay at bottom */}
+                      <div className="absolute bottom-0 left-0 right-0 bg-black/50 backdrop-blur-sm px-2 py-1">
+                        <p className="text-[9px] font-bold text-white uppercase tracking-wide text-center truncate">
+                          {photo.label}
+                        </p>
+                      </div>
                     </>
                   ) : (
                     <div className="flex flex-col items-center gap-0.5">
@@ -167,10 +178,9 @@ const DetailsScreen: React.FC<DetailsScreenProps> = ({
                   )}
                 </div>
                 <div className="px-0.5">
-                  <p className={`text-[10px] font-semibold truncate leading-none ${photo.url ? 'text-gray-900' : 'text-gray-500'}`}>
-                    {photo.label}
+                  <p className={`text-[10px] font-semibold truncate leading-none ${photo.url ? 'text-gray-400' : 'text-gray-500'}`}>
+                    {photo.filename}
                   </p>
-                  {photo.url && <p className="text-[7px] text-gray-400 mt-0.5 truncate leading-none">{photo.filename}</p>}
                 </div>
               </button>
             ))}
@@ -203,7 +213,7 @@ const DetailsScreen: React.FC<DetailsScreenProps> = ({
 
   return (
     <div className="flex flex-col h-full w-full bg-white overflow-hidden animate-in fade-in duration-300 relative">
-      <header className="pt-14 pb-3 px-5 bg-white border-b border-gray-100 z-10">
+      <header className="safe-pt safe-px pb-3 bg-white border-b border-gray-100 z-10">
         <div className="flex items-center gap-3 mb-3">
           <button 
             onClick={onBack}
@@ -254,10 +264,10 @@ const DetailsScreen: React.FC<DetailsScreenProps> = ({
             ) : (
               <button 
                 onClick={onLogin}
-                className="h-10 px-3 bg-slate-100 rounded-xl flex items-center gap-2 text-slate-700 active:scale-95 transition-all"
+                className="h-10 px-3 bg-blue-500 hover:bg-blue-600 text-white rounded-xl flex items-center gap-2 text-xs font-semibold transition-colors active:scale-95"
               >
-                <span className="material-symbols-outlined text-[18px]">login</span>
-                <span className="text-[9px] font-black uppercase tracking-widest whitespace-nowrap">Sign in with Microsoft</span>
+                <span className="material-symbols-outlined text-sm">cloud</span>
+                <span>Microsoft</span>
               </button>
             )}
           </div>
@@ -329,32 +339,36 @@ const DetailsScreen: React.FC<DetailsScreenProps> = ({
       </main>
 
       {capturedCount < 12 && (
-        <div className="absolute bottom-8 left-1/2 -translate-x-1/2 z-20">
-          <button 
-            onClick={() => {
-              const nextIdx = photos.findIndex(p => !p.url);
-              onAddPhoto(nextIdx !== -1 ? nextIdx : 0);
-            }}
-            className="bg-primary hover:scale-105 active:scale-95 text-background-dark px-8 py-4 rounded-full flex items-center gap-3 shadow-xl transition-all"
-          >
-            <span className="material-symbols-outlined text-xl font-bold">add_a_photo</span>
-            <span className="font-black text-xs tracking-widest uppercase">Resume Capture</span>
-          </button>
+        <div className="fixed bottom-0 left-0 right-0 pb-safe z-20 pointer-events-none">
+          <div className="flex justify-center pb-8">
+            <button 
+              onClick={() => {
+                const nextIdx = photos.findIndex(p => !p.url);
+                onAddPhoto(nextIdx !== -1 ? nextIdx : 0);
+              }}
+              className="bg-primary hover:scale-105 active:scale-95 text-background-dark px-8 py-4 rounded-full flex items-center gap-3 shadow-xl transition-all pointer-events-auto"
+            >
+              <span className="material-symbols-outlined text-xl font-bold">add_a_photo</span>
+              <span className="font-black text-xs tracking-widest uppercase">Resume Capture</span>
+            </button>
+          </div>
         </div>
       )}
 
       {capturedCount === 12 && (
-        <div className="absolute bottom-8 left-1/2 -translate-x-1/2 z-20">
-          <button 
-            onClick={() => {
-              onAllPhotosComplete?.();
-              onBack();
-            }}
-            className="bg-green-500 hover:bg-green-600 active:bg-green-700 hover:scale-105 active:scale-100 text-white px-8 py-3 rounded-full flex items-center gap-2 shadow-lg hover:shadow-xl active:shadow-md transition-all"
-          >
-            <span className="material-symbols-outlined text-lg font-bold">check_circle</span>
-            <span className="font-black text-xs tracking-widest uppercase">Complete</span>
-          </button>
+        <div className="fixed bottom-0 left-0 right-0 pb-safe z-20 pointer-events-none">
+          <div className="flex justify-center pb-8">
+            <button 
+              onClick={() => {
+                onAllPhotosComplete?.();
+                onBack();
+              }}
+              className="bg-green-500 hover:bg-green-600 active:bg-green-700 hover:scale-105 active:scale-100 text-white px-8 py-3 rounded-full flex items-center gap-2 shadow-lg hover:shadow-xl active:shadow-md transition-all pointer-events-auto"
+            >
+              <span className="material-symbols-outlined text-lg font-bold">check_circle</span>
+              <span className="font-black text-xs tracking-widest uppercase">Complete</span>
+            </button>
+          </div>
         </div>
       )}
 

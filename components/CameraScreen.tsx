@@ -457,7 +457,7 @@ const CameraScreen: React.FC<CameraScreenProps> = ({
 
           <div className="flex-1"></div>
 
-          <footer className={`safe-pb w-full bg-gradient-to-t from-black/90 via-black/40 to-transparent flex flex-col items-center pointer-events-auto transition-all duration-500 ${isLandscape ? 'pb-4 px-12 pt-2' : 'pb-12 pt-6'}`}>
+          <footer className={`safe-pb w-full bg-gradient-to-t from-black/90 via-black/40 to-transparent flex flex-col items-center pointer-events-auto transition-all duration-500 ${isLandscape ? 'px-12 pt-2' : 'pt-6'}`}>
             <div className="w-full flex items-center justify-center">
                <button 
                 onClick={handleTakePhoto}

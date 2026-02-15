@@ -5,7 +5,7 @@ import { MOCK_PRINTERS, MOCK_PROJECTS } from './constants';
 import { storageService } from './services/storageService';
 import { googleDriveService } from './services/googleDriveService';
 import { oneDriveService } from './services/oneDriveService';
-import { microsoftAuthService, MicrosoftUser } from './services/microsoftAuthService';
+import { microsoftAuthService } from './services/microsoftAuthService';
 import { readBarcode } from './services/barcodeService';
 import SplashScreen from './components/SplashScreen';
 import GalleryScreen from './components/GalleryScreen';

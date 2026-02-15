@@ -46,7 +46,7 @@ const SplashScreen: React.FC = () => {
         {/* Title and tagline with staggered animation */}
         <div className="text-center space-y-3 animate-fadeIn" style={{animationDelay: '200ms'}}>
           <h1 className="text-[40px] font-bold tracking-tight bg-gradient-to-r from-gray-900 via-gray-800 to-gray-900 bg-clip-text text-transparent leading-tight">
-            Photo Suite
+            Photo APP
           </h1>
           <p className="text-base font-medium text-gray-600/90">
             Capture and manage your assets

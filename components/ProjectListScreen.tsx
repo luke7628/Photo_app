@@ -21,6 +21,10 @@ const ProjectListScreen: React.FC<ProjectListScreenProps> = ({
 }) => {
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [activeMenuId, setActiveMenuId] = useState<string | null>(null);
+  const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
+  const [siteName, setSiteName] = useState('');
+  const [batch, setBatch] = useState('');
+  const [auditorName, setAuditorName] = useState('');
   
   // 计算项目缩略图和统计信息
   const projectsWithMeta = useMemo(() => {
@@ -34,7 +38,7 @@ const ProjectListScreen: React.FC<ProjectListScreenProps> = ({
   return (
     <div className="flex flex-col h-full bg-gray-50 overflow-hidden">
       {/* Top Header */}
-      <header className="safe-pt flex items-center justify-between px-3 sm:px-6 py-4 sm:py-6 bg-white border-b border-gray-200 shrink-0">
+      <header className="safe-pt safe-px flex items-center justify-between py-3 sm:py-5 bg-white border-b border-gray-200 shrink-0">
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 sm:gap-3 mb-1">
             <div className="flex-shrink-0 w-8 h-8 sm:w-12 sm:h-12 flex items-center justify-center rounded-xl sm:rounded-2xl bg-blue-50 border border-blue-100">
@@ -58,10 +62,10 @@ const ProjectListScreen: React.FC<ProjectListScreenProps> = ({
           ) : (
             <button 
               onClick={onLogin}
-              className="flex items-center gap-1 sm:gap-2 bg-blue-500 hover:bg-blue-600 text-white px-2 sm:px-4 py-1.5 sm:py-2 rounded-lg text-[10px] sm:text-xs font-semibold transition-colors active:scale-95"
+              className="h-9 px-4 bg-blue-500 hover:bg-blue-600 text-white rounded-lg flex items-center gap-2 text-xs font-semibold transition-colors active:scale-95"
             >
                <span className="material-symbols-outlined text-sm">cloud</span>
-               <span className="hidden sm:inline">Microsoft</span>
+               <span>Microsoft</span>
             </button>
           )}
           <button 
@@ -135,7 +139,8 @@ const ProjectListScreen: React.FC<ProjectListScreenProps> = ({
                   e.stopPropagation(); 
                   setActiveMenuId(activeMenuId === project.id ? null : project.id); 
                 }}
-                className="absolute top-1.5 sm:top-2 right-1.5 sm:right-2 w-6 h-6 sm:w-7 sm:h-7 flex items-center justify-center rounded-lg hover:bg-white/80 text-gray-600 hover:text-gray-800 transition-colors shadow-sm"
+                className="absolute top-1.5 sm:top-2 right-1.5 sm:right-2 w-6 h-6 sm:w-7 sm:h-7 flex items-center justify-center rounded-lg text-white backdrop-blur-sm transition-colors active:scale-90"
+                style={{backgroundColor: 'rgba(120, 120, 128, 0.4)'}}
                 title="More options"
               >
                 <span className="material-symbols-outlined text-base sm:text-lg">more_vert</span>
@@ -144,7 +149,7 @@ const ProjectListScreen: React.FC<ProjectListScreenProps> = ({
               {activeMenuId === project.id && (
                 <div className="absolute top-8 sm:top-10 right-0 w-28 sm:w-32 bg-white shadow-lg rounded-lg border border-gray-200 overflow-hidden z-20 animate-fadeIn">
                   <button 
-                    onClick={() => { onDeleteProject(project.id); setActiveMenuId(null); }} 
+                    onClick={() => { setDeleteConfirmId(project.id); setActiveMenuId(null); }} 
                     className="w-full px-2.5 sm:px-3 py-1.5 sm:py-2 text-[11px] sm:text-xs font-semibold text-red-600 hover:bg-red-50 flex items-center gap-1.5 sm:gap-2 transition-colors"
                   >
                     <span className="material-symbols-outlined text-sm">delete</span>
@@ -165,49 +170,136 @@ const ProjectListScreen: React.FC<ProjectListScreenProps> = ({
         )}
       </main>
 
-      {/* Footer */}
-      <footer className="px-3 sm:px-4 py-3 sm:py-5 text-center border-t border-gray-200 bg-white shrink-0 safe-pb">
-        <p className="text-[10px] sm:text-xs font-medium text-gray-400">Photo Suite © 2026</p>
-      </footer>
-
       {/* Create Modal */}
       {showCreateModal && (
         <div className="fixed inset-0 z-[100] bg-black/40 backdrop-blur-sm flex items-center justify-center p-3 sm:p-4 safe-pb">
            <div className="w-full max-w-sm bg-white rounded-xl sm:rounded-2xl p-5 sm:p-8 shadow-xl animate-slideUp">
               <h2 className="text-xl sm:text-2xl font-bold text-gray-900 mb-1.5 sm:mb-2">New Project</h2>
-              <p className="text-xs sm:text-sm text-gray-500 mb-4 sm:mb-6">Create a new project to organize your assets</p>
-              <input 
-                autoFocus
-                placeholder="Project name..."
-                className="w-full h-11 sm:h-12 px-3 sm:px-4 bg-gray-100 rounded-lg border border-transparent focus:border-blue-500 focus:outline-none text-sm font-medium mb-4 sm:mb-6 placeholder-gray-500"
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter') {
-                    const val = (e.target as HTMLInputElement).value.trim();
-                    if (val) {
-                      onCreateProject(val);
-                      setShowCreateModal(false);
-                    }
-                  }
-                }}
-              />
+              <p className="text-xs sm:text-sm text-gray-500 mb-4 sm:mb-6">Enter project details</p>
+              
+              <div className="space-y-3 sm:space-y-4 mb-4 sm:mb-6">
+                <div>
+                  <label className="text-xs sm:text-sm font-semibold text-gray-700 block mb-1.5">Site Name</label>
+                  <input 
+                    autoFocus
+                    value={siteName}
+                    onChange={(e) => setSiteName(e.target.value)}
+                    placeholder="e.g., Ardc/Modc/"
+                    className="w-full h-11 sm:h-12 px-3 sm:px-4 bg-gray-100 rounded-lg border border-transparent focus:border-blue-500 focus:outline-none text-sm font-medium placeholder-gray-500"
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        (document.querySelector('input[placeholder="e.g., 2026P1"]') as HTMLInputElement)?.focus();
+                      }
+                    }}
+                  />
+                </div>
+                
+                <div>
+                  <label className="text-xs sm:text-sm font-semibold text-gray-700 block mb-1.5">Batch</label>
+                  <input 
+                    value={batch}
+                    onChange={(e) => setBatch(e.target.value)}
+                    placeholder="e.g., 2026P1"
+                    className="w-full h-11 sm:h-12 px-3 sm:px-4 bg-gray-100 rounded-lg border border-transparent focus:border-blue-500 focus:outline-none text-sm font-medium placeholder-gray-500"
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        (document.querySelector('input[placeholder="e.g., John Doe"]') as HTMLInputElement)?.focus();
+                      }
+                    }}
+                  />
+                </div>
+                
+                <div>
+                  <label className="text-xs sm:text-sm font-semibold text-gray-700 block mb-1.5">Auditor Name</label>
+                  <input 
+                    value={auditorName}
+                    onChange={(e) => setAuditorName(e.target.value)}
+                    placeholder="e.g., John Doe"
+                    className="w-full h-11 sm:h-12 px-3 sm:px-4 bg-gray-100 rounded-lg border border-transparent focus:border-blue-500 focus:outline-none text-sm font-medium placeholder-gray-500"
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        const projectName = `${siteName}_${batch}_${auditorName}`.trim();
+                        if (projectName.replaceAll('_', '')) {
+                          onCreateProject(projectName);
+                          setSiteName('');
+                          setBatch('');
+                          setAuditorName('');
+                          setShowCreateModal(false);
+                        }
+                      }
+                    }}
+                  />
+                </div>
+              </div>
+              
               <div className="flex gap-2 sm:gap-3">
                 <button 
-                  onClick={() => setShowCreateModal(false)} 
+                  onClick={() => {
+                    setShowCreateModal(false);
+                    setSiteName('');
+                    setBatch('');
+                    setAuditorName('');
+                  }} 
                   className="flex-1 h-10 sm:h-11 rounded-lg text-gray-700 text-sm font-semibold hover:bg-gray-100 transition-colors active:scale-95"
                 >
                   Cancel
                 </button>
                 <button 
                   onClick={() => { 
-                    const val = (document.querySelector('input') as any)?.value?.trim();
-                    if (val) {
-                      onCreateProject(val);
+                    const projectName = `${siteName}_${batch}_${auditorName}`.trim();
+                    if (projectName.replaceAll('_', '')) {
+                      onCreateProject(projectName);
+                      setSiteName('');
+                      setBatch('');
+                      setAuditorName('');
                       setShowCreateModal(false);
                     }
                   }} 
-                  className="flex-[2] h-10 sm:h-11 bg-blue-500 hover:bg-blue-600 text-white rounded-lg text-sm font-semibold transition-colors active:scale-95"
+                  disabled={!siteName.trim() || !batch.trim() || !auditorName.trim()}
+                  className="flex-[2] h-10 sm:h-11 bg-blue-500 hover:bg-blue-600 text-white rounded-lg text-sm font-semibold transition-colors active:scale-95 disabled:bg-gray-300 disabled:cursor-not-allowed"
                 >
                   Create
+                </button>
+              </div>
+           </div>
+        </div>
+      )}
+
+      {/* Delete Confirmation Modal */}
+      {deleteConfirmId && (
+        <div className="fixed inset-0 z-[100] bg-black/40 backdrop-blur-sm flex items-center justify-center p-3 sm:p-4 safe-pb">
+           <div className="w-full max-w-sm bg-white rounded-xl sm:rounded-2xl p-5 sm:p-8 shadow-xl animate-slideUp">
+              <div className="flex items-center gap-3 mb-4">
+                <div className="w-10 h-10 rounded-full bg-red-100 flex items-center justify-center flex-shrink-0">
+                  <span className="material-symbols-outlined text-red-600 text-lg">warning</span>
+                </div>
+                <h2 className="text-lg sm:text-xl font-bold text-gray-900">Delete Project</h2>
+              </div>
+              <p className="text-sm text-gray-600 mb-2 leading-relaxed">
+                <span className="font-semibold text-gray-900 block mb-2">Unsynchronized photos will be permanently deleted:</span>
+                All photos in this project that have not been synced to the cloud will be permanently removed locally.
+              </p>
+              <p className="text-sm text-gray-600 mb-5 leading-relaxed">
+                <span className="font-semibold text-green-600 block mb-1">Cloud data is safe:</span>
+                Deleting this project will only remove the local list and unsynchronized data. Your synced photos on the cloud will remain unaffected.
+              </p>
+              <div className="flex gap-2 sm:gap-3">
+                <button 
+                  onClick={() => setDeleteConfirmId(null)} 
+                  className="flex-1 h-10 sm:h-11 rounded-lg text-gray-700 text-sm font-semibold hover:bg-gray-100 transition-colors active:scale-95"
+                >
+                  Cancel
+                </button>
+                <button 
+                  onClick={() => { 
+                    if (deleteConfirmId) {
+                      onDeleteProject(deleteConfirmId);
+                      setDeleteConfirmId(null);
+                    }
+                  }} 
+                  className="flex-1 h-10 sm:h-11 bg-red-500 hover:bg-red-600 text-white rounded-lg text-sm font-semibold transition-colors active:scale-95"
+                >
+                  Delete
                 </button>
               </div>
            </div>

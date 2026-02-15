@@ -137,7 +137,7 @@ const SettingsScreen: React.FC<SettingsScreenProps> = ({ settings, onUpdate, act
       )}
 
       {/* Header */}
-      <header className="safe-pt px-4 sm:px-6 py-4 sm:py-5 bg-white border-b border-gray-200 z-10">
+      <header className="safe-pt safe-px py-4 sm:py-5 bg-white border-b border-gray-200 z-10">
         <div className="flex items-center gap-3 sm:gap-4">
           <button 
             onClick={onBack}
@@ -309,10 +309,6 @@ const SettingsScreen: React.FC<SettingsScreenProps> = ({ settings, onUpdate, act
         </section>
       </main>
 
-      {/* Footer */}
-      <footer className="px-4 sm:px-6 py-3 sm:py-4 bg-white border-t border-gray-200 flex items-center justify-center safe-pb">
-        <p className="text-xs text-gray-400 text-center">Photo Suite © 2026</p>
-      </footer>
     </div>
   );
 };

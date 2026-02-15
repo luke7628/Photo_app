@@ -19,6 +19,11 @@ const ReviewScreen: React.FC<ReviewScreenProps> = ({ imageUrl, data, isAnalyzing
   const activeHandle = useRef<string | null>(null);
   const startPos = useRef({ x: 0, y: 0, cropX: 0, cropY: 0, cropW: 0, cropH: 0 });
   
+  // Generate photo filename
+  const photoName = data?.model && data?.serialNumber 
+    ? `${data.model}_${data.serialNumber}_${sessionIndex + 1}`
+    : `Photo_${sessionIndex + 1}`;
+  
   const [uiRotation, setUiRotation] = useState(0);
   const [imageRotation, setImageRotation] = useState(0);
 
@@ -164,7 +169,7 @@ const ReviewScreen: React.FC<ReviewScreenProps> = ({ imageUrl, data, isAnalyzing
          onTouchMove={handleTouchMove} 
          onTouchEnd={handleTouchEnd}>
       
-      <header className={`safe-pt bg-white rounded-b-3xl shadow-sm shrink-0 transition-all duration-500 ${isLandscape ? 'px-12 pb-1.5' : 'px-5 pb-2'}`}>
+      <header className={`safe-pt safe-px bg-white rounded-b-3xl shadow-sm shrink-0 transition-all duration-500 ${isLandscape ? 'pb-1.5' : 'pb-2'}`}>
         <div className={`flex items-center gap-2 transition-all ${isLandscape ? 'pt-1.5 mb-1' : 'pt-2 mb-1.5'}`}>
            <div style={rotationStyle} className={`size-7 rounded-lg flex items-center justify-center ${isSingleRetake ? 'bg-amber-100' : 'bg-sage/10'}`}>
              <span className={`material-symbols-outlined text-[16px] ${isSingleRetake ? 'text-amber-600' : 'text-sage'}`}>
@@ -175,7 +180,7 @@ const ReviewScreen: React.FC<ReviewScreenProps> = ({ imageUrl, data, isAnalyzing
              <h1 className="text-base font-black text-gray-900 tracking-tight leading-none uppercase">
                {isSingleRetake ? 'Reviewing' : `Step ${sessionIndex + 1}`}
              </h1>
-             <p className="text-[8px] font-bold text-sage uppercase tracking-widest leading-none">{PHOTO_LABELS[sessionIndex]}</p>
+             <p className="text-[8px] font-bold text-gray-400 tracking-tight leading-none">{photoName}</p>
            </div>
         </div>
 
@@ -193,7 +198,7 @@ const ReviewScreen: React.FC<ReviewScreenProps> = ({ imageUrl, data, isAnalyzing
             <div className="w-full flex justify-between items-center mb-1.5">
                <div className="flex flex-col" style={rotationStyle}>
                   <p className={`text-[9px] font-bold uppercase tracking-[0.15em] leading-none ${hasValidData ? 'text-primary' : 'text-red-500'}`}>
-                    {hasValidData ? 'Detected Serial' : 'Missing Info'}
+                    {hasValidData ? 'Serial Number' : 'Missing Info'}
                   </p>
                </div>
                <div className="flex items-center gap-1 bg-white/60 px-2 py-1 rounded-lg border border-gray-200" style={rotationStyle}>
@@ -206,7 +211,7 @@ const ReviewScreen: React.FC<ReviewScreenProps> = ({ imageUrl, data, isAnalyzing
               {isAnalyzing ? (
                 <div className="flex flex-col items-center gap-1 py-0.5">
                    <div className="h-7 w-36 bg-gray-200/50 rounded-xl animate-pulse"></div>
-                   <p className="text-[7px] font-bold text-gray-400 uppercase tracking-[0.2em] animate-bounce">AI Analyzing...</p>
+                   <p className="text-[7px] font-bold text-gray-400 uppercase tracking-[0.2em] animate-bounce">Analyzing...</p>
                 </div>
               ) : (
                 <p className={`text-xl sm:text-2xl font-black tracking-tight truncate uppercase leading-none ${hasValidData ? 'text-gray-900' : 'text-red-500/50'}`}>
@@ -250,6 +255,13 @@ const ReviewScreen: React.FC<ReviewScreenProps> = ({ imageUrl, data, isAnalyzing
             style={{ transform: `rotate(${imageRotation}deg)` }}
           />
           
+          {/* Photo label overlay at bottom */}
+          <div className="absolute bottom-0 left-0 right-0 z-30 bg-black/50 backdrop-blur-sm px-3 py-2 pointer-events-none">
+            <p className="text-white text-xs font-bold uppercase tracking-wide text-center">
+              {PHOTO_LABELS[sessionIndex]}
+            </p>
+          </div>
+          
           <div className="absolute inset-0 z-10 pointer-events-none">
             <div className="absolute inset-0 bg-black/40" style={{
               maskImage: `linear-gradient(to right, black ${crop.x}%, transparent ${crop.x}%, transparent ${crop.x + crop.w}%, black ${crop.x + crop.w}%)`,
@@ -288,7 +300,7 @@ const ReviewScreen: React.FC<ReviewScreenProps> = ({ imageUrl, data, isAnalyzing
         </div>
       </main>
 
-      <footer className={`safe-pb bg-white rounded-t-3xl shadow-[0_-15_50px_rgba(0,0,0,0.06)] shrink-0 z-20 transition-all duration-500 ${isLandscape ? 'pb-3 pt-2 px-12' : 'pb-6 pt-3 px-5'}`}>
+      <footer className={`safe-pb bg-white rounded-t-3xl shadow-[0_-15_50px_rgba(0,0,0,0.06)] shrink-0 z-20 transition-all duration-500 ${isLandscape ? 'pt-2 px-12' : 'pt-3 px-5'}`}>
         <div className={`flex gap-4 ${isLandscape ? 'justify-center' : ''}`}>
           <button 
             onClick={onRetake}
@@ -344,30 +356,20 @@ const ReviewScreen: React.FC<ReviewScreenProps> = ({ imageUrl, data, isAnalyzing
               <div className="space-y-4 mb-8">
                 <div>
                   <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest block mb-2">Serial Number</label>
-                  <div className="flex gap-2 items-center">
-                    <input 
-                      autoFocus
-                      value={editSerial}
-                      onChange={(e) => {
-                        setEditSerial(e.target.value.toUpperCase());
-                        setModalError(false);
-                      }}
-                      placeholder="N/A"
-                      className={`flex-1 h-12 px-4 bg-gray-100 rounded-lg border-2 text-base font-black uppercase tracking-widest placeholder:text-gray-400 focus:outline-none transition-all ${
-                        modalError && (!editSerial || !editSerial.trim())
-                        ? 'border-red-400 bg-red-50 text-red-500 animate-pulse' 
-                        : 'border-transparent focus:border-primary/50 text-gray-800'
-                      }`}
-                    />
-                    <button
-                      onClick={onRetake}
-                      type="button"
-                      className="h-12 w-12 flex items-center justify-center bg-blue-500 hover:bg-blue-600 text-white rounded-lg shadow-md active:scale-95 transition-all flex-shrink-0"
-                      title="Re-scan barcode"
-                    >
-                      <span className="material-symbols-outlined text-lg">qr_code_2</span>
-                    </button>
-                  </div>
+                  <input 
+                    autoFocus
+                    value={editSerial}
+                    onChange={(e) => {
+                      setEditSerial(e.target.value.toUpperCase());
+                      setModalError(false);
+                    }}
+                    placeholder="N/A"
+                    className={`w-full h-12 px-4 bg-gray-100 rounded-lg border-2 text-base font-black uppercase tracking-widest placeholder:text-gray-400 focus:outline-none transition-all ${
+                      modalError && (!editSerial || !editSerial.trim())
+                      ? 'border-red-400 bg-red-50 text-red-500 animate-pulse' 
+                      : 'border-transparent focus:border-primary/50 text-gray-800'
+                    }`}
+                  />
                 </div>
                 
                 <div>

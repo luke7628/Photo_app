@@ -130,7 +130,7 @@ const GalleryScreen: React.FC<GalleryScreenProps> = ({
   return (
     <div className="flex flex-col h-full bg-gray-50 relative transition-all duration-300">
       {/* Header */}
-      <header className={`safe-pt px-5 bg-white border-b border-gray-200 z-30 transition-all ${isLandscape ? 'pb-2' : 'pb-4'}`}>
+      <header className={`safe-pt safe-px bg-white border-b border-gray-200 z-30 transition-all ${isLandscape ? 'pb-2' : 'pb-4'}`}>
         {/* Top row: Back button + Title + User + Settings */}
         <div className={`flex items-center gap-3 transition-all ${isLandscape ? 'mb-2 pt-2' : 'mb-3 pt-4'}`}>
           <button 
@@ -176,9 +176,10 @@ const GalleryScreen: React.FC<GalleryScreenProps> = ({
               <button 
                 onClick={onLogin} 
                 style={rotationStyle} 
-                className="h-9 px-4 bg-blue-500 text-white rounded-lg text-xs font-semibold hover:bg-blue-600 transition-colors"
+                className="h-9 px-4 bg-blue-500 text-white rounded-lg flex items-center gap-2 text-xs font-semibold hover:bg-blue-600 transition-colors active:scale-95"
               >
-                Microsoft
+                <span className="material-symbols-outlined text-sm">cloud</span>
+                <span>Microsoft</span>
               </button>
             )}
             <button 

@@ -1,6 +1,6 @@
 {
-  "name": "Dematic Printer Photo Suite",
-  "description": "A specialized field technician tool for capturing and verifying industrial printer installations using AI-powered vision.",
+  "name": "Photo APP",
+  "description": "A specialized field technician tool for capturing and verifying industrial printer installations with image-based checks.",
   "requestFramePermissions": [
     "camera"
   ]

@@ -1,11 +1,13 @@
 import { BrowserMultiFormatReader, BarcodeFormat, DecodeHintType } from '@zxing/library';
-import jsQR from 'jsqr';
-import { preprocessImage } from './imagePreprocessor';
 
 /**
- * 条形码和QR码识别服务 - 完全离线
- * - ZXing 库：识别 Code128, EAN, Code39 等多种条形码
- * - jsQR 库：识别 QR 码并提取数据
+ * 条形码和QR码识别服务 - 完全离线、优化移动端
+ * 
+ * 识别策略（按优先级）：
+ * 1. BarcodeDetector API（浏览器原生，移动端快且准）
+ * 2. ZXing 库（兜底，支持更多格式）
+ * 
+ * 适用场景：照片质量好、光线充足，无需预处理
  */
 
 let barcodeReader: BrowserMultiFormatReader | null = null;
@@ -42,24 +44,18 @@ function getReader() {
   return barcodeReader;
 }
 
+/**
+ * 辅助函数：去重添加结果
+ */
 function addUniqueResult(results: BarcodeResult[], next: BarcodeResult) {
   if (!next.value) return;
-  if (results.some(r => r.type === next.type && r.value === next.value)) return;
+  if (results.some(r => r.value === next.value)) return;
   results.push(next);
 }
 
-function uniqueBase64List(values: string[]): string[] {
-  const seen = new Set<string>();
-  const result: string[] = [];
-  values.forEach(value => {
-    if (!value) return;
-    if (seen.has(value)) return;
-    seen.add(value);
-    result.push(value);
-  });
-  return result;
-}
-
+/**
+ * 辅助函数：从 base64 加载图片
+ */
 async function loadImageFromBase64(base64Image: string): Promise<HTMLImageElement> {
   const img = new Image();
   img.src = `data:image/jpeg;base64,${base64Image}`;
@@ -70,190 +66,22 @@ async function loadImageFromBase64(base64Image: string): Promise<HTMLImageElemen
   return img;
 }
 
-function canvasToBase64(canvas: HTMLCanvasElement, quality = 0.9): string {
-  return canvas.toDataURL('image/jpeg', quality).split(',')[1] || '';
-}
-
-function cropBandToBase64(source: HTMLCanvasElement, yStartRatio: number, yEndRatio: number, scale = 1, quality = 0.9): string {
-  const startY = Math.max(0, Math.floor(source.height * yStartRatio));
-  const endY = Math.min(source.height, Math.ceil(source.height * yEndRatio));
-  const bandHeight = Math.max(1, endY - startY);
-
-  const outCanvas = document.createElement('canvas');
-  outCanvas.width = Math.max(1, Math.round(source.width * scale));
-  outCanvas.height = Math.max(1, Math.round(bandHeight * scale));
-
-  const outCtx = outCanvas.getContext('2d');
-  if (!outCtx) return '';
-  outCtx.imageSmoothingEnabled = false;
-  outCtx.drawImage(
-    source,
-    0,
-    startY,
-    source.width,
-    bandHeight,
-    0,
-    0,
-    outCanvas.width,
-    outCanvas.height
-  );
-
-  return canvasToBase64(outCanvas, quality);
-}
-
-async function createBarcodeCandidates(base64Images: string[]): Promise<string[]> {
-  const candidates: string[] = [];
-
-  // Helper: 增强对比度并转换为 base64
-  const enhanceContrast = (srcCanvas: HTMLCanvasElement, multiplier: number, quality = 0.85): string => {
-    const canvas = document.createElement('canvas');
-    canvas.width = srcCanvas.width;
-    canvas.height = srcCanvas.height;
-    const ctx = canvas.getContext('2d');
-    if (!ctx) return '';
-    
-    ctx.drawImage(srcCanvas, 0, 0);
-    const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-    const data = imageData.data;
-    
-    // 应用对比度增强 + 灰度化
-    for (let i = 0; i < data.length; i += 4) {
-      const gray = data[i] * 0.299 + data[i + 1] * 0.587 + data[i + 2] * 0.114;
-      // 对比度增强：(gray - 128) * multiplier + 128
-      const enhanced = Math.min(255, Math.max(0, (gray - 128) * multiplier + 128));
-      data[i] = enhanced;
-      data[i + 1] = enhanced;
-      data[i + 2] = enhanced;
-    }
-    ctx.putImageData(imageData, 0, 0);
-    return canvasToBase64(canvas, quality);
-  };
-
-  // Helper: 反色处理
-  const invertColors = (srcCanvas: HTMLCanvasElement, quality = 0.85): string => {
-    const canvas = document.createElement('canvas');
-    canvas.width = srcCanvas.width;
-    canvas.height = srcCanvas.height;
-    const ctx = canvas.getContext('2d');
-    if (!ctx) return '';
-    
-    ctx.drawImage(srcCanvas, 0, 0);
-    const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-    const data = imageData.data;
-    
-    for (let i = 0; i < data.length; i += 4) {
-      data[i] = 255 - data[i];       // R
-      data[i + 1] = 255 - data[i + 1]; // G
-      data[i + 2] = 255 - data[i + 2]; // B
-    }
-    ctx.putImageData(imageData, 0, 0);
-    return canvasToBase64(canvas, quality);
-  };
-
-  for (const base64Image of base64Images) {
-    if (!base64Image) continue;
-
-    const img = await loadImageFromBase64(base64Image);
-    console.log('🔍 [createBarcodeCandidates] 原始图像尺寸:', img.width, 'x', img.height);
-    const maxWidth = 1920;
-    const scale = img.width > maxWidth ? maxWidth / img.width : 1;
-
-    const scaledWidth = Math.max(1, Math.round(img.width * scale));
-    const scaledHeight = Math.max(1, Math.round(img.height * scale));
-
-    const canvas = document.createElement('canvas');
-    const ctx = canvas.getContext('2d');
-    if (!ctx) {
-      candidates.push(base64Image);
-      continue;
-    }
-
-    canvas.width = scaledWidth;
-    canvas.height = scaledHeight;
-    ctx.imageSmoothingEnabled = true;
-    ctx.drawImage(img, 0, 0, scaledWidth, scaledHeight);
-
-    // 1. 原始图像 + 不同质量
-    candidates.push(base64Image);
-    candidates.push(canvasToBase64(canvas, 0.80));
-    candidates.push(canvasToBase64(canvas, 0.85));
-    candidates.push(canvasToBase64(canvas, 0.90));
-
-    // 2. 对比度增强版本（2.0x 和 2.5x）- 帮助模糊或低对比图像
-    candidates.push(enhanceContrast(canvas, 2.0, 0.85));
-    candidates.push(enhanceContrast(canvas, 2.5, 0.85));
-
-    // 3. 反色版本 - 某些条码反色识别更好
-    candidates.push(invertColors(canvas, 0.85));
-    const invertedEnhanced = invertColors(canvas, 0.85);
-    const invertCanvas = document.createElement('canvas');
-    const invertCtx = invertCanvas.getContext('2d');
-    if (invertCtx) {
-      const invertImg = new Image();
-      invertImg.onload = () => {
-        invertCanvas.width = invertImg.width;
-        invertCanvas.height = invertImg.height;
-        invertCtx.drawImage(invertImg, 0, 0);
-      };
-      invertImg.src = `data:image/jpeg;base64,${invertedEnhanced}`;
-    }
-    candidates.push(invertedEnhanced);
-
-    // 4. 2x 放大
-    const canvas2x = document.createElement('canvas');
-    const ctx2x = canvas2x.getContext('2d');
-    if (ctx2x) {
-      canvas2x.width = scaledWidth * 2;
-      canvas2x.height = scaledHeight * 2;
-      ctx2x.imageSmoothingEnabled = true;
-      ctx2x.drawImage(canvas, 0, 0, scaledWidth, scaledHeight, 0, 0, canvas2x.width, canvas2x.height);
-      candidates.push(canvasToBase64(canvas2x, 0.85));
-      candidates.push(enhanceContrast(canvas2x, 2.0, 0.85));
-      candidates.push(enhanceContrast(canvas2x, 2.5, 0.85));
-    }
-
-    // 5. 覆盖更多水平带状区域 - 手机拍摄角度可能导致条码在意外位置
-    const bandRatios = [
-      [0.05, 0.30],   // 上部早期
-      [0.10, 0.35],   // 上部 1
-      [0.15, 0.40],   // 上部 2
-      [0.20, 0.45],   // 上部 3
-      [0.25, 0.50],   // 上部 4
-      [0.30, 0.55],   // 中上
-      [0.40, 0.65],   // 中部
-      [0.45, 0.70],   // 中下
-      [0.50, 0.75],   // 下部 1
-      [0.55, 0.80],   // 下部 2
-      [0.60, 0.85],   // 下部 3
-      [0.65, 0.90],   // 下部 4
-    ];
-
-    for (const [start, end] of bandRatios) {
-      // 原始带状
-      const band = cropBandToBase64(canvas, start, end, 1, 0.85);
-      candidates.push(band);
-      
-      // 增强对比的带状
-      const bandEnhanced = cropBandToBase64(canvas, start, end, 1, 0.85);
-      const bandCanvas = document.createElement('canvas');
-      const bandCtx = bandCanvas.getContext('2d');
-      if (bandCtx) {
-        const startY = Math.max(0, Math.floor(canvas.height * start));
-        const endY = Math.min(canvas.height, Math.ceil(canvas.height * end));
-        const bandHeight = Math.max(1, endY - startY);
-        bandCanvas.width = canvas.width;
-        bandCanvas.height = bandHeight;
-        bandCtx.drawImage(canvas, 0, startY, canvas.width, bandHeight, 0, 0, canvas.width, bandHeight);
-        candidates.push(enhanceContrast(bandCanvas, 2.0, 0.85));
-      }
-    }
-
-    console.log('🔍 [createBarcodeCandidates] 总候选数:', candidates.length);
+/**
+ * 辅助函数：标准化 base64 字符串
+ */
+function normalizeBase64(base64Image: string): string {
+  if (!base64Image) return '';
+  if (base64Image.startsWith('data:')) {
+    const parts = base64Image.split(',');
+    return parts[1] || '';
   }
-
-  return uniqueBase64List(candidates);
+  return base64Image;
 }
 
+/**
+ * 使用浏览器原生 BarcodeDetector API
+ * 在移动端性能和识别率通常优于 ZXing
+ */
 async function decodeWithBarcodeDetector(base64Image: string): Promise<BarcodeResult[]> {
   const detected: BarcodeResult[] = [];
   const BarcodeDetectorCtor = (window as any).BarcodeDetector;
@@ -298,306 +126,99 @@ async function decodeWithBarcodeDetector(base64Image: string): Promise<BarcodeRe
   return detected;
 }
 
-async function decodeBarcodeFromBase64(base64Image: string): Promise<{ text: string; format?: string } | null> {
+/**
+ * 使用 ZXing 库识别条码（兜底方案）
+ * 直接从原图读取，不做预处理
+ */
+async function decodeWithZXing(base64Image: string): Promise<{ text: string; format?: string } | null> {
   if (!base64Image) return null;
 
   try {
-    // 跳过 Canvas 处理（测试发现对比度增强反而破坏识别）
-    // 直接用原始图像的 Image 方法 - 这是最可靠的方式
-    console.log('🔍 [decodeBarcodeFromBase64] 直接使用 Image 方式（跳过Canvas）...');
     const img = await loadImageFromBase64(base64Image);
-
     const reader = getReader();
-    const multiDecode = (reader as any).decodeMultipleFromImageElement as ((el: HTMLImageElement) => any) | undefined;
-
-    if (multiDecode) {
-      console.log('🔍 [decodeBarcodeFromBase64] 使用 multiDecode');
-      const results = await multiDecode(img);
-      console.log('🔍 [decodeBarcodeFromBase64] multiDecode 返回:', results);
-      if (Array.isArray(results) && results.length > 0) {
-        const first = results.find((res: any) => res?.getText?.()) || results[0];
-        console.log('🔍 [decodeBarcodeFromBase64] 第一个结果:', first);
-        const text = first?.getText?.()?.trim();
-        console.log('🔍 [decodeBarcodeFromBase64] getText 返回:', text);
-        if (!text) return null;
-        
-        // 正确调用 getBarcodeFormat 函数
-        let format = 'UNKNOWN';
-        try {
-          const formatFunc = first.getBarcodeFormat;
-          console.log('🔍 [decodeBarcodeFromBase64] formatFunc:', formatFunc);
-          if (formatFunc && typeof formatFunc === 'function') {
-            const formatObj = formatFunc.call(first);
-            console.log('🔍 [decodeBarcodeFromBase64] formatObj:', formatObj);
-            format = formatObj?.toString?.() || 'UNKNOWN';
-          }
-        } catch (e) {
-          console.log('🔍 [decodeBarcodeFromBase64] 获取格式失败:', e);
-        }
-        
-        return {
-          text,
-          format
-        };
-      }
-      return null;
-    }
-
-    console.log('🔍 [decodeBarcodeFromBase64] 使用单 decode');
+    
+    // 尝试解码
     const result = await reader.decodeFromImageElement(img);
-    console.log('🔍 [decodeBarcodeFromBase64] decode 返回:', result);
-    const text = result?.getText?.()?.trim();
-    console.log('🔍 [decodeBarcodeFromBase64] getText 返回:', text);
+    if (!result) return null;
+    
+    const text = result.getText?.()?.trim();
     if (!text) return null;
     
-    // 正确调用 getBarcodeFormat 函数
+    // 获取格式信息
     let format = 'UNKNOWN';
     try {
       const formatFunc = result.getBarcodeFormat;
-      console.log('🔍 [decodeBarcodeFromBase64] formatFunc:', formatFunc);
       if (formatFunc && typeof formatFunc === 'function') {
         const formatObj = formatFunc.call(result);
-        console.log('🔍 [decodeBarcodeFromBase64] formatObj:', formatObj);
         format = formatObj?.toString?.() || 'UNKNOWN';
       }
     } catch (e) {
-      console.log('🔍 [decodeBarcodeFromBase64] 获取格式失败:', e);
+      // Ignore format error
     }
     
-    return {
-      text,
-      format
-    };
+    return { text, format };
   } catch (error) {
-    console.log('🔍 [decodeBarcodeFromBase64] 异常:', error);
     return null;
   }
 }
 
 /**
- * 从 Canvas 解码条形码（提供二值化图像）
- */
-async function decodeFromCanvas(base64Image: string): Promise<{ text: string; format?: string } | null> {
-  try {
-    console.log('🔍 [decodeFromCanvas] 开始...');
-    const img = await loadImageFromBase64(base64Image);
-    console.log('🔍 [decodeFromCanvas] 图像加载，尺寸:', img.width, 'x', img.height);
-    
-    // 创建 canvas
-    const canvas = document.createElement('canvas');
-    canvas.width = img.width;
-    canvas.height = img.height;
-    
-    const ctx = canvas.getContext('2d');
-    if (!ctx) {
-      console.log('🔍 [decodeFromCanvas] canvas 上下文获取失败');
-      return null;
-    }
-    
-    ctx.drawImage(img, 0, 0);
-    console.log('🔍 [decodeFromCanvas] 图像绘制完成');
-    
-    // 获取图像数据
-    const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-    const data = imageData.data;
-    console.log('🔍 [decodeFromCanvas] 获取像素数据，长度:', data.length);
-    
-    // 对比度增强 - 更强的倍数来改善 ZXing 识别
-    for (let i = 0; i < data.length; i += 4) {
-      // 计算灰度值
-      const gray = data[i] * 0.299 + data[i + 1] * 0.587 + data[i + 2] * 0.114;
-      
-      // 更强的对比度增强（3.5倍）以帮助 ZXing 识别
-      const enhanced = Math.min(255, Math.max(0, (gray - 128) * 3.5 + 128));
-      
-      data[i] = enhanced;
-      data[i + 1] = enhanced;
-      data[i + 2] = enhanced;
-    }
-    
-    ctx.putImageData(imageData, 0, 0);
-    console.log('🔍 [decodeFromCanvas] 对比度增强完成 (3.5x)');
-    
-    // 将 Canvas 转换为 base64 图像 - 使用最高质量避免 JPEG 损失
-    const enhancedBase64 = canvas.toDataURL('image/jpeg', 1.0).split(',')[1];
-    console.log('🔍 [decodeFromCanvas] 转换为 base64，长度:', enhancedBase64.length);
-    
-    // 使用 ZXing 解码增强后的图像
-    const reader = getReader();
-    console.log('🔍 [decodeFromCanvas] 加载增强后的图像...');
-    const enhancedImg = await loadImageFromBase64(enhancedBase64);
-    console.log('🔍 [decodeFromCanvas] 图像加载成功，尺寸:', enhancedImg.width, 'x', enhancedImg.height);
-    
-    console.log('🔍 [decodeFromCanvas] 开始 decodeFromImageElement...');
-    const result = await reader.decodeFromImageElement(enhancedImg);
-    console.log('🔍 [decodeFromCanvas] 解码返回:', result);
-    
-    if (result) {
-      const text = result?.getText?.()?.trim();
-      console.log('✅ [decodeFromCanvas] 成功! 文本:', text);
-      
-      let format = 'UNKNOWN';
-      try {
-        const formatFunc = result.getBarcodeFormat;
-        if (formatFunc && typeof formatFunc === 'function') {
-          const formatObj = formatFunc.call(result);
-          format = formatObj?.toString?.() || 'UNKNOWN';
-        }
-      } catch (e) {
-        // ignore format error
-      }
-      
-      return { text, format };
-    }
-    
-    console.log('🔍 [decodeFromCanvas] 无结果返回');
-    return null;
-  } catch (error) {
-    console.log('❌ [decodeFromCanvas] 异常:', error instanceof Error ? error.message : String(error));
-    return null;
-  }
-}
-
-
-/**
- * 从图像中识别条形码（支持多种格式）
+ * 主识别函数：优先 BarcodeDetector，失败则用 ZXing 兜底
+ * 针对移动端优化，照片质量好的场景
+ * 
  * @param base64Image - Base64 编码的图像
- * @returns 条形码数组
+ * @returns 条形码结果数组
  */
-function normalizeBase64(base64Image: string): string {
-  if (!base64Image) return '';
-  if (base64Image.startsWith('data:')) {
-    const parts = base64Image.split(',');
-    return parts[1] || '';
-  }
-  return base64Image;
-}
-
 export async function readBarcode(base64Image: string): Promise<BarcodeResult[]> {
   const results: BarcodeResult[] = [];
   
   try {
-    console.log('🔍 [readBarcode] 开始识别，输入长度:', base64Image.length);
     const normalizedBase64 = normalizeBase64(base64Image);
-    console.log('🔍 [readBarcode] 规范化后长度:', normalizedBase64.length);
-    
-    // 预处理图像以提高识别率
-    const processedImage = await preprocessImage(normalizedBase64);
-    console.log('🔍 [readBarcode] 预处理完成，输出长度:', processedImage?.length);
+    if (!normalizedBase64) {
+      console.warn('[readBarcode] 输入图像为空');
+      return results;
+    }
 
-    const barcodeCandidates = await createBarcodeCandidates([
-      normalizedBase64,
-      processedImage || ''
-    ]);
-    console.log('🔍 [readBarcode] 生成候选接收', barcodeCandidates.length, '个');
+    console.log('🔍 [readBarcode] 开始识别（优先 BarcodeDetector，兜底 ZXing）');
 
-    // 0. 尝试原生 BarcodeDetector（部分移动端更稳定）
+    // 1. 优先使用原生 BarcodeDetector（移动端快且准）
     try {
-      console.log('🔍 [readBarcode] 尝试 BarcodeDetector...');
-      for (const candidate of barcodeCandidates) {
-        const detectorResults = await decodeWithBarcodeDetector(candidate);
-        console.log('🔍 [readBarcode] BarcodeDetector 返回:', detectorResults.length, '个结果');
-        detectorResults.forEach(r => {
-          console.log('🔍 [readBarcode] 添加BarcodeDetector结果:', r.value);
-          addUniqueResult(results, r);
-        });
-        if (detectorResults.length > 0) {
-          console.log('✅ BarcodeDetector 识别成功:', detectorResults.map(r => r.value));
-        }
-        if (results.length >= 2) break;
+      const detectorResults = await decodeWithBarcodeDetector(normalizedBase64);
+      if (detectorResults.length > 0) {
+        detectorResults.forEach(r => addUniqueResult(results, r));
+        console.log('✅ BarcodeDetector 识别成功:', detectorResults.map(r => `${r.value} (${r.format})`).join(', '));
+        return results; // 识别成功直接返回
       }
     } catch (error) {
-      console.log('ℹ️ BarcodeDetector 不可用或识别失败:', error);
+      console.log('ℹ️ BarcodeDetector 不可用或失败，尝试 ZXing 兜底');
     }
-    
-    // 1. 尝试识别条形码（Code128, EAN等）
+
+    // 2. 兜底：使用 ZXing
     try {
-      console.log('🔍 [readBarcode] 尝试 ZXing... (候选总数:', barcodeCandidates.length, ')');
-      for (let i = 0; i < barcodeCandidates.length; i++) {
-        const candidate = barcodeCandidates[i];
-        console.log(`🔍 [readBarcode] 处理候选 ${i}，长度:`, candidate.length);
-        const decoded = await decodeBarcodeFromBase64(candidate);
-        if (decoded) {
-          console.log(`✅ [readBarcode] 候选 ${i} 返回文本:`, decoded.text, '格式:', decoded.format);
-          addUniqueResult(results, {
-            type: 'barcode',
-            value: decoded.text,
-            format: decoded.format || 'UNKNOWN'
-          });
-          console.log('✅ 条形码识别成功:', decoded.text, '(格式:', decoded.format, ')');
-        } else {
-          console.log(`ℹ️ [readBarcode] 候选 ${i} 无结果`);
-        }
-        if (results.length >= 2) break;
-      }
-    } catch (error) {
-      console.log('ℹ️ Code128/EAN条形码未找到或识别失败:', error);
-    }
-    
-    // 2. 尝试识别 QR 码（优先使用预处理图像，失败则尝试原图）
-    try {
-      console.log('🔍 [readBarcode] 尝试 jsQR...');
-      let qrResult = await readQRCode(processedImage || normalizedBase64);
-      if (!qrResult && processedImage !== normalizedBase64) {
-        console.log('🔍 [readBarcode] jsQR在预处理图像失败，尝试原图...');
-        qrResult = await readQRCode(normalizedBase64);
-      }
-      if (qrResult) {
-        console.log('🔍 [readBarcode] jsQR 返回:', qrResult);
+      const zxingResult = await decodeWithZXing(normalizedBase64);
+      if (zxingResult) {
         addUniqueResult(results, {
-          type: 'qrcode',
-          value: qrResult
+          type: 'barcode',
+          value: zxingResult.text,
+          format: zxingResult.format
         });
-        console.log('✅ QR码识别成功:', qrResult);
-      } else {
-        console.log('🔍 [readBarcode] jsQR 无结果');
+        console.log('✅ ZXing 识别成功:', zxingResult.text, `(${zxingResult.format})`);
+        return results;
       }
     } catch (error) {
-      console.log('ℹ️ QR码未找到:', error);
+      console.log('ℹ️ ZXing 识别失败');
+    }
+
+    // 3. 都失败
+    if (results.length === 0) {
+      console.warn('❌ 所有识别方法均失败。建议：靠近条码、调整光线、确保条码清晰');
     }
     
-    console.log('🔍 [readBarcode] 返回结果数:', results.length, 'results:', results);
     return results;
   } catch (error) {
-    console.error('条形码识别错误:', error);
-    console.log('🔍 [readBarcode] 返回空结果数组');
+    console.error('❌ [readBarcode] 识别异常:', error);
     return results;
   }
-}
-
-/**
- * 识别 QR 码（使用 jsQR 库）
- * @param base64Image - Base64 编码的图像
- * @returns QR 码内容
- */
-async function readQRCode(base64Image: string): Promise<string | null> {
-  return new Promise((resolve) => {
-    const img = new Image();
-    img.onload = () => {
-      const canvas = document.createElement('canvas');
-      canvas.width = img.width;
-      canvas.height = img.height;
-      const ctx = canvas.getContext('2d');
-      
-      if (!ctx) {
-        resolve(null);
-        return;
-      }
-      
-      ctx.drawImage(img, 0, 0);
-      const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-      const code = jsQR(imageData.data, imageData.width, imageData.height);
-      
-      if (code) {
-        resolve(code.data);
-      } else {
-        resolve(null);
-      }
-    };
-    
-    img.onerror = () => resolve(null);
-    img.src = `data:image/jpeg;base64,${base64Image}`;
-  });
 }
 
 /**

@@ -2,7 +2,7 @@ import type { CapacitorConfig } from '@capacitor/cli';
 
 const config: CapacitorConfig = {
   appId: 'com.dematic.photosuite',
-  appName: 'Photo Suite',
+  appName: 'Photo APP',
   webDir: 'dist',
   server: {
     androidScheme: 'https',
