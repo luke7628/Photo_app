@@ -102,7 +102,8 @@ const App: React.FC = () => {
         code,
         MICROSOFT_CLIENT_ID,
         MICROSOFT_REDIRECT_URI,
-        codeVerifier
+        codeVerifier,
+        MICROSOFT_TENANT_ID
       );
 
       console.log('🔐 [exchangeAuthCode] Token exchange result:', success);

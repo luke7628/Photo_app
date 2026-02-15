@@ -69,7 +69,8 @@ export const microsoftAuthService = {
     code: string,
     clientId: string,
     redirectUri: string,
-    codeVerifier: string
+    codeVerifier: string,
+    tenantId: string = 'common'
   ): Promise<boolean> {
     try {
       console.log('🔐 [exchangeCodeForToken] Starting token exchange with code');
@@ -83,8 +84,10 @@ export const microsoftAuthService = {
         scope: 'offline_access https://graph.microsoft.com/Files.ReadWrite.All https://graph.microsoft.com/User.Read'
       });
 
-      console.log('🔐 [exchangeCodeForToken] Sending request to token endpoint...');
-      const res = await fetch('https://login.microsoftonline.com/common/oauth2/v2.0/token', {
+      const tokenEndpoint = `https://login.microsoftonline.com/${tenantId}/oauth2/v2.0/token`;
+      console.log('🔐 [exchangeCodeForToken] Sending request to token endpoint:', tokenEndpoint);
+      
+      const res = await fetch(tokenEndpoint, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/x-www-form-urlencoded'
