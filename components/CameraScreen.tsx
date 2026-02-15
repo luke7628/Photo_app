@@ -185,7 +185,7 @@ const CameraScreen: React.FC<CameraScreenProps> = ({
 
           const onError = (e: any) => {
             console.error('Video element error:', e);
-            setCameraError('视频加载失败，请点击重试');
+            setCameraError('Failed to load video, please retry');
           };
 
           // 添加监听器并记录清理函数
@@ -237,18 +237,18 @@ const CameraScreen: React.FC<CameraScreenProps> = ({
         }
       } catch (err: any) {
         console.error("Camera Access Error:", err);
-        let errorMessage = '无法访问摄像头';
+        let errorMessage = 'Unable to access camera';
         
         if (err.name === 'NotAllowedError') {
-          errorMessage = '摄像头权限被拒绝，请在浏览器设置中允许摄像头访问';
+          errorMessage = 'Camera permission denied, please allow camera access in browser settings';
         } else if (err.name === 'NotFoundError') {
-          errorMessage = '设备上未找到摄像头';
+          errorMessage = 'No camera found on this device';
         } else if (err.name === 'NotReadableError') {
-          errorMessage = '摄像头被其他应用占用，请关闭其他使用摄像头的应用';
+          errorMessage = 'Camera is in use by another application, please close other apps using the camera';
         } else if (err.name === 'TypeError') {
-          errorMessage = '摄像头配置错误，请刷新页面重试';
+          errorMessage = 'Camera configuration error, please refresh the page and retry';
         } else if (err.name === 'SecurityError') {
-          errorMessage = '安全错误：请在HTTPS或localhost上访问此应用';
+          errorMessage = 'Security error: Please access this app on HTTPS or localhost';
         }
         
         setCameraError(errorMessage);
@@ -282,12 +282,12 @@ const CameraScreen: React.FC<CameraScreenProps> = ({
 
   const handleTakePhoto = () => {
     if (!videoRef.current || !canvasRef.current) {
-      setCameraError('摄像头未初始化');
+      setCameraError('Camera not initialized');
       return;
     }
     
     if (!isCameraReady) {
-      setCameraError('摄像头尚未准备就绪');
+      setCameraError('Camera not ready yet');
       return;
     }
     
@@ -307,12 +307,12 @@ const CameraScreen: React.FC<CameraScreenProps> = ({
       const context = canvas.getContext('2d');
 
       if (!context) {
-        throw new Error('无法获取画布上下文');
+        throw new Error('Failed to get canvas context');
       }
 
       // 使用视频流的实际分辨率
       if (video.videoWidth <= 0 || video.videoHeight <= 0) {
-        throw new Error('视频流未正确加载');
+        throw new Error('Video stream not loaded correctly');
       }
 
       canvas.width = video.videoWidth;
@@ -335,7 +335,7 @@ const CameraScreen: React.FC<CameraScreenProps> = ({
       }, 150);
     } catch (err: any) {
       console.error('Take photo error:', err);
-      setCameraError(err.message || '拍照失败，请重试');
+      setCameraError(err.message || 'Failed to take photo, please retry');
       setIsCapturing(false);
     }
   };
@@ -356,7 +356,7 @@ const CameraScreen: React.FC<CameraScreenProps> = ({
               <span className="material-symbols-outlined text-5xl text-red-500">error_outline</span>
               <div className="text-center">
                 <p className="text-white text-lg font-bold mb-2">{cameraError}</p>
-                <p className="text-gray-400 text-sm">请检查摄像头权限、设备状态和浏览器设置</p>
+                <p className="text-gray-400 text-sm">Please check camera permissions, device status, and browser settings</p>
               </div>
               <div className="flex flex-col gap-3 w-full">
                 <button
@@ -368,19 +368,19 @@ const CameraScreen: React.FC<CameraScreenProps> = ({
                   }}
                   className="w-full px-4 py-2 bg-blue-500 text-white rounded-xl font-semibold hover:bg-blue-600 transition-colors"
                 >
-                  重试
+                  Retry
                 </button>
                 <button
                   onClick={() => window.location.reload()}
                   className="w-full px-4 py-2 bg-green-500 text-white rounded-xl font-semibold hover:bg-green-600 transition-colors"
                 >
-                  刷新页面
+                  Refresh Page
                 </button>
                 <button
                   onClick={onClose}
                   className="w-full px-4 py-2 bg-gray-600 text-white rounded-xl font-semibold hover:bg-gray-700 transition-colors"
                 >
-                  返回
+                  Back
                 </button>
               </div>
             </div>
@@ -398,8 +398,8 @@ const CameraScreen: React.FC<CameraScreenProps> = ({
                 </div>
               </div>
               <div className="text-center">
-                <p className="text-white font-semibold">初始化摄像头...</p>
-                <p className="text-gray-400 text-xs mt-2">请允许浏览器访问摄像头</p>
+                <p className="text-white font-semibold">Initializing camera...</p>
+                <p className="text-gray-400 text-xs mt-2">Please allow browser to access camera</p>
               </div>
             </div>
           </div>

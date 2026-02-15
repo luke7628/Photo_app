@@ -237,7 +237,7 @@ const ReviewScreen: React.FC<ReviewScreenProps> = ({ imageUrl, data, isAnalyzing
           <button
             onClick={() => setImageRotation(prev => (prev - 90) % 360)}
             className="size-8 flex items-center justify-center bg-blue-500 hover:bg-blue-600 text-white rounded-lg shadow-md active:scale-95 transition-all"
-            title="逆时针旋转90°"
+            title="Rotate counter-clockwise 90°"
           >
             <span className="material-symbols-outlined text-[18px]">rotate_left</span>
           </button>
