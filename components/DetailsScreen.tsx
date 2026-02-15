@@ -213,7 +213,7 @@ const DetailsScreen: React.FC<DetailsScreenProps> = ({
 
   return (
     <div className="flex flex-col h-full w-full bg-white overflow-hidden animate-in fade-in duration-300 relative">
-      <header className="pt-4 px-4 pb-3 bg-white border-b border-gray-100 z-10">
+      <header className="safe-pt safe-px pb-3 bg-white border-b border-gray-100 z-10">
         <div className="flex items-center gap-3 mb-3">
           <button 
             onClick={onBack}

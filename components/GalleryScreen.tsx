@@ -130,7 +130,7 @@ const GalleryScreen: React.FC<GalleryScreenProps> = ({
   return (
     <div className="flex flex-col h-full bg-gray-50 relative transition-all duration-300">
       {/* Header */}
-      <header className={`pt-4 px-4 bg-white border-b border-gray-200 z-30 transition-all ${isLandscape ? 'pb-2' : 'pb-4'}`}>
+      <header className={`safe-pt safe-px bg-white border-b border-gray-200 z-30 transition-all ${isLandscape ? 'pb-2' : 'pb-4'}`}>
         {/* Top row: Back button + Title + User + Settings */}
         <div className={`flex items-center gap-3 transition-all ${isLandscape ? 'mb-2 pt-2' : 'mb-3 pt-4'}`}>
           <button 

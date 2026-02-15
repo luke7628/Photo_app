@@ -214,43 +214,45 @@ input, textarea {
   }
 }
 
-/* Safe area support for notch devices - with fallback for older browsers */
-.safe-pt {
-  padding-top: env(safe-area-inset-top);
-  padding-top: max(var(--spacing-lg), env(safe-area-inset-top));
-}
+/* Safe area support for notch devices - ONLY enabled in PWA standalone mode */
+@media (display-mode: standalone) {
+  .safe-pt {
+    padding-top: env(safe-area-inset-top);
+    padding-top: max(16px, env(safe-area-inset-top));
+  }
 
-.safe-pb {
-  padding-bottom: env(safe-area-inset-bottom);
-  padding-bottom: max(var(--spacing-lg), env(safe-area-inset-bottom));
-}
+  .safe-pb {
+    padding-bottom: env(safe-area-inset-bottom);
+    padding-bottom: max(16px, env(safe-area-inset-bottom));
+  }
 
-.pb-safe {
-  padding-bottom: env(safe-area-inset-bottom);
-}
+  .pb-safe {
+    padding-bottom: env(safe-area-inset-bottom);
+  }
 
-.safe-px {
-  padding-left: env(safe-area-inset-left);
-  padding-right: env(safe-area-inset-right);
-  padding-left: max(var(--spacing-lg), env(safe-area-inset-left));
-  padding-right: max(var(--spacing-lg), env(safe-area-inset-right));
-}
+  .safe-px {
+    padding-left: env(safe-area-inset-left);
+    padding-right: env(safe-area-inset-right);
+    padding-left: max(16px, env(safe-area-inset-left));
+    padding-right: max(16px, env(safe-area-inset-right));
+  }
 
-.safe-pl {
-  padding-left: env(safe-area-inset-left);
-  padding-left: max(var(--spacing-lg), env(safe-area-inset-left));
-}
+  .safe-pl {
+    padding-left: env(safe-area-inset-left);
+    padding-left: max(16px, env(safe-area-inset-left));
+  }
 
-.safe-pr {
-  padding-right: env(safe-area-inset-right);
-  padding-right: max(var(--spacing-lg), env(safe-area-inset-right));
-}
+  .safe-pr {
+    padding-right: env(safe-area-inset-right);
+    padding-right: max(16px, env(safe-area-inset-right));
+  }
 
-.safe-area-inset {
-  padding-top: env(safe-area-inset-top);
-  padding-left: env(safe-area-inset-left);
-  padding-right: env(safe-area-inset-right);
-  padding-bottom: env(safe-area-inset-bottom);
+  .safe-area-inset {
+    padding-top: env(safe-area-inset-top);
+    padding-left: env(safe-area-inset-left);
+    padding-right: env(safe-area-inset-right);
+    padding-bottom: env(safe-area-inset-bottom);
+  }
 }
 
 /* Fixed positioning that respects safe areas */

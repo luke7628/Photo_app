@@ -86,11 +86,17 @@
       bottom: 0;
       width: 100%;
       overflow: hidden;
-      padding-top: env(safe-area-inset-top);
-      padding-bottom: env(safe-area-inset-bottom);
       box-sizing: border-box;
       display: flex;
       flex-direction: column;
+    }
+    
+    /* Only apply safe area padding in NON-standalone mode (regular browser) */
+    @media not all and (display-mode: standalone) {
+      #root {
+        padding-top: env(safe-area-inset-top);
+        padding-bottom: env(safe-area-inset-bottom);
+      }
     }
 
     /* Custom Scrollbar */
