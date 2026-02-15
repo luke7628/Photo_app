@@ -424,7 +424,7 @@ const CameraScreen: React.FC<CameraScreenProps> = ({
 
         {/* UI 覆盖层 */}
         <div className="absolute inset-0 z-10 flex flex-col pointer-events-none">
-          <header className={`safe-pt w-full flex items-center justify-between pointer-events-auto bg-gradient-to-b from-black/80 via-black/20 to-transparent transition-all duration-500 ${isLandscape ? 'p-4 px-12' : 'p-6'}`}>
+          <header className={`pt-4 w-full flex items-center justify-between pointer-events-auto bg-gradient-to-b from-black/80 via-black/20 to-transparent transition-all duration-500 ${isLandscape ? 'p-4 px-12' : 'p-6'}`}>
             <button 
               onClick={onClose}
               style={rotationStyle}
@@ -457,7 +457,7 @@ const CameraScreen: React.FC<CameraScreenProps> = ({
 
           <div className="flex-1"></div>
 
-          <footer className={`safe-pb w-full bg-gradient-to-t from-black/90 via-black/40 to-transparent flex flex-col items-center pointer-events-auto transition-all duration-500 ${isLandscape ? 'px-12 pt-2' : 'pt-6'}`}>
+          <footer className={`pb-4 w-full bg-gradient-to-t from-black/90 via-black/40 to-transparent flex flex-col items-center pointer-events-auto transition-all duration-500 ${isLandscape ? 'px-12 pt-2' : 'pt-6'}`}>
             <div className="w-full flex items-center justify-center">
                <button 
                 onClick={handleTakePhoto}

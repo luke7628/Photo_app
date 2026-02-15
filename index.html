@@ -89,14 +89,10 @@
       height: 100vh;
       height: 100dvh;
       overflow: hidden;
-    }
-
-    /* In PWA standalone mode, respect safe area insets for proper viewport */
-    @media (display-mode: standalone) {
-      #root {
-        top: env(safe-area-inset-top);
-        bottom: env(safe-area-inset-bottom);
-      }
+      padding-top: env(safe-area-inset-top);
+      padding-bottom: env(safe-area-inset-bottom);
+      display: flex;
+      flex-direction: column;
     }
 
     /* Custom Scrollbar */

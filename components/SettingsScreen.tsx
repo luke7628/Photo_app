@@ -124,7 +124,7 @@ const SettingsScreen: React.FC<SettingsScreenProps> = ({ settings, onUpdate, act
     <div className="flex flex-col h-full w-full bg-gray-50 relative">
       {/* Loading Progress Overlay */}
       {isReloading && (
-        <div className="fixed inset-0 z-[999] bg-black/50 backdrop-blur-sm flex flex-col items-center justify-center safe-pb animate-fadeIn">
+        <div className="fixed inset-0 z-[999] bg-black/50 backdrop-blur-sm flex flex-col items-center justify-center pb-4 animate-fadeIn">
           <div className="bg-white rounded-2xl p-8 shadow-2xl w-full mx-4 max-w-sm">
             <div className="flex justify-center mb-6">
               <div className="relative">
@@ -155,7 +155,7 @@ const SettingsScreen: React.FC<SettingsScreenProps> = ({ settings, onUpdate, act
 
       {/* Reboot Overlay */}
       {showRebootOverlay && (
-        <div className="fixed inset-0 z-[1000] bg-black flex flex-col items-center justify-center animate-fadeIn safe-pb">
+        <div className="fixed inset-0 z-[1000] bg-black flex flex-col items-center justify-center animate-fadeIn pb-4">
           <div className="relative mb-8">
             <div className="absolute -inset-8 bg-blue-500/20 blur-3xl rounded-full animate-pulse"></div>
             <span className="material-symbols-outlined text-5xl sm:text-6xl text-blue-500 animate-spin">
@@ -168,7 +168,7 @@ const SettingsScreen: React.FC<SettingsScreenProps> = ({ settings, onUpdate, act
       )}
 
       {/* Header */}
-      <header className="safe-pt safe-px py-4 sm:py-5 bg-white border-b border-gray-200 z-10">
+      <header className="pt-4 sm:pt-5 px-4 sm:px-6 py-4 sm:py-5 bg-white border-b border-gray-200 z-10">
         <div className="flex items-center gap-3 sm:gap-4">
           <button 
             onClick={onBack}

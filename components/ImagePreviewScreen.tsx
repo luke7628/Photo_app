@@ -216,7 +216,7 @@ const ImagePreviewScreen: React.FC<ImagePreviewScreenProps> = ({
         }
       }} />
 
-      <header className="absolute top-0 inset-x-0 safe-pt safe-px pb-12 bg-gradient-to-b from-black/80 via-transparent z-20 flex items-center justify-between pointer-events-none">
+      <header className="absolute top-0 inset-x-0 pt-4 px-4 pb-12 bg-gradient-to-b from-black/80 via-transparent z-20 flex items-center justify-between pointer-events-none">
         <button onClick={isCropping ? () => setIsCropping(false) : onBack}
           className="size-12 flex items-center justify-center rounded-2xl bg-black/40 text-white backdrop-blur-md border border-white/10 active:scale-90 pointer-events-auto">
           <span className="material-symbols-outlined font-bold">{isCropping ? 'close' : 'arrow_back'}</span>
@@ -275,7 +275,7 @@ const ImagePreviewScreen: React.FC<ImagePreviewScreenProps> = ({
         )}
       </div>
 
-      <footer className="absolute bottom-0 inset-x-0 safe-pb pt-10 px-6 bg-gradient-to-t from-black/80 via-transparent z-20">
+      <footer className="absolute bottom-0 inset-x-0 pb-4 pt-10 px-6 bg-gradient-to-t from-black/80 via-transparent z-20">
         <div className="flex gap-4 pb-6">
           {isCropping ? (
             <>
