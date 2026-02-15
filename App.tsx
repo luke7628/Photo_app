@@ -86,28 +86,46 @@ const App: React.FC = () => {
   }, []);
 
   const exchangeAuthCode = useCallback(async (code: string) => {
+    console.log('🔐 [exchangeAuthCode] Starting token exchange...');
+    
     const codeVerifier = sessionStorage.getItem(MICROSOFT_PKCE_VERIFIER_KEY);
     if (!codeVerifier) {
-      console.warn('Missing PKCE code verifier. Please try logging in again.');
+      console.error('❌ [exchangeAuthCode] Missing PKCE code verifier');
       return;
     }
 
-    const success = await microsoftAuthService.exchangeCodeForToken(
-      code,
-      MICROSOFT_CLIENT_ID,
-      MICROSOFT_REDIRECT_URI,
-      codeVerifier
-    );
+    try {
+      const success = await microsoftAuthService.exchangeCodeForToken(
+        code,
+        MICROSOFT_CLIENT_ID,
+        MICROSOFT_REDIRECT_URI,
+        codeVerifier
+      );
 
-    if (success && microsoftAuthService.accessToken) {
-      oneDriveService.setToken(microsoftAuthService.accessToken);
+      console.log('🔐 [exchangeAuthCode] Token exchange result:', success);
 
-      const userInfo = await microsoftAuthService.getUserInfo();
-      if (userInfo) {
-        setUser(userInfo as any);
-        storageService.saveUser(userInfo as any);
-        setSettings(prev => ({ ...prev, cloudProvider: 'onedrive' }));
+      if (success && microsoftAuthService.accessToken) {
+        console.log('🔐 [exchangeAuthCode] Access token obtained, setting OneDrive token');
+        oneDriveService.setToken(microsoftAuthService.accessToken);
+
+        console.log('🔐 [exchangeAuthCode] Fetching user info...');
+        const userInfo = await microsoftAuthService.getUserInfo();
+        console.log('🔐 [exchangeAuthCode] User info result:', userInfo);
+
+        if (userInfo) {
+          console.log('✅ [exchangeAuthCode] Setting user state:', userInfo);
+          setUser(userInfo as any);
+          storageService.saveUser(userInfo as any);
+          setSettings(prev => ({ ...prev, cloudProvider: 'onedrive' }));
+          console.log('✅ [exchangeAuthCode] User successfully logged in');
+        } else {
+          console.warn('⚠️ [exchangeAuthCode] Failed to get user info');
+        }
+      } else {
+        console.error('❌ [exchangeAuthCode] Token exchange failed or no access token');
       }
+    } catch (error) {
+      console.error('❌ [exchangeAuthCode] Error:', error);
     }
   }, []);
 
@@ -120,7 +138,10 @@ const App: React.FC = () => {
   }, [exchangeAuthCode]);
 
   const handleLogin = useCallback(async () => {
+    console.log('🔑 [handleLogin] Starting login process...');
+    
     if (!MICROSOFT_CLIENT_ID) {
+      console.error('❌ [handleLogin] MICROSOFT_CLIENT_ID is not configured');
       // Show a user-friendly message in the UI instead of an alert
       const message = "Microsoft Login is not configured.\n\n" +
         "To enable Microsoft OneDrive integration:\n" +
@@ -137,9 +158,11 @@ const App: React.FC = () => {
       return;
     }
 
+    console.log('🔑 [handleLogin] Creating PKCE pair...');
     const { verifier, challenge } = await microsoftAuthService.createPkcePair();
     sessionStorage.setItem(MICROSOFT_PKCE_VERIFIER_KEY, verifier);
     localStorage.removeItem(MICROSOFT_AUTH_CODE_KEY);
+    console.log('🔑 [handleLogin] PKCE pair created, generating login URL...');
     
     // Generate login URL and redirect
     const loginUrl = microsoftAuthService.getLoginUrl(
@@ -148,6 +171,7 @@ const App: React.FC = () => {
       MICROSOFT_TENANT_ID,
       challenge
     );
+    console.log('🔑 [handleLogin] Opening auth window...');
     
     // 在新窗口打开登录页面（也可以直接重定向）
     // window.location.href = loginUrl;
@@ -155,15 +179,22 @@ const App: React.FC = () => {
     // 或者在新窗口打开，保持当前应用继续运行
     const authWindow = window.open(loginUrl, 'microsoft_auth', 'width=500,height=600');
     if (!authWindow) {
+      console.log('🔑 [handleLogin] Pop-up blocked, redirecting directly');
       window.location.href = loginUrl;
       return;
     }
     
     // 监听来自回调页面的消息
     const handleAuthMessage = async (event: MessageEvent) => {
-      if (event.origin !== window.location.origin) return;
+      console.log('📨 [handleAuthMessage] Received message:', event.data);
+      
+      if (event.origin !== window.location.origin) {
+        console.warn('⚠️ [handleAuthMessage] Origin mismatch:', event.origin, '!==', window.location.origin);
+        return;
+      }
       
       if (event.data.type === 'microsoft_auth_success') {
+        console.log('✅ [handleAuthMessage] Auth success received with code');
         const { code } = event.data;
         await exchangeAuthCode(code);
 
@@ -173,6 +204,7 @@ const App: React.FC = () => {
     };
 
     window.addEventListener('message', handleAuthMessage);
+    console.log('📡 [handleLogin] Message listener registered, waiting for callback...');
   }, [exchangeAuthCode]);
 
 

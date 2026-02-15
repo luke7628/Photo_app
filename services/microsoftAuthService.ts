@@ -72,6 +72,8 @@ export const microsoftAuthService = {
     codeVerifier: string
   ): Promise<boolean> {
     try {
+      console.log('🔐 [exchangeCodeForToken] Starting token exchange with code');
+      
       const params = new URLSearchParams({
         grant_type: 'authorization_code',
         code,
@@ -81,6 +83,7 @@ export const microsoftAuthService = {
         scope: 'offline_access https://graph.microsoft.com/Files.ReadWrite.All https://graph.microsoft.com/User.Read'
       });
 
+      console.log('🔐 [exchangeCodeForToken] Sending request to token endpoint...');
       const res = await fetch('https://login.microsoftonline.com/common/oauth2/v2.0/token', {
         method: 'POST',
         headers: {
@@ -89,13 +92,16 @@ export const microsoftAuthService = {
         body: params.toString()
       });
 
+      console.log('🔐 [exchangeCodeForToken] Token endpoint response status:', res.status);
+
       if (!res.ok) {
         const error = await res.text();
-        console.error('Token Exchange Error:', error);
+        console.error('❌ [exchangeCodeForToken] Token Exchange Error:', error);
         return false;
       }
 
       const data = await res.json();
+      console.log('🔐 [exchangeCodeForToken] Token received successfully');
       
       this.accessToken = data.access_token;
       this.idToken = data.id_token;
@@ -108,9 +114,10 @@ export const microsoftAuthService = {
         localStorage.setItem('microsoft_refresh_token', data.refresh_token);
       }
 
+      console.log('✅ [exchangeCodeForToken] Token saved to localStorage');
       return true;
     } catch (e) {
-      console.error('Exchange Code Error:', e);
+      console.error('❌ [exchangeCodeForToken] Exchange Code Error:', e);
       return false;
     }
   },
@@ -164,9 +171,14 @@ export const microsoftAuthService = {
    * 获取用户信息
    */
   async getUserInfo(): Promise<MicrosoftUser | null> {
-    if (!this.accessToken) return null;
+    if (!this.accessToken) {
+      console.warn('⚠️ [getUserInfo] No access token available');
+      return null;
+    }
 
     try {
+      console.log('👤 [getUserInfo] Fetching user info from Microsoft Graph...');
+      
       const res = await fetch('https://graph.microsoft.com/v1.0/me', {
         headers: {
           'Authorization': `Bearer ${this.accessToken}`,
@@ -174,23 +186,34 @@ export const microsoftAuthService = {
         }
       });
 
+      console.log('👤 [getUserInfo] Graph API response status:', res.status);
+
       if (!res.ok) {
         if (res.status === 401) {
           // Token 过期，可以尝试刷新
-          console.warn('Token expired, need refresh');
+          console.warn('⚠️ [getUserInfo] Token expired (401), need refresh');
         }
+        const errText = await res.text();
+        console.error('❌ [getUserInfo] Graph API error:', errText);
         return null;
       }
 
       const data = await res.json();
+      console.log('👤 [getUserInfo] User data received:', {
+        displayName: data.displayName,
+        userPrincipalName: data.userPrincipalName
+      });
       
-      return {
+      const userInfo: MicrosoftUser = {
         name: data.displayName || data.userPrincipalName,
         email: data.userPrincipalName,
         photoUrl: undefined // Microsoft Graph Photo 需要单独请求
       };
+
+      console.log('✅ [getUserInfo] User info parsed:', userInfo);
+      return userInfo;
     } catch (e) {
-      console.error('Get User Info Error:', e);
+      console.error('❌ [getUserInfo] Get User Info Error:', e);
       return null;
     }
   },
