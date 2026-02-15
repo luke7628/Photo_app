@@ -22,7 +22,10 @@ import ProjectListScreen from './components/ProjectListScreen';
 // Do NOT hardcode secrets in source.
 // Environment variables injected via GitHub Actions for production deployment
 const MICROSOFT_CLIENT_ID = import.meta.env.VITE_MICROSOFT_CLIENT_ID || "";
-const MICROSOFT_TENANT_ID = import.meta.env.VITE_MICROSOFT_TENANT_ID || "common";
+// For personal Microsoft accounts only, use "consumers"
+// For organizations only, use "organizations"
+// For both, use "common"
+const MICROSOFT_TENANT_ID = import.meta.env.VITE_MICROSOFT_TENANT_ID || "consumers";
 const MICROSOFT_REDIRECT_URI = import.meta.env.VITE_MICROSOFT_REDIRECT_URI ||
   `${window.location.origin}${import.meta.env.BASE_URL}auth-callback.html`;
 const MICROSOFT_PKCE_VERIFIER_KEY = 'microsoft_code_verifier';
