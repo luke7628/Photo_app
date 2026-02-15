@@ -19,17 +19,13 @@ import ProjectListScreen from './components/ProjectListScreen';
 
 // !!! IMPORTANT CONFIGURATION !!!
 // MICROSOFT OneDrive SETUP (RECOMMENDED):
-// 1. Go to https://portal.azure.com
-// 2. Navigate to Azure Active Directory → App registrations → New registration
-// 3. Set Redirect URI to "http://localhost:3000/auth/callback" (or your domain)
-// 4. Go to Certificates & secrets → New client secret (copy the value)
-// 5. Go to API permissions → Add "Files.ReadWrite.All" and "User.Read"
-// 6. Grant admin consent
-// 7. Copy Application (client) ID, Tenant ID, and Client Secret here:
-const MICROSOFT_CLIENT_ID = "YOUR_MICROSOFT_CLIENT_ID";
-const MICROSOFT_TENANT_ID = "common"; // or your specific tenant ID
-const MICROSOFT_CLIENT_SECRET = "YOUR_MICROSOFT_CLIENT_SECRET";
-const MICROSOFT_REDIRECT_URI = "http://localhost:3000/auth/callback";
+// Configure these in .env.local (Vite env vars).
+// Do NOT hardcode secrets in source.
+const MICROSOFT_CLIENT_ID = import.meta.env.VITE_MICROSOFT_CLIENT_ID || "";
+const MICROSOFT_TENANT_ID = import.meta.env.VITE_MICROSOFT_TENANT_ID || "common";
+const MICROSOFT_CLIENT_SECRET = import.meta.env.VITE_MICROSOFT_CLIENT_SECRET || "";
+const MICROSOFT_REDIRECT_URI = import.meta.env.VITE_MICROSOFT_REDIRECT_URI ||
+  `${window.location.origin}${import.meta.env.BASE_URL}auth-callback.html`;
 
 // GOOGLE DRIVE SETUP (ALTERNATIVE):
 // 1. Go to Google Cloud Console (https://console.cloud.google.com)
@@ -98,13 +94,14 @@ const App: React.FC = () => {
   }, []);
 
   const handleLogin = useCallback(() => {
-    if (MICROSOFT_CLIENT_ID.includes("YOUR_MICROSOFT_CLIENT_ID")) {
+    if (!MICROSOFT_CLIENT_ID) {
       // Show a user-friendly message in the UI instead of an alert
       const message = "Microsoft Login is not configured.\n\n" +
         "To enable Microsoft OneDrive integration:\n" +
         "1. Register an app in Azure AD\n" +
-        "2. Configure MICROSOFT_CLIENT_ID in App.tsx\n" +
-        "3. Rebuild the application\n\n" +
+        "2. Set VITE_MICROSOFT_CLIENT_ID in .env.local\n" +
+        "3. (Optional) Set VITE_MICROSOFT_TENANT_ID and VITE_MICROSOFT_REDIRECT_URI\n" +
+        "4. Rebuild the application\n\n" +
         "The app will continue to work with local storage.";
       
       if (confirm(message + "\n\nWould you like to see the setup guide?")) {
@@ -135,6 +132,11 @@ const App: React.FC = () => {
         const { code } = event.data;
         
         // 使用授权码交换 token
+        if (!MICROSOFT_CLIENT_SECRET) {
+          console.warn('Microsoft client secret is missing. Token exchange requires a backend or a secret in env.');
+          return;
+        }
+
         const success = await microsoftAuthService.exchangeCodeForToken(
           code,
           MICROSOFT_CLIENT_ID,

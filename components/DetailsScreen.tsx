@@ -62,7 +62,7 @@ const DetailsScreen: React.FC<DetailsScreenProps> = ({
     switch (viewMode) {
       case ViewMode.LIST:
         return (
-          <div className="flex flex-col pb-32">
+          <div className="flex flex-col">
             {photos.map((photo, index) => (
               <div 
                 key={index} 
@@ -98,7 +98,7 @@ const DetailsScreen: React.FC<DetailsScreenProps> = ({
         );
       case ViewMode.LARGE:
         return (
-          <div className="flex flex-col gap-5 pb-40 px-2">
+          <div className="flex flex-col gap-5 px-2">
             {photos.map((photo, index) => (
               <div key={index} className="flex flex-col gap-2 group cursor-pointer" onClick={() => photo.url ? onPreviewImage(photos, index) : onAddPhoto(index)}>
                 <div className={`relative aspect-video rounded-xl overflow-hidden flex items-center justify-center border-2 transition-all ${photo.url ? 'bg-slate-100 border-white shadow-md' : 'bg-gray-50 border-dashed border-gray-200'}`}>
@@ -140,7 +140,7 @@ const DetailsScreen: React.FC<DetailsScreenProps> = ({
       case ViewMode.GRID:
       default:
         return (
-          <div className="grid grid-cols-3 gap-1.5 pb-32 px-2">
+          <div className="grid grid-cols-3 gap-1.5 px-2">
             {photos.map((photo, index) => (
               <button 
                 key={index} 
@@ -213,7 +213,7 @@ const DetailsScreen: React.FC<DetailsScreenProps> = ({
 
   return (
     <div className="flex flex-col h-full w-full bg-white overflow-hidden animate-in fade-in duration-300 relative">
-      <header className="safe-pt safe-px pb-3 bg-white border-b border-gray-100 z-10">
+      <header className="pt-4 px-4 pb-3 bg-white border-b border-gray-100 z-10">
         <div className="flex items-center gap-3 mb-3">
           <button 
             onClick={onBack}
@@ -339,8 +339,8 @@ const DetailsScreen: React.FC<DetailsScreenProps> = ({
       </main>
 
       {capturedCount < 12 && (
-        <div className="fixed bottom-0 left-0 right-0 pb-safe z-20 pointer-events-none">
-          <div className="flex justify-center pb-8">
+        <div className="fixed bottom-0 left-0 right-0 z-20 pointer-events-none">
+          <div className="flex justify-center">
             <button 
               onClick={() => {
                 const nextIdx = photos.findIndex(p => !p.url);
@@ -356,8 +356,8 @@ const DetailsScreen: React.FC<DetailsScreenProps> = ({
       )}
 
       {capturedCount === 12 && (
-        <div className="fixed bottom-0 left-0 right-0 pb-safe z-20 pointer-events-none">
-          <div className="flex justify-center pb-8">
+        <div className="fixed bottom-0 left-0 right-0 z-20 pointer-events-none">
+          <div className="flex justify-center">
             <button 
               onClick={() => {
                 onAllPhotosComplete?.();

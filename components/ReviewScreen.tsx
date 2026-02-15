@@ -169,7 +169,7 @@ const ReviewScreen: React.FC<ReviewScreenProps> = ({ imageUrl, data, isAnalyzing
          onTouchMove={handleTouchMove} 
          onTouchEnd={handleTouchEnd}>
       
-      <header className={`safe-pt safe-px bg-white rounded-b-3xl shadow-sm shrink-0 transition-all duration-500 ${isLandscape ? 'pb-1.5' : 'pb-2'}`}>
+      <header className={`pt-4 px-4 bg-white rounded-b-3xl shadow-sm shrink-0 transition-all duration-500 ${isLandscape ? 'pb-1.5' : 'pb-2'}`}>
         <div className={`flex items-center gap-2 transition-all ${isLandscape ? 'pt-1.5 mb-1' : 'pt-2 mb-1.5'}`}>
            <div style={rotationStyle} className={`size-7 rounded-lg flex items-center justify-center ${isSingleRetake ? 'bg-amber-100' : 'bg-sage/10'}`}>
              <span className={`material-symbols-outlined text-[16px] ${isSingleRetake ? 'text-amber-600' : 'text-sage'}`}>
@@ -300,7 +300,7 @@ const ReviewScreen: React.FC<ReviewScreenProps> = ({ imageUrl, data, isAnalyzing
         </div>
       </main>
 
-      <footer className={`safe-pb bg-white rounded-t-3xl shadow-[0_-15_50px_rgba(0,0,0,0.06)] shrink-0 z-20 transition-all duration-500 ${isLandscape ? 'pt-2 px-12' : 'pt-3 px-5'}`}>
+      <footer className={`bg-white rounded-t-3xl shadow-[0_-15_50px_rgba(0,0,0,0.06)] shrink-0 z-20 transition-all duration-500 ${isLandscape ? 'pt-2 px-12' : 'pt-3 px-5'}`}>
         <div className={`flex gap-4 ${isLandscape ? 'justify-center' : ''}`}>
           <button 
             onClick={onRetake}

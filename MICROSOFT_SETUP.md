@@ -26,7 +26,7 @@
 |------|-----|
 | **Name** | Photo Suite（或任何你喜欢的名称） |
 | **Supported account types** | Accounts in this organizational directory only (Single tenant) **或** Multitenant - 取决于你的需求 |
-| **Redirect URI** | Web - `http://localhost:3000/Photo_app/public/auth-callback.html` |
+| **Redirect URI** | Web - `http://localhost:3000/Photo_app/auth-callback.html` |
 
 > ⚠️ **重注意**：如果是生产环境，将 `localhost:3000` 替换为你的实际域名。
 
@@ -81,7 +81,7 @@
 const MICROSOFT_CLIENT_ID = "YOUR_MICROSOFT_CLIENT_ID";           // 替换为你的 Client ID
 const MICROSOFT_TENANT_ID = "YOUR_TENANT_ID";                     // 替换为你的 Tenant ID
 const MICROSOFT_CLIENT_SECRET = "YOUR_MICROSOFT_CLIENT_SECRET";   // 替换为你的 Client Secret
-const MICROSOFT_REDIRECT_URI = "http://localhost:3000/Photo_app/public/auth-callback.html";
+const MICROSOFT_REDIRECT_URI = "http://localhost:3000/Photo_app/auth-callback.html";
 ```
 
 **示例：**
@@ -103,7 +103,7 @@ const MICROSOFT_REDIRECT_URI = "http://localhost:3000/Photo_app/public/auth-call
 ```env
 VITE_MICROSOFT_CLIENT_ID=your_client_id_here
 VITE_MICROSOFT_TENANT_ID=your_tenant_id_here
-VITE_MICROSOFT_REDIRECT_URI=http://localhost:3000/Photo_app/public/auth-callback.html
+VITE_MICROSOFT_REDIRECT_URI=http://localhost:3000/Photo_app/auth-callback.html
 ```
 
 > ⚠️ **注意**：`VITE_` 前缀是必需的（Vite 约定），客户端密码应该在后端安全存储，不应在前端暴露。
@@ -180,7 +180,7 @@ OneDrive
 1. 在 **Authentication** 中更新 Redirect URI
 2. 替换为你的生产域名：
    ```
-   https://yourdomain.com/Photo_app/public/auth-callback.html
+  https://yourdomain.com/Photo_app/auth-callback.html
    ```
 3. 保存更改
 

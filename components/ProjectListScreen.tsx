@@ -38,7 +38,7 @@ const ProjectListScreen: React.FC<ProjectListScreenProps> = ({
   return (
     <div className="flex flex-col h-full bg-gray-50 overflow-hidden">
       {/* Top Header */}
-      <header className="safe-pt safe-px flex items-center justify-between py-2.5 sm:py-5 bg-white border-b border-gray-200 shrink-0">
+      <header className="flex items-center justify-between py-2.5 sm:py-5 px-2 sm:px-6 bg-white border-b border-gray-200 shrink-0">
         <div className="flex-1 min-w-0 pr-2">
           <div className="flex items-center gap-1.5 sm:gap-3 mb-0.5 sm:mb-1">
             <div className="flex-shrink-0 w-7 h-7 sm:w-12 sm:h-12 flex items-center justify-center rounded-lg sm:rounded-2xl bg-blue-50 border border-blue-100">
@@ -80,7 +80,7 @@ const ProjectListScreen: React.FC<ProjectListScreenProps> = ({
 
       {/* Projects Grid */}
       <main className="flex-1 overflow-y-auto px-2 sm:px-6 pt-3 sm:pt-6 custom-scrollbar">
-        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-2 sm:gap-4 pb-6">
+        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-2 sm:gap-4">
           
           {/* Create New Project Card */}
           <button 
@@ -172,7 +172,7 @@ const ProjectListScreen: React.FC<ProjectListScreenProps> = ({
 
       {/* Create Modal */}
       {showCreateModal && (
-        <div className="fixed inset-0 z-[100] bg-black/40 backdrop-blur-sm flex items-center justify-center p-2 sm:p-4 safe-pb">
+        <div className="fixed inset-0 z-[100] bg-black/40 backdrop-blur-sm flex items-center justify-center p-2 sm:p-4">
            <div className="w-full max-w-sm bg-white rounded-lg sm:rounded-2xl p-4 sm:p-8 shadow-xl animate-slideUp">
               <h2 className="text-lg sm:text-2xl font-bold text-gray-900 mb-1 sm:mb-2">New Project</h2>
               <p className="text-xs sm:text-sm text-gray-500 mb-3 sm:mb-6">Enter project details</p>
@@ -267,7 +267,7 @@ const ProjectListScreen: React.FC<ProjectListScreenProps> = ({
 
       {/* Delete Confirmation Modal */}
       {deleteConfirmId && (
-        <div className="fixed inset-0 z-[100] bg-black/40 backdrop-blur-sm flex items-center justify-center p-2 sm:p-4 safe-pb">
+        <div className="fixed inset-0 z-[100] bg-black/40 backdrop-blur-sm flex items-center justify-center p-2 sm:p-4">
            <div className="w-full max-w-sm bg-white rounded-lg sm:rounded-2xl p-4 sm:p-8 shadow-xl animate-slideUp">
               <div className="flex items-center gap-2 sm:gap-3 mb-3 sm:mb-4">
                 <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-full bg-red-100 flex items-center justify-center flex-shrink-0">
