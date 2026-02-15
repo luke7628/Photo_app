@@ -90,22 +90,6 @@
       display: flex;
       flex-direction: column;
     }
-    
-    /* In PWA standalone mode, offset #root by safe area to avoid overlap */
-    @media (display-mode: standalone) {
-      #root {
-        top: env(safe-area-inset-top, 0px);
-        bottom: env(safe-area-inset-bottom, 0px);
-      }
-    }
-    
-    /* Only apply safe area padding in NON-standalone mode (regular browser) */
-    @media not all and (display-mode: standalone) {
-      #root {
-        padding-top: env(safe-area-inset-top);
-        padding-bottom: env(safe-area-inset-bottom);
-      }
-    }
 
     /* Custom Scrollbar */
     .custom-scrollbar::-webkit-scrollbar {
