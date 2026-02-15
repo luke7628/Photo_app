@@ -321,6 +321,13 @@ const CameraScreen: React.FC<CameraScreenProps> = ({
       
       const fullBase64 = canvas.toDataURL('image/jpeg', 0.95);
       
+      console.log('📷 [CameraScreen] 照片已拍摄:', {
+        width: canvas.width,
+        height: canvas.height,
+        base64Length: fullBase64.length,
+        base64Sample: fullBase64.substring(0, 100)
+      });
+      
       // 快门效果
       const shutter = document.getElementById('shutter-overlay');
       if (shutter) {

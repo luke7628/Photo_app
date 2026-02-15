@@ -11,9 +11,10 @@ interface ReviewScreenProps {
   onRetake: () => void;
   onConfirm: () => void;
   onUpdateData: (data: { serialNumber: string; model: string; partNumber?: string }) => void;
+  onBack?: () => void;
 }
 
-const ReviewScreen: React.FC<ReviewScreenProps> = ({ imageUrl, data, isAnalyzing, sessionIndex, isSingleRetake, onRetake, onConfirm, onUpdateData }) => {
+const ReviewScreen: React.FC<ReviewScreenProps> = ({ imageUrl, data, isAnalyzing, sessionIndex, isSingleRetake, onRetake, onConfirm, onUpdateData, onBack }) => {
   const [crop, setCrop] = useState({ x: 0, y: 0, w: 100, h: 100 });
   const containerRef = useRef<HTMLDivElement>(null);
   const activeHandle = useRef<string | null>(null);
@@ -31,6 +32,7 @@ const ReviewScreen: React.FC<ReviewScreenProps> = ({ imageUrl, data, isAnalyzing
   const [showEditModal, setShowEditModal] = useState(false);
   const [editSerial, setEditSerial] = useState('');
   const [editPartNumber, setEditPartNumber] = useState('');
+  const [showDiscardConfirm, setShowDiscardConfirm] = useState(false);
 
   // Validation & Animation
   const [shakeError, setShakeError] = useState(false);
@@ -90,6 +92,24 @@ const ReviewScreen: React.FC<ReviewScreenProps> = ({ imageUrl, data, isAnalyzing
       return;
     }
     onConfirm();
+  };
+
+  const handleBackAttempt = () => {
+    console.log('🔙 [ReviewScreen] 返回按钮被点击, sessionIndex:', sessionIndex, 'isSingleRetake:', isSingleRetake);
+    // 如果是第一张照片且不是单次重拍，需要确认
+    if (sessionIndex === 0 && !isSingleRetake) {
+      console.log('🔙 [ReviewScreen] 第一张照片未保存，显示确认对话框');
+      setShowDiscardConfirm(true);
+    } else {
+      console.log('🔙 [ReviewScreen] 直接返回');
+      if (onBack) onBack();
+    }
+  };
+
+  const handleConfirmDiscard = () => {
+    console.log('🔙 [ReviewScreen] 确认丢弃照片');
+    setShowDiscardConfirm(false);
+    if (onBack) onBack();
   };
 
   const handleTouchStart = (e: React.TouchEvent | React.MouseEvent, handle: string) => {
@@ -171,6 +191,17 @@ const ReviewScreen: React.FC<ReviewScreenProps> = ({ imageUrl, data, isAnalyzing
       
       <header className={`pt-4 px-4 bg-white rounded-b-3xl shadow-sm shrink-0 transition-all duration-500 ${isLandscape ? 'pb-1.5' : 'pb-2'}`}>
         <div className={`flex items-center gap-2 transition-all ${isLandscape ? 'pt-1.5 mb-1' : 'pt-2 mb-1.5'}`}>
+           {/* 返回按钮 */}
+           {onBack && (
+             <button
+               onClick={handleBackAttempt}
+               className="size-7 rounded-lg bg-gray-100 hover:bg-gray-200 flex items-center justify-center active:scale-95 transition-all"
+               style={rotationStyle}
+             >
+               <span className="material-symbols-outlined text-[16px] text-gray-700">arrow_back</span>
+             </button>
+           )}
+           
            <div style={rotationStyle} className={`size-7 rounded-lg flex items-center justify-center ${isSingleRetake ? 'bg-amber-100' : 'bg-sage/10'}`}>
              <span className={`material-symbols-outlined text-[16px] ${isSingleRetake ? 'text-amber-600' : 'text-sage'}`}>
                {isSingleRetake ? 'published_with_changes' : 'image_search'}
@@ -421,6 +452,38 @@ const ReviewScreen: React.FC<ReviewScreenProps> = ({ imageUrl, data, isAnalyzing
                 </button>
               </div>
            </div>
+        </div>
+      )}
+
+      {/* Discard Confirmation Dialog */}
+      {showDiscardConfirm && (
+        <div className="fixed inset-0 z-[100] bg-black/50 backdrop-blur-md flex items-center justify-center p-6 animate-in fade-in">
+          <div className="w-full max-w-[320px] bg-white rounded-[1.5rem] p-6 shadow-2xl animate-in zoom-in-95 duration-200">
+            <div className="flex flex-col items-center gap-4 mb-6">
+              <div className="size-16 rounded-full bg-red-100 flex items-center justify-center">
+                <span className="material-symbols-outlined text-4xl text-red-500">warning</span>
+              </div>
+              <div className="text-center">
+                <h3 className="text-lg font-black text-gray-900 mb-2">Discard Photo?</h3>
+                <p className="text-sm text-gray-600">This photo has not been saved. Are you sure you want to go back and discard it?</p>
+              </div>
+            </div>
+
+            <div className="flex flex-col gap-3">
+              <button 
+                onClick={() => setShowDiscardConfirm(false)} 
+                className="w-full h-12 rounded-xl bg-gray-100 hover:bg-gray-200 text-gray-700 font-bold text-sm transition-colors active:scale-95"
+              >
+                Cancel
+              </button>
+              <button 
+                onClick={handleConfirmDiscard}
+                className="w-full h-12 rounded-xl bg-red-500 hover:bg-red-600 text-white font-bold text-sm transition-colors active:scale-95"
+              >
+                Yes, Discard
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </div>
