@@ -91,10 +91,12 @@
       overflow: hidden;
     }
 
-    /* In PWA standalone mode, respect safe area inset at bottom for home indicator */
+    /* In PWA standalone mode, respect safe area insets for proper viewport */
     @media (display-mode: standalone) {
       #root {
+        top: env(safe-area-inset-top);
         bottom: env(safe-area-inset-bottom);
+        height: auto;
       }
     }    /* Custom Scrollbar */
     .custom-scrollbar::-webkit-scrollbar {
