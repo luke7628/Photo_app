@@ -116,14 +116,13 @@ const SettingsScreen: React.FC<SettingsScreenProps> = ({ settings, onUpdate, act
     }
   };
 
-
   const projectName = activeProject?.name || 'My_Project';
   const cloudServiceName = settings.cloudProvider === 'onedrive' ? 'OneDrive' : 'Local Storage';
   const displayPath = `${cloudServiceName}${settings.drivePath}${projectName}/${settings.useSubfoldersBySN ? 'SN_123456/' : ''}`;
-
-  return (
-    <div className="flex flex-col h-full bg-gray-50">
-      {isReloading && (
+                [
+                  { value: 'none', label: 'None' },
+                  { value: 'onedrive', label: 'OneDrive' }
+                ].map(provider => (
         <div className="fixed inset-0 z-[999] bg-black/50 backdrop-blur-sm flex flex-col items-center justify-center animate-fadeIn">
           <div className="bg-white rounded-2xl p-8 shadow-2xl w-full mx-4 max-w-sm">
             <div className="flex justify-center mb-6">
@@ -241,7 +240,8 @@ const SettingsScreen: React.FC<SettingsScreenProps> = ({ settings, onUpdate, act
               <div className="flex bg-gray-100 p-1 rounded-lg ml-4">
                 {[
                   { value: 'none', label: 'None' },
-                  { value: 'onedrive', label: 'OneDrive' }
+                  { value: 'onedrive', label: 'OneDrive' },
+                  { value: 'drive', label: 'Drive' }
                 ].map(provider => (
                   <button
                     key={provider.value}
