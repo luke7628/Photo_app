@@ -49,28 +49,28 @@ const ProjectListScreen: React.FC<ProjectListScreenProps> = ({
           <p className="text-[9px] sm:text-sm font-medium text-gray-500 ml-8 sm:ml-0">Asset Suite</p>
         </div>
 
-        <div className="flex items-center gap-1 sm:gap-3 flex-shrink-0">
+        <div className="flex items-center gap-0.5 sm:gap-3 flex-shrink-0">
           {user ? (
             <button 
               onClick={onLogout} 
               title={user.name}
-              className="flex items-center gap-1 sm:gap-2 bg-gray-100 hover:bg-gray-200 px-2 sm:px-4 py-1 sm:py-2 rounded-lg transition-colors active:scale-95 h-8 sm:h-10"
+              className="flex items-center gap-0.5 sm:gap-2 bg-gray-100 hover:bg-gray-200 px-1.5 sm:px-4 py-1 sm:py-2 rounded-lg transition-colors active:scale-95 h-8 sm:h-10"
             >
-              <img src={user.photoUrl} className="w-5 h-5 sm:w-6 sm:h-6 rounded-full object-cover" alt="User" />
+              <img src={user.photoUrl} className="w-5 h-5 sm:w-6 sm:h-6 rounded-full object-cover flex-shrink-0" alt="User" />
               <span className="hidden sm:inline text-xs font-semibold text-gray-700 truncate max-w-[80px]">{user.name.split(' ')[0]}</span>
             </button>
           ) : (
             <button 
               onClick={onLogin}
-              className="h-8 sm:h-10 px-2 sm:px-4 bg-blue-500 hover:bg-blue-600 text-white rounded-lg flex items-center gap-1 sm:gap-2 text-[11px] sm:text-xs font-semibold transition-colors active:scale-95"
+              className="h-8 sm:h-10 px-1.5 sm:px-3 bg-blue-500 hover:bg-blue-600 text-white rounded-lg flex items-center gap-0.5 sm:gap-1.5 text-[10px] sm:text-xs font-semibold transition-colors active:scale-95 flex-shrink-0"
             >
-               <span className="material-symbols-outlined text-sm sm:text-base">cloud</span>
-               <span className="hidden sm:inline">Microsoft</span>
+               <span className="material-symbols-outlined text-sm sm:text-base flex-shrink-0">cloud</span>
+               <span className="hidden xs:inline">Microsoft</span>
             </button>
           )}
           <button 
             onClick={onOpenSettings}
-            className="w-8 h-8 sm:w-10 sm:h-10 flex items-center justify-center rounded-lg bg-gray-100 hover:bg-gray-200 text-gray-600 transition-colors active:scale-90"
+            className="w-8 h-8 sm:w-10 sm:h-10 flex items-center justify-center rounded-lg bg-gray-100 hover:bg-gray-200 text-gray-600 transition-colors active:scale-90 flex-shrink-0"
             title="Settings"
           >
             <span className="material-symbols-outlined text-lg sm:text-xl">settings</span>

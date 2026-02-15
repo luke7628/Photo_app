@@ -122,6 +122,37 @@ const SettingsScreen: React.FC<SettingsScreenProps> = ({ settings, onUpdate, act
 
   return (
     <div className="flex flex-col h-full w-full bg-gray-50 relative">
+      {/* Loading Progress Overlay */}
+      {isReloading && (
+        <div className="fixed inset-0 z-[999] bg-black/50 backdrop-blur-sm flex flex-col items-center justify-center safe-pb animate-fadeIn">
+          <div className="bg-white rounded-2xl p-8 shadow-2xl w-full mx-4 max-w-sm">
+            <div className="flex justify-center mb-6">
+              <div className="relative">
+                <div className="absolute -inset-6 bg-blue-500/20 blur-2xl rounded-full animate-pulse"></div>
+                <span className="material-symbols-outlined text-5xl text-blue-500 relative" style={{animation: 'spin 2s linear infinite'}}>
+                  cloud_download
+                </span>
+              </div>
+            </div>
+            <h2 className="text-center text-lg font-bold text-gray-900 mb-2">Updating...</h2>
+            <p className="text-center text-sm text-gray-600 mb-6">Installing latest version</p>
+            
+            <div className="space-y-3">
+              <div className="flex justify-between text-xs font-semibold text-gray-600">
+                <span>Progress</span>
+                <span>{Math.round(reloadProgress)}%</span>
+              </div>
+              <div className="h-3 w-full bg-gray-200 rounded-full overflow-hidden">
+                <div 
+                  className="h-full bg-gradient-to-r from-blue-400 to-blue-600 transition-all duration-300 rounded-full shadow-lg"
+                  style={{ width: `${reloadProgress}%` }}
+                />
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Reboot Overlay */}
       {showRebootOverlay && (
         <div className="fixed inset-0 z-[1000] bg-black flex flex-col items-center justify-center animate-fadeIn safe-pb">
@@ -291,20 +322,6 @@ const SettingsScreen: React.FC<SettingsScreenProps> = ({ settings, onUpdate, act
                 {isReloading ? 'Updating...' : 'Refresh'}
               </button>
             </div>
-            {isReloading && (
-              <div className="space-y-2 mt-4 pt-4 border-t border-gray-100">
-                <div className="flex justify-between text-xs font-semibold text-gray-600">
-                  <span>Downloading...</span>
-                  <span>{Math.round(reloadProgress)}%</span>
-                </div>
-                <div className="h-2 w-full bg-gray-200 rounded-full overflow-hidden">
-                  <div 
-                    className="h-full bg-blue-500 transition-all duration-300"
-                    style={{ width: `${reloadProgress}%` }}
-                  />
-                </div>
-              </div>
-            )}
           </div>
         </section>
       </main>
