@@ -278,16 +278,9 @@ input, textarea {
     }
     
     #root {
-      height: 100vh;
-      height: 100dvh;
+      height: calc(100vh - env(safe-area-inset-top) - env(safe-area-inset-bottom));
+      height: calc(100dvh - env(safe-area-inset-top) - env(safe-area-inset-bottom));
       width: 100%;
-    }
-    
-    /* Ensure app container respects safe areas in PWA mode */
-    .app-container {
-      top: env(safe-area-inset-top) !important;
-      bottom: env(safe-area-inset-bottom) !important;
-      height: auto !important;
     }
   }
 }

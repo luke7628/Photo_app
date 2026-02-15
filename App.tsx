@@ -632,7 +632,7 @@ const App: React.FC = () => {
   const activePrinters = useMemo(() => printers.filter(p => p.projectId === activeProjectId), [printers, activeProjectId]);
 
   return (
-    <div className="app-container fixed top-0 right-0 bottom-0 left-0 bg-white overflow-hidden flex flex-col">
+    <div className="app-container w-full h-full bg-white overflow-hidden flex flex-col">
       <div key={currentScreen} className="w-full h-full screen-enter flex flex-col overflow-hidden">
         {currentScreen === AppScreen.SPLASH && <SplashScreen />}
         {currentScreen === AppScreen.PROJECT_LIST && <ProjectListScreen projects={projects} printers={printers} onSelectProject={(id) => { setActiveProjectId(id); setCurrentScreen(AppScreen.GALLERY); }} onCreateProject={(name) => setProjects([{ id: `p-${Date.now()}`, name, printerIds: [], createdAt: new Date().toISOString() }, ...projects])} onRenameProject={(id, newName) => setProjects(prev => prev.map(p => p.id === id ? { ...p, name: newName } : p))} onDeleteProject={(id) => { setProjects(prev => prev.filter(p => p.id !== id)); setPrinters(prev => prev.filter(p => p.projectId !== id)); }} onOpenSettings={() => setCurrentScreen(AppScreen.SETTINGS)} user={user} onLogin={handleLogin} onLogout={handleLogout} />}
