@@ -1,3 +1,7 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
 /* Apple-inspired theme and global styles */
 :root {
   /* Color palette - inspired by Apple's design */
