@@ -449,31 +449,59 @@ const App: React.FC = () => {
           const cleaned = compact.replace(/[^A-Z0-9-_]/g, '');
           console.log(`📊 [parsePayload] 清理后:`, cleaned);
 
+          // 优先识别部件号（Part Number）- ZT4开头，后面跟数字和字母
           if (!partNumber) {
-            const partMatch = cleaned.match(/ZT4(11|21)\d{2,3}[-_]?[A-Z0-9]+/i);
+            // 更灵活的部件号匹配：ZT4 + 数字（3-6位）+ 可选分隔符 + 字母数字组合
+            const partMatch = cleaned.match(/ZT4\d{3,6}[-_]?[A-Z0-9]{5,}/i);
             if (partMatch) {
-              let normalized = partMatch[0].replace('_', '-');
-              if (!normalized.includes('-') && normalized.length > 7) {
-                normalized = `${normalized.slice(0, 7)}-${normalized.slice(7)}`;
+              let normalized = partMatch[0].replace(/_/g, '-');
+              // 如果没有分隔符且长度够长，自动添加分隔符（ZT41142T010000Z -> ZT41142-T010000Z）
+              if (!normalized.includes('-') && normalized.length > 9) {
+                const match = normalized.match(/^(ZT4\d{3,6})([A-Z0-9]+)$/);
+                if (match) {
+                  normalized = `${match[1]}-${match[2]}`;
+                }
               }
               partNumber = normalized;
               console.log('✅ [parsePayload] 识别为部件号:', partNumber);
             }
           }
 
+          // 识别序列号（Serial Number）
+          // 优先级1：带标签的序列号（SN:, S/N:, SERIAL: 等）
           if (!serialNumber) {
-            const labeledSerial = cleaned.match(/SN[:=]?([A-Z0-9-]{8,})/i);
+            const labeledSerial = cleaned.match(/(?:SN|SERIAL|S-N|S_N)[:=\s]*([A-Z0-9]{8,})/i);
             if (labeledSerial) {
               serialNumber = labeledSerial[1];
               console.log('✅ [parsePayload] 识别为序列号（带标签）:', serialNumber);
             }
           }
 
+          // 优先级2：Zebra 典型序列号格式（字母+数字组合，长度8-20）
           if (!serialNumber) {
-            const serialMatch = cleaned.match(/[A-Z0-9]{2}[A-Z]\d{9}/i) || cleaned.match(/\d{10,15}/);
-            if (serialMatch) {
-              serialNumber = serialMatch[0];
-              console.log('✅ [parsePayload] 识别为序列号（正则）:', serialNumber);
+            // 匹配：至少包含1个字母和数字的组合，长度8-20位
+            const zebraSerial = cleaned.match(/(?<![A-Z0-9])([A-Z]{2,4}\d{6,}|[A-Z0-9]{2}[A-Z]\d{6,}|\d{2,4}[A-Z]{2,4}\d{6,})(?![A-Z0-9])/i);
+            if (zebraSerial && zebraSerial[1].length >= 8 && zebraSerial[1].length <= 20) {
+              serialNumber = zebraSerial[1];
+              console.log('✅ [parsePayload] 识别为序列号（Zebra格式）:', serialNumber);
+            }
+          }
+
+          // 优先级3：纯数字序列号（10-15位）
+          if (!serialNumber) {
+            const numericSerial = cleaned.match(/(?<![A-Z0-9])(\d{10,15})(?![A-Z0-9])/);
+            if (numericSerial) {
+              serialNumber = numericSerial[1];
+              console.log('✅ [parsePayload] 识别为序列号（纯数字）:', serialNumber);
+            }
+          }
+
+          // 优先级4：通用格式（字母数字混合，8-20位，避免匹配部件号）
+          if (!serialNumber && !cleaned.startsWith('ZT4')) {
+            const genericSerial = cleaned.match(/(?<![A-Z0-9])([A-Z0-9]{8,20})(?![A-Z0-9])/i);
+            if (genericSerial && !genericSerial[1].match(/^ZT4/i)) {
+              serialNumber = genericSerial[1];
+              console.log('✅ [parsePayload] 识别为序列号（通用格式）:', serialNumber);
             }
           }
         });
