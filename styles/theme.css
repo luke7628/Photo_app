@@ -265,7 +265,6 @@ input, textarea {
 }
 
 /* iOS PWA specific fixes */
-/* iOS PWA specific fixes */
 @supports (padding: max(0px)) {
   @media (display-mode: standalone) {
     html {
@@ -282,6 +281,7 @@ input, textarea {
       height: 100vh;
       height: 100dvh;
       width: 100%;
+      box-sizing: border-box;
     }
   }
 }
