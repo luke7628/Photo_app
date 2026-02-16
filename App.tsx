@@ -323,8 +323,9 @@ const App: React.FC = () => {
       const savedPrinters = await storageService.loadPrinters(); // Async IDB
       const savedUser = storageService.loadUser();
       const savedSettings = storageService.loadSettings();
+      // @ts-ignore - backward compatibility check for old 'drive' value
       const normalizedSettings = savedSettings?.cloudProvider === 'drive'
-        ? { ...savedSettings, cloudProvider: 'onedrive' }
+        ? { ...savedSettings, cloudProvider: 'onedrive' as const }
         : savedSettings;
       
       // 合并MOCK数据，确保测试项目存在
