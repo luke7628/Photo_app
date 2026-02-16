@@ -39,15 +39,12 @@ const ProjectListScreen: React.FC<ProjectListScreenProps> = ({
   return (
     <div className="screen-container">
       {/* Top Header with safe-area padding */}
-      <header className="screen-header px-2 sm:px-6 bg-white border-b border-gray-200 shrink-0 flex items-center justify-between py-2.5 sm:py-5">
-        <div className="flex-1 min-w-0 pr-2">
-          <div className="flex items-center gap-1.5 sm:gap-3 mb-0.5 sm:mb-1">
-            <div className="flex-shrink-0 w-7 h-7 sm:w-12 sm:h-12 flex items-center justify-center rounded-lg sm:rounded-2xl bg-blue-50 border border-blue-100">
-              <span className="material-symbols-outlined text-sm sm:text-2xl text-blue-500">folder_open</span>
-            </div>
-            <h1 className="text-base sm:text-3xl font-bold text-gray-900 truncate">Project Hub</h1>
+      <header className="screen-header px-2 sm:px-6 bg-white border-b border-gray-200 shrink-0 flex items-center justify-between py-3 sm:py-5">
+        <div className="flex items-center gap-2 sm:gap-3 flex-1 min-w-0 pr-2">
+          <div className="flex-shrink-0 w-9 h-9 sm:w-12 sm:h-12 flex items-center justify-center rounded-xl sm:rounded-2xl bg-blue-50 border border-blue-100">
+            <span className="material-symbols-outlined text-lg sm:text-2xl text-blue-500">folder_open</span>
           </div>
-          <p className="text-[9px] sm:text-sm font-medium text-gray-500 ml-8 sm:ml-0">Asset Suite</p>
+          <h1 className="text-xl sm:text-3xl font-bold text-gray-900 truncate">Project Hub</h1>
         </div>
 
         <div className="flex items-center gap-0.5 sm:gap-3 flex-shrink-0 relative">
