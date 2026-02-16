@@ -78,10 +78,12 @@ const ProjectListScreen: React.FC<ProjectListScreenProps> = ({
           {/* Create New Project Card */}
           <button 
             onClick={() => setShowCreateModal(true)}
-            className="aspect-square flex flex-col items-center justify-center gap-1 sm:gap-2 bg-blue-50 border-2 border-dashed border-blue-300 rounded-lg sm:rounded-xl hover:bg-blue-100 active:scale-95 transition-all group"
+            className="aspect-square flex flex-col items-center justify-center gap-2 sm:gap-3 bg-blue-50 border-2 border-dashed border-blue-300 rounded-lg sm:rounded-xl hover:bg-blue-100 active:scale-95 transition-all group"
           >
-            <span className="material-symbols-outlined text-2xl sm:text-4xl text-blue-400 group-hover:text-blue-500 transition-colors">add</span>
-            <span className="text-[9px] sm:text-xs font-bold text-blue-600 text-center px-1">New Project</span>
+            <span className="material-symbols-outlined text-3xl sm:text-5xl text-blue-400 group-hover:text-blue-500 transition-colors">add</span>
+            <span className="text-xs sm:text-base font-bold text-blue-600 text-center px-2 leading-tight">
+              New<br className="sm:hidden" /> Project
+            </span>
           </button>
 
           {/* Project Cards */}
