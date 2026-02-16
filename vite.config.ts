@@ -21,6 +21,18 @@ export default defineConfig(({ mode }) => {
       resolve: {
         alias: {
           '@': path.resolve(__dirname, '.'),
+          '@ericblade/quagga2': path.resolve(__dirname, 'node_modules/@ericblade/quagga2/lib/quagga.js'),
+        }
+      },
+      ssr: {
+        // 确保这些浏览器包被正确打包，而不是当作外部依赖
+        noExternal: ['@ericblade/quagga2']
+      },
+      build: {
+        // 优化 Rollup 配置处理依赖
+        rollupOptions: {
+          // 不标记为外部依赖，确保被打包进来
+          external: []
         }
       }
     };
