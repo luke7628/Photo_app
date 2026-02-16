@@ -281,7 +281,10 @@ const DetailsScreen: React.FC<DetailsScreenProps> = ({
         </div>
       </header>
 
-      <main className="flex-1 overflow-y-auto no-scrollbar bg-white">
+      <main 
+        className="flex-1 overflow-y-auto no-scrollbar bg-white"
+        style={{ paddingBottom: 'calc(2rem + env(safe-area-inset-bottom, 0px))' }}
+      >
         <div className="sticky top-0 bg-white z-10 px-5 py-3 border-b border-gray-100">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">

@@ -118,7 +118,7 @@ const GalleryScreen: React.FC<GalleryScreenProps> = ({
   return (
     <div className="flex flex-col h-full bg-white relative transition-all duration-300">
       {/* Header */}
-      <header className={`pt-4 px-4 bg-white border-b border-gray-200 z-30 transition-all ${isLandscape ? 'pb-2' : 'pb-4'}`}>
+      <header className={`pt-4 px-4 bg-white z-30 transition-all flex-shrink-0 ${isLandscape ? 'pb-2' : 'pb-4'}`}>
         {/* Top row: Back button + Title + User + Settings */}
         <div className={`flex items-center gap-3 transition-all ${isLandscape ? 'mb-2 pt-2' : 'mb-3 pt-4'}`}>
           <button 
@@ -236,13 +236,13 @@ const GalleryScreen: React.FC<GalleryScreenProps> = ({
         )}
 
         {/* Filter buttons */}
-        <div className={`flex gap-2 overflow-x-auto no-scrollbar pt-3 transition-all ${isLandscape ? 'mt-1 pb-1' : 'mt-3 pb-1'}`}>
+        <div className={`flex gap-2 overflow-x-auto no-scrollbar transition-all border-b border-gray-100 ${isLandscape ? 'mt-1 pb-2 pt-2' : 'mt-3 pb-3 pt-1'}`}>
           {(['ALL'] as const).concat(availableModels).map((f) => (
             <button
               key={f}
               onClick={() => setFilter(f as any)}
-              className={`flex items-center px-4 py-1.5 rounded-full text-xs font-medium transition-all whitespace-nowrap ${
-                filter === f ? 'bg-blue-500 text-white shadow-md' : 'bg-white border border-gray-200 text-gray-700 hover:bg-gray-50'
+              className={`flex items-center px-4 py-1.5 rounded-full text-xs font-medium transition-all whitespace-nowrap flex-shrink-0 ${
+                filter === f ? 'bg-blue-500 text-white shadow-md' : 'bg-gray-50 border border-gray-200 text-gray-700 hover:bg-gray-100'
               }`}
             >
               {f}
@@ -252,7 +252,14 @@ const GalleryScreen: React.FC<GalleryScreenProps> = ({
       </header>
 
       {/* Printer list */}
-      <main className={`flex-1 overflow-y-auto px-5 no-scrollbar transition-all ${isLandscape ? 'pt-3' : 'pt-5'}`}>
+      <main 
+        className={`flex-1 overflow-y-auto px-5 no-scrollbar transition-all bg-white ${isLandscape ? 'pt-3' : 'pt-5'}`}
+        style={{
+          paddingBottom: isLandscape 
+            ? 'calc(5rem + env(safe-area-inset-bottom, 0px))' 
+            : 'calc(7rem + env(safe-area-inset-bottom, 0px))'
+        }}
+      >
         <div className={`grid gap-3 transition-all ${isLandscape ? 'grid-cols-2 md:grid-cols-3' : 'grid-cols-1'}`}>
           {filteredPrinters.map((printer, idx) => (
             <PrinterItem key={printer.id} printer={printer} onSelect={onSelectPrinter} isLandscape={isLandscape} index={idx} />
@@ -267,7 +274,14 @@ const GalleryScreen: React.FC<GalleryScreenProps> = ({
       </main>
 
       {/* Floating Action Button */}
-      <div className={`fixed left-1/2 -translate-x-1/2 z-40 pointer-events-auto transition-all ${isLandscape ? 'bottom-4' : 'bottom-8'}`}>
+      <div 
+        className="fixed left-1/2 -translate-x-1/2 z-40 pointer-events-auto transition-all"
+        style={{
+          bottom: isLandscape 
+            ? 'calc(1rem + env(safe-area-inset-bottom, 0px))' 
+            : 'calc(2rem + env(safe-area-inset-bottom, 0px))'
+        }}
+      >
         <button 
           onClick={onAdd}
           style={rotationStyle}

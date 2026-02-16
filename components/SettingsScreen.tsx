@@ -148,7 +148,10 @@ const SettingsScreen: React.FC<SettingsScreenProps> = ({ settings, onUpdate, act
       </header>
 
       {/* Content */}
-      <main className="flex-1 overflow-y-auto px-4 sm:px-6 py-4 sm:py-6 no-scrollbar space-y-4 sm:space-y-6">
+      <main 
+        className="flex-1 overflow-y-auto px-4 sm:px-6 py-4 sm:py-6 no-scrollbar space-y-4 sm:space-y-6"
+        style={{ paddingBottom: 'calc(2rem + env(safe-area-inset-bottom, 0px))' }}
+      >
         {/* Camera Section */}
         <section>
           <h2 className="text-xs sm:text-sm font-bold text-gray-600 mb-3 flex items-center gap-2 px-1">
