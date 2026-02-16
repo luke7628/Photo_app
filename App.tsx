@@ -468,28 +468,36 @@ const App: React.FC = () => {
           let barcodeResults: any[] = [];
           
           // 策略1: 优先使用Quagga2（在iOS上对模糊/倾斜条码效果更好）
+          console.log('🔍 [analyzeWithBarcode] 策略1: 尝试Quagga2识别（iOS优化）...');
           try {
-            console.log('🔍 [analyzeWithBarcode] 策略1: 尝试Quagga2识别（iOS优化）...');
             await initializeQuagga();
             console.log('✅ [analyzeWithBarcode] Quagga2初始化成功');
             const quaggaResults = await readBarcodeWithQuagga(base64Image);
-            console.log('✅ [analyzeWithBarcode] Quagga2识别成功:', quaggaResults.length, '个结果');
-            console.log('📊 [analyzeWithBarcode] Quagga2结果详情:', JSON.stringify(quaggaResults, null, 2));
+            console.log('📊 [analyzeWithBarcode] Quagga2返回:', quaggaResults.length, '个结果');
             
-            barcodeResults = quaggaResults.map(r => ({
-              type: r.type as any,
-              value: r.value,
-              format: r.format,
-              confidence: r.confidence || 0.9,
-              localized: true,
-            }));
+            if (quaggaResults.length > 0) {
+              console.log('✅ [analyzeWithBarcode] Quagga2识别成功！');
+              console.log('📊 [analyzeWithBarcode] Quagga2结果详情:', JSON.stringify(quaggaResults, null, 2));
+              
+              barcodeResults = quaggaResults.map(r => ({
+                type: r.type as any,
+                value: r.value,
+                format: r.format,
+                confidence: r.confidence || 0.9,
+                localized: true,
+              }));
+            } else {
+              console.warn('⚠️ [analyzeWithBarcode] Quagga2返回0结果，将尝试BarcodeDetector+ZXing');
+            }
           } catch (quaggaError) {
-            console.warn('⚠️ [analyzeWithBarcode] Quagga2失败，fallback到BarcodeDetector+ZXing');
+            console.warn('⚠️ [analyzeWithBarcode] Quagga2异常，将尝试BarcodeDetector+ZXing');
             console.error('Quagga2 Error:', quaggaError);
             console.error('Quagga2 Error message:', (quaggaError as any)?.message);
             console.error('Quagga2 Error stack:', (quaggaError as any)?.stack);
-            
-            // 策略2: Fallback到优化的4阶段识别（BarcodeDetector + ZXing）
+          }
+          
+          // 策略2: 如果Quagga2失败或返回0结果，使用BarcodeDetector+ZXing 4阶段识别
+          if (barcodeResults.length === 0) {
             console.log('🔍 [analyzeWithBarcode] 策略2: 使用BarcodeDetector+ZXing 4阶段识别...');
             const legacyResults = await readBarcode(base64Image);
             console.log('📊 [analyzeWithBarcode] 4阶段识别返回:', legacyResults.length, '个结果');
