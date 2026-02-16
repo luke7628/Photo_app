@@ -841,10 +841,10 @@ const App: React.FC = () => {
 
       {/* Toast Notification */}
       {showToast && (
-        <div className="fixed top-20 left-1/2 transform -translate-x-1/2 z-[9999] animate-in fade-in slide-in-from-top-4 duration-300 pointer-events-none">
-          <div className="bg-gray-900/95 backdrop-blur-lg text-white px-6 py-4 rounded-2xl shadow-2xl border border-gray-700/50 flex items-center gap-3 max-w-sm animate-out fade-out slide-out-to-top-4 duration-300" style={{animation: 'none'}}>
-            <span className="material-symbols-outlined text-blue-400 text-2xl animate-bounce">info</span>
-            <p className="text-sm font-medium leading-snug">{toastMessage}</p>
+        <div className="fixed top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 z-[9999] animate-in fade-in zoom-in-95 duration-300 pointer-events-none">
+          <div className="bg-white/98 backdrop-blur-xl text-gray-900 px-8 py-6 rounded-3xl shadow-2xl border-2 border-gray-300 flex items-center gap-4 max-w-md min-w-[300px] animate-out fade-out zoom-out-95 duration-300" style={{animation: 'none'}}>
+            <span className="material-symbols-outlined text-blue-600 text-3xl animate-bounce">info</span>
+            <p className="text-base font-semibold leading-relaxed text-gray-900">{toastMessage}</p>
           </div>
         </div>
       )}
