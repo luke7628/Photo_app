@@ -21,7 +21,10 @@ const SearchScreen: React.FC<SearchScreenProps> = ({ printers, onBack, onPreview
   });
 
   return (
-    <div className="flex flex-col h-full bg-white relative">
+    <div 
+      className="flex flex-col h-full bg-white relative"
+      style={{ paddingBottom: 'env(safe-area-inset-bottom, 0px)' }}
+    >
       <div className="sticky top-0 z-50 bg-white pt-14 pb-2 border-b border-slate-100">
         <div className="flex items-center px-5 pb-4 justify-between">
           <div className="flex items-center gap-3">
