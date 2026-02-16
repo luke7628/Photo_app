@@ -20,6 +20,8 @@ interface BarcodeResult {
   type: 'barcode' | 'qrcode';
   value: string;
   format?: string;
+  region?: string;  // 识别区域名称（如 '全图', '顶部20%', '底部80-100%'）
+  regionIndex?: number;  // 区域索引（0=全图，1-5=分区）
 }
 
 /**
@@ -86,7 +88,11 @@ function getReader() {
  */
 function addUniqueResult(results: BarcodeResult[], next: BarcodeResult) {
   if (!next.value) return;
-  if (results.some(r => r.value === next.value)) return;
+  // 去重：相同value的只保留第一个
+  if (results.some(r => r.value === next.value)) {
+    console.log(`  ⚠️ 重复条码（已跳过）: ${next.value.substring(0, 30)} 来自 ${next.region || '未知区域'}`);
+    return;
+  }
   results.push(next);
 }
 
@@ -697,7 +703,7 @@ export async function readBarcode(base64Image: string): Promise<BarcodeResult[]>
       console.log('  ├─ BarcodeDetector (全图)...');
       try {
         const detectorResults = await decodeWithBarcodeDetector(optimizedBase64, false);
-        detectorResults.forEach(r => addUniqueResult(results, r));
+        detectorResults.forEach(r => addUniqueResult(results, { ...r, region: '全图', regionIndex: 0 }));
         console.log(`  │  └─ 找到 ${detectorResults.length} 个条码`);
       } catch (e) {
         console.error('  │  └─ ❌ 异常:', e);
@@ -712,7 +718,9 @@ export async function readBarcode(base64Image: string): Promise<BarcodeResult[]>
         addUniqueResult(results, {
           type: 'barcode',
           value: zxingResult.text,
-          format: zxingResult.format
+          format: zxingResult.format,
+          region: '全图',
+          regionIndex: 0
         });
         console.log(`  │  └─ ✅ 识别: ${zxingResult.text.substring(0, 30)}`);
       } else {
@@ -731,7 +739,9 @@ export async function readBarcode(base64Image: string): Promise<BarcodeResult[]>
         addUniqueResult(results, {
           type: 'barcode',
           value: zxingResultPreprocessed.text,
-          format: zxingResultPreprocessed.format
+          format: zxingResultPreprocessed.format,
+          region: '全图',
+          regionIndex: 0
         });
         console.log(`     └─ ✅ 识别: ${zxingResultPreprocessed.text.substring(0, 30)}`);
       } else {
@@ -759,7 +769,9 @@ export async function readBarcode(base64Image: string): Promise<BarcodeResult[]>
     
     console.log(`📍 [readBarcode] 第二阶段：横向多区域扫描 (${scanRegions.length}个区域)`);
     
-    for (const region of scanRegions) {
+    for (let i = 0; i < scanRegions.length; i++) {
+      const region = scanRegions[i];
+      const regionIndex = i + 1; // 1-5对应5个区域
       console.log(`  ▶ 扫描区域: ${region.name}`);
       
       try {
@@ -772,7 +784,9 @@ export async function readBarcode(base64Image: string): Promise<BarcodeResult[]>
           addUniqueResult(results, {
             type: 'barcode',
             value: zxingRegionResult.text,
-            format: zxingRegionResult.format
+            format: zxingRegionResult.format,
+            region: region.name,
+            regionIndex
           });
           console.log(`    ├─ ✅ 原图识别: ${zxingRegionResult.text.substring(0, 30)}`);
         } else {
@@ -783,7 +797,9 @@ export async function readBarcode(base64Image: string): Promise<BarcodeResult[]>
             addUniqueResult(results, {
               type: 'barcode',
               value: zxingPreprocessedResult.text,
-              format: zxingPreprocessedResult.format
+              format: zxingPreprocessedResult.format,
+              region: region.name,
+              regionIndex
             });
             console.log(`    └─ ✅ 预处理识别: ${zxingPreprocessedResult.text.substring(0, 30)}`);
           } else {
@@ -801,7 +817,7 @@ export async function readBarcode(base64Image: string): Promise<BarcodeResult[]>
     if (results.length > 0) {
       console.log(`🎉 [readBarcode] 识别成功！共找到 ${results.length} 个条码:`);
       results.forEach((r, idx) => {
-        console.log(`   ${idx + 1}. [${r.format}] ${r.value.substring(0, 50)}`);
+        console.log(`   ${idx + 1}. [${r.format}] ${r.value.substring(0, 50)} (区域: ${r.region || '未知'})`);
       });
       return results;
     }

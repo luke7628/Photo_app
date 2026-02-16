@@ -485,8 +485,9 @@ const App: React.FC = () => {
           let model = '';
           let partNumber = '';
 
-      const parsePayload = (payload: string) => {
+      const parsePayload = (payload: string, barcodeInfo?: any) => {
         console.log('📊 [parsePayload] 输入:', payload);
+        console.log('📊 [parsePayload] 条码信息:', barcodeInfo);
         const parts = payload
           .toUpperCase()
           .split(/[\n|;]+/)
@@ -501,13 +502,11 @@ const App: React.FC = () => {
           const cleaned = compact.replace(/[^A-Z0-9-_]/g, '');
           console.log(`📊 [parsePayload] 清理后:`, cleaned);
 
-          // 优先识别部件号（Part Number）- ZT4开头，后面跟数字和字母
+          // 优先识别部件号（Part Number）- ZT4开头
           if (!partNumber) {
-            // 更灵活的部件号匹配：ZT4 + 数字（3-6位）+ 可选分隔符 + 字母数字组合
             const partMatch = cleaned.match(/ZT4\d{3,6}[-_]?[A-Z0-9]{5,}/i);
             if (partMatch) {
               let normalized = partMatch[0].replace(/_/g, '-');
-              // 如果没有分隔符且长度够长，自动添加分隔符（ZT41142T010000Z -> ZT41142-T010000Z）
               if (!normalized.includes('-') && normalized.length > 9) {
                 const match = normalized.match(/^(ZT4\d{3,6})([A-Z0-9]+)$/);
                 if (match) {
@@ -516,53 +515,75 @@ const App: React.FC = () => {
               }
               partNumber = normalized;
               console.log('✅ [parsePayload] 识别为部件号:', partNumber);
+              return; // 发现PN后直接返回，避免继续识别为SN
             }
           }
 
           // 识别序列号（Serial Number）
-          // 优先级1：带标签的序列号（SN:, S/N:, SERIAL: 等）
+          // 优先级1：带标签的序列号
           if (!serialNumber) {
             const labeledSerial = cleaned.match(/(?:SN|SERIAL|S-N|S_N)[:=\s]*([A-Z0-9]{8,})/i);
             if (labeledSerial) {
               serialNumber = labeledSerial[1];
               console.log('✅ [parsePayload] 识别为序列号（带标签）:', serialNumber);
+              return; // 发现SN后直接返回
             }
           }
 
-          // 优先级2：Zebra 典型序列号格式（字母+数字组合，长度8-20）
+          // 优先级2：位置策略 - 使用条码所在区域判断
+          // 底部区域更可能是PN（且以ZT4开头或长数字），顶部/上部更可能是SN
+          const isBottomRegion = barcodeInfo?.regionIndex && barcodeInfo.regionIndex >= 4; // 底部80%以后
+          const isTopRegion = barcodeInfo?.regionIndex && barcodeInfo.regionIndex <= 2; // 顶部40%以前
+          
+          if (isBottomRegion && cleaned.length > 8) {
+            // 底部区域：优先当作PN
+            if (!partNumber && cleaned.match(/^[A-Z0-9]{8,}/i)) {
+              partNumber = cleaned;
+              console.log('✅ [parsePayload] 识别为部件号（底部位置）:', partNumber);
+              return;
+            }
+          }
+
+          if (isTopRegion && !serialNumber && cleaned.length >= 8 && cleaned.length <= 20) {
+            // 顶部区域：优先当作SN
+            serialNumber = cleaned;
+            console.log('✅ [parsePayload] 识别为序列号（顶部位置）:', serialNumber);
+            return;
+          }
+
+          // 优先级3：Zebra 典型序列号格式（数字+字母+数字）
           if (!serialNumber) {
-            // 匹配模式：数字+字母+数字 (如 99UZ21902791)
             const pattern1 = cleaned.match(/(?<![A-Z0-9])(\d{2,4}[A-Z]{2,4}\d{6,})(?![A-Z0-9])/i);
-            if (pattern1 && pattern1[1].length >= 8 && pattern1[1].length <= 20) {
+            if (pattern1 && pattern1[1].length >= 8 && pattern1[1].length <= 20 && !cleaned.startsWith('ZT4')) {
               serialNumber = pattern1[1];
               console.log('✅ [parsePayload] 识别为序列号（格式: 数字+字母+数字）:', serialNumber);
+              return;
             }
           }
           
-          // 优先级2.5：其他Zebra格式（字母开头）
+          // 优先级4：其他Zebra格式（字母开头）
           if (!serialNumber) {
             const pattern2 = cleaned.match(/(?<![A-Z0-9])([A-Z]{2,4}\d{6,}|[A-Z0-9]{2}[A-Z]\d{6,})(?![A-Z0-9])/i);
-            if (pattern2 && pattern2[1].length >= 8 && pattern2[1].length <= 20) {
+            if (pattern2 && pattern2[1].length >= 8 && pattern2[1].length <= 20 && !cleaned.startsWith('ZT4')) {
               serialNumber = pattern2[1];
               console.log('✅ [parsePayload] 识别为序列号（格式: 字母+数字）:', serialNumber);
+              return;
             }
           }
 
-          // 优先级3：纯数字序列号（10-15位）
-          if (!serialNumber) {
-            const numericSerial = cleaned.match(/(?<![A-Z0-9])(\d{10,15})(?![A-Z0-9])/);
-            if (numericSerial) {
-              serialNumber = numericSerial[1];
-              console.log('✅ [parsePayload] 识别为序列号（纯数字）:', serialNumber);
-            }
+          // 优先级5：纯数字序列号（10-15位）
+          if (!serialNumber && cleaned.match(/^\d{10,15}$/)) {
+            serialNumber = cleaned;
+            console.log('✅ [parsePayload] 识别为序列号（纯数字）:', serialNumber);
+            return;
           }
 
-          // 优先级4：通用格式（字母数字混合，8-20位，避免匹配部件号）
-          if (!serialNumber && !cleaned.startsWith('ZT4')) {
-            const genericSerial = cleaned.match(/(?<![A-Z0-9])([A-Z0-9]{8,20})(?![A-Z0-9])/i);
-            if (genericSerial && !genericSerial[1].match(/^ZT4/i)) {
-              serialNumber = genericSerial[1];
+          // 优先级6：通用格式（避免误识别PN）
+          if (!serialNumber && !partNumber && !cleaned.startsWith('ZT4')) {
+            if (cleaned.length >= 8 && cleaned.length <= 20) {
+              serialNumber = cleaned;
               console.log('✅ [parsePayload] 识别为序列号（通用格式）:', serialNumber);
+              return;
             }
           }
         });
@@ -582,8 +603,9 @@ const App: React.FC = () => {
           const typeStr = result.type === 'qrcode' ? 'QR码' : '条形码';
           const confStr = (result as any).confidence ? ` (置信度: ${((result as any).confidence * 100).toFixed(0)}%)` : '';
           const locStr = (result as any).localized ? ' [已定位]' : '';
-          console.log(`[analyzeWithBarcode] ${typeStr}内容:`, result.value, `${result.format || ''}${confStr}${locStr}`);
-          parsePayload(result.value);
+          const regionStr = (result as any).region ? ` [区域: ${(result as any).region}]` : '';
+          console.log(`[analyzeWithBarcode] ${typeStr}内容:`, result.value, `${result.format || ''}${confStr}${locStr}${regionStr}`);
+          parsePayload(result.value, result);
         }
       } else {
         console.log('❌ [analyzeWithBarcode] 未找到条码结果');
