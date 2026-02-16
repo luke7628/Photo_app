@@ -34,8 +34,8 @@ const createDebugInitializer = (setStatus: (status: 'loading' | 'active' | 'erro
       if (forceDebug || isDev) {
         setStatus('loading');
         console.log('🔧 [Debug] Initializing eruda debug tool...');
-        const eruda = await import('eruda');
-        eruda.default.init({
+        const erudaModule = await import('eruda');
+        erudaModule.default.init({
           container: document.body,
           tool: ['console', 'network', 'elements', 'resources', 'info'],
           useShadowDom: true,
@@ -48,14 +48,15 @@ const createDebugInitializer = (setStatus: (status: 'loading' | 'active' | 'erro
         erudaLoaded = true;
         setStatus('active');
         console.log('✅ [Debug] Eruda initialized successfully!');
-        console.log('📱 [Debug] Look for floating button in bottom-right corner');
-        console.log('💡 [Debug] If you don\'t see it, tap anywhere on screen twice');
+        console.log('📱 [Debug] Tap the floating button in bottom-right corner to open console');
         
-        // Force show after a delay
+        // Automatically open the console panel after a short delay
         setTimeout(() => {
-          if ((window as any).eruda) {
-            (window as any).eruda.show();
-            console.log('🎯 [Debug] Eruda panel shown automatically');
+          try {
+            erudaModule.default.show();
+            console.log('🎯 [Debug] Eruda console opened automatically');
+          } catch (e) {
+            console.log('ℹ️ [Debug] Eruda button is ready - tap it to open console');
           }
         }, 1000);
       } else {
