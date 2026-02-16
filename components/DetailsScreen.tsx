@@ -144,10 +144,10 @@ const DetailsScreen: React.FC<DetailsScreenProps> = ({
             {photos.map((photo, index) => (
               <button 
                 key={index} 
-                className="flex flex-col gap-1 group cursor-pointer active:scale-95 transition-transform"
+                className="flex flex-col gap-1 group cursor-pointer active:scale-95 transition-transform duration-200"
                 onClick={() => photo.url ? onPreviewImage(photos, index) : onAddPhoto(index)}
               >
-                <div className={`relative aspect-square rounded-lg overflow-hidden flex items-center justify-center border transition-all ${photo.url ? 'bg-gray-100 border-gray-200 shadow-sm group-hover:shadow-md group-hover:scale-105' : 'bg-blue-50 border-2 border-dashed border-blue-300 hover:bg-blue-100'}`}>
+                <div className={`relative aspect-square rounded-lg overflow-hidden flex items-center justify-center border transition-all duration-200 group-hover:shadow-lg group-hover:scale-105 ${photo.url ? 'bg-gray-100 border-gray-200 shadow-sm' : 'bg-blue-50 border-2 border-dashed border-blue-300 hover:bg-blue-100'}`}>
                   {photo.url ? (
                     <>
                       <img src={photo.url} className="w-full h-full object-cover" alt={photo.label} />
@@ -212,8 +212,8 @@ const DetailsScreen: React.FC<DetailsScreenProps> = ({
   };
 
   return (
-    <div className="flex flex-col h-full w-full bg-white overflow-hidden animate-in fade-in duration-300 relative">
-      <header className="pt-4 px-4 pb-3 bg-white border-b border-gray-100 z-10">
+    <div className="screen-container animate-in fade-in duration-300">
+      <header className="screen-header px-4 pb-3 bg-white border-b border-gray-100 z-10">
         <div className="flex items-center gap-3 mb-3">
           <button 
             onClick={onBack}
@@ -282,8 +282,7 @@ const DetailsScreen: React.FC<DetailsScreenProps> = ({
       </header>
 
       <main 
-        className="flex-1 overflow-y-auto no-scrollbar bg-white"
-        style={{ paddingBottom: '2rem' }}
+        className="screen-content no-scrollbar"
       >
         <div className="sticky top-0 bg-white z-10 px-5 py-3 border-b border-gray-100">
           <div className="flex items-center justify-between">
@@ -323,7 +322,7 @@ const DetailsScreen: React.FC<DetailsScreenProps> = ({
       </main>
 
       {capturedCount < 12 && (
-        <div className="fixed bottom-0 left-0 right-0 z-20 pointer-events-none">
+        <div className="fixed left-0 right-0 z-20 pointer-events-none" style={{ bottom: 'calc(1rem + env(safe-area-inset-bottom, 0px))' }}>
           <div className="flex justify-center">
             <button 
               onClick={() => {
@@ -340,7 +339,7 @@ const DetailsScreen: React.FC<DetailsScreenProps> = ({
       )}
 
       {capturedCount === 12 && (
-        <div className="fixed bottom-0 left-0 right-0 z-20 pointer-events-none">
+        <div className="fixed left-0 right-0 z-20 pointer-events-none" style={{ bottom: 'calc(1rem + env(safe-area-inset-bottom, 0px))' }}>
           <div className="flex justify-center">
             <button 
               onClick={() => {

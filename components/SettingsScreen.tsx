@@ -85,7 +85,7 @@ const SettingsScreen: React.FC<SettingsScreenProps> = ({ settings, onUpdate, act
   const displayPath = `${cloudServiceName}${settings.drivePath}${projectName}/${settings.useSubfoldersBySN ? 'SN_123456/' : ''}`;
 
   return (
-    <div className="flex flex-col h-full bg-white">
+    <div className="screen-container">
       {isReloading && (
         <div className="fixed inset-0 z-[999] bg-black/50 backdrop-blur-sm flex flex-col items-center justify-center animate-fadeIn">
           <div className="bg-white rounded-2xl p-8 shadow-2xl w-full mx-4 max-w-sm">
@@ -130,8 +130,8 @@ const SettingsScreen: React.FC<SettingsScreenProps> = ({ settings, onUpdate, act
         </div>
       )}
 
-      {/* Header */}
-      <header className="pt-4 sm:pt-5 px-4 sm:px-6 py-4 sm:py-5 bg-white border-b border-gray-200 z-10">
+      {/* Header with safe-area padding */}
+      <header className="screen-header px-4 sm:px-6 py-4 sm:py-5 bg-white border-b border-gray-200 z-10">
         <div className="flex items-center gap-3 sm:gap-4">
           <button 
             onClick={onBack}
@@ -149,8 +149,7 @@ const SettingsScreen: React.FC<SettingsScreenProps> = ({ settings, onUpdate, act
 
       {/* Content */}
       <main 
-        className="flex-1 overflow-y-auto px-4 sm:px-6 py-4 sm:py-6 no-scrollbar space-y-4 sm:space-y-6"
-        style={{ paddingBottom: '2rem' }}
+        className="screen-content px-4 sm:px-6 py-4 sm:py-6 no-scrollbar space-y-4 sm:space-y-6"
       >
         {/* Camera Section */}
         <section>
@@ -158,18 +157,22 @@ const SettingsScreen: React.FC<SettingsScreenProps> = ({ settings, onUpdate, act
             <span className="material-symbols-outlined text-base text-gray-400">photo_camera</span>
             Camera
           </h2>
-          <div className="bg-white rounded-lg sm:rounded-xl p-4 sm:p-5 shadow-sm border border-gray-200 space-y-4">
+          <div className="bg-white rounded-lg sm:rounded-xl p-4 sm:p-5 shadow-sm border border-gray-200 hover:shadow-md hover:border-gray-300 transition-all duration-200 space-y-4">
             <div className="flex items-center justify-between">
               <div className="flex-1">
                 <p className="text-sm font-semibold text-gray-900">Flash Mode</p>
                 <p className="text-xs text-gray-500 mt-0.5">Default flash setting</p>
               </div>
-              <div className="flex bg-gray-100 p-1 rounded-lg ml-4">
+              <div className="flex bg-gray-100 p-1 rounded-lg ml-4 gap-1">
                 {(['off', 'auto', 'on'] as const).map(mode => (
                   <button
                     key={mode}
                     onClick={() => updateField('defaultFlash', mode)}
-                    className={`px-2.5 sm:px-3 py-1 rounded-md text-xs font-semibold whitespace-nowrap transition-all ${settings.defaultFlash === mode ? 'bg-white text-blue-500 shadow-sm' : 'text-gray-500'}`}
+                    className={`px-2.5 sm:px-3 py-1.5 rounded-md text-xs font-semibold whitespace-nowrap transition-all duration-200 active:scale-95 ${
+                      settings.defaultFlash === mode 
+                        ? 'bg-white text-blue-500 shadow-md shadow-blue-200 border border-blue-100' 
+                        : 'text-gray-500 hover:text-gray-700 active:bg-gray-200'
+                    }`}
                   >
                     {mode.charAt(0).toUpperCase() + mode.slice(1)}
                   </button>
@@ -177,16 +180,22 @@ const SettingsScreen: React.FC<SettingsScreenProps> = ({ settings, onUpdate, act
               </div>
             </div>
             <div className="h-px bg-gray-100"></div>
-            <div className="flex items-center justify-between">
+            <div className="flex items-center justify-between group">
               <div className="flex-1">
                 <p className="text-sm font-semibold text-gray-900">Skip Review</p>
                 <p className="text-xs text-gray-500 mt-0.5">Auto-advance after capture</p>
               </div>
               <button 
                 onClick={() => updateField('skipReview', !settings.skipReview)}
-                className={`w-12 h-7 sm:w-14 sm:h-8 flex-shrink-0 rounded-full p-1 transition-colors ml-4 ${settings.skipReview ? 'bg-blue-500' : 'bg-gray-300'}`}
+                className={`w-12 h-7 sm:w-14 sm:h-8 flex-shrink-0 rounded-full p-1 transition-all duration-300 ml-4 flex items-center ${
+                  settings.skipReview 
+                    ? 'bg-blue-500 shadow-md shadow-blue-200' 
+                    : 'bg-gray-300 shadow-sm'
+                } active:scale-95`}
               >
-                <div className={`w-5 h-5 sm:w-6 sm:h-6 bg-white rounded-full shadow-md transition-transform ${settings.skipReview ? 'translate-x-5 sm:translate-x-6' : ''}`} />
+                <div className={`w-5 h-5 sm:w-6 sm:h-6 bg-white rounded-full shadow-md transition-all duration-300 ${
+                  settings.skipReview ? 'translate-x-5 sm:translate-x-6' : 'translate-x-0'
+                }`} />
               </button>
             </div>
           </div>
@@ -240,9 +249,15 @@ const SettingsScreen: React.FC<SettingsScreenProps> = ({ settings, onUpdate, act
               </div>
               <button 
                 onClick={() => updateField('useSubfoldersBySN', !settings.useSubfoldersBySN)}
-                className={`w-12 h-7 sm:w-14 sm:h-8 flex-shrink-0 rounded-full p-1 transition-colors ml-4 ${settings.useSubfoldersBySN ? 'bg-blue-500' : 'bg-gray-300'}`}
+                className={`w-12 h-7 sm:w-14 sm:h-8 flex-shrink-0 rounded-full p-1 transition-all duration-300 ml-4 flex items-center ${
+                  settings.useSubfoldersBySN 
+                    ? 'bg-blue-500 shadow-md shadow-blue-200' 
+                    : 'bg-gray-300 shadow-sm'
+                } active:scale-95`}
               >
-                <div className={`w-5 h-5 sm:w-6 sm:h-6 bg-white rounded-full shadow-md transition-transform ${settings.useSubfoldersBySN ? 'translate-x-5 sm:translate-x-6' : ''}`} />
+                <div className={`w-5 h-5 sm:w-6 sm:h-6 bg-white rounded-full shadow-md transition-all duration-300 ${
+                  settings.useSubfoldersBySN ? 'translate-x-5 sm:translate-x-6' : 'translate-x-0'
+                }`} />
               </button>
             </div>
 
@@ -273,16 +288,20 @@ const SettingsScreen: React.FC<SettingsScreenProps> = ({ settings, onUpdate, act
             <span className="material-symbols-outlined text-base text-gray-400">settings_suggest</span>
             System
           </h2>
-          <div className="bg-white rounded-lg sm:rounded-xl p-4 sm:p-5 shadow-sm border border-gray-200">
-            <div className="flex items-center justify-between">
+          <div className="bg-gradient-to-br from-gray-900 to-gray-800 rounded-lg sm:rounded-xl p-4 sm:p-5 shadow-md border border-gray-700 hover:shadow-lg hover:border-gray-600 transition-all duration-200">
+            <div className="flex items-center justify-between group">
               <div className="flex-1 min-w-0">
-                <p className="text-sm font-semibold text-gray-900">Refresh App</p>
-                <p className="text-xs text-gray-500 mt-0.5">Reload from cloud</p>
+                <p className="text-sm font-semibold text-white">Refresh App</p>
+                <p className="text-xs text-gray-400 mt-0.5">Reload from cloud</p>
               </div>
               <button 
                 onClick={handleReload}
                 disabled={isReloading}
-                className="flex-shrink-0 ml-4 px-3 sm:px-4 py-2 rounded-lg bg-gray-900 hover:bg-black text-white text-xs font-semibold transition-colors active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
+                className={`flex-shrink-0 ml-4 px-3 sm:px-5 py-2.5 rounded-lg text-white text-xs font-bold transition-all duration-200 active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap ${
+                  isReloading
+                    ? 'bg-blue-500/50'
+                    : 'bg-blue-500 hover:bg-blue-600 shadow-lg shadow-blue-500/30 hover:shadow-blue-500/50'
+                }`}
               >
                 {isReloading ? 'Updating...' : 'Refresh'}
               </button>

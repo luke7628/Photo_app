@@ -52,12 +52,15 @@
     }
 
     #root {
-      height: 100%;
       width: 100%;
+      height: 100dvh;
       position: fixed;
       top: 0;
       left: 0;
+      right: 0;
+      bottom: 0;
       background: #ffffff;
+      box-sizing: border-box;
       display: flex;
       flex-direction: column;
       overflow: hidden;
@@ -78,18 +81,56 @@
       background: #a6a6ad;
     }
     
-    /* Screen transition */
+    /* Screen transition - smooth fade-in with subtle scale */
     .screen-enter {
-      animation: screen-in 0.3s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+      animation: screen-in 0.4s cubic-bezier(0.4, 0, 0.2, 1) forwards;
     }
     
     @keyframes screen-in {
       from { 
         opacity: 0;
+        transform: translateY(8px);
       }
-      to { 
+      to {
         opacity: 1;
+        transform: translateY(0);
       }
+    }
+
+    /* Slide and fade for directional transitions */
+    @keyframes slide-in-from-bottom {
+      from {
+        opacity: 0;
+        transform: translateY(16px);
+      }
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+
+    @keyframes slide-in-from-right {
+      from {
+        opacity: 0;
+        transform: translateX(16px);
+      }
+      to {
+        opacity: 1;
+        transform: translateX(0);
+      }
+    }
+
+    /* Button press feedback keyframes */
+    @keyframes button-press {
+      0% { transform: scale(1); }
+      50% { transform: scale(0.96); }
+      100% { transform: scale(1); }
+    }
+
+    /* Smooth bounce for attention */
+    @keyframes gentle-bounce {
+      0%, 100% { transform: translateY(0); }
+      50% { transform: translateY(-4px); }
     }
     
     /* Disable scrolling on body */
@@ -99,6 +140,82 @@
     }
     .no-scrollbar::-webkit-scrollbar {
       display: none;
+    }
+    
+    /* Unified Screen Design System */
+    .screen-container {
+      display: flex;
+      flex-direction: column;
+      height: 100%;
+      width: 100%;
+      background: #ffffff;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .screen-container.dark {
+      background: #000000;
+    }
+
+    /* Header should handle top safe-area */
+    .screen-header {
+      padding-top: env(safe-area-inset-top, 0px);
+      padding-left: env(safe-area-inset-left, 0px);
+      padding-right: env(safe-area-inset-right, 0px);
+      flex-shrink: 0;
+    }
+
+    .screen-content {
+      flex: 1;
+      overflow-y: auto;
+      overflow-x: hidden;
+      background: #ffffff;
+      padding-left: env(safe-area-inset-left, 0px);
+      padding-right: env(safe-area-inset-right, 0px);
+      /* Bottom padding handles both floating button clearance and home indicator */
+      padding-bottom: calc(5.5rem + env(safe-area-inset-bottom, 0px));
+    }
+
+    .screen-content.dark {
+      background: #000000;
+    }
+
+    .screen-content.landscape {
+      padding-bottom: calc(5rem + env(safe-area-inset-bottom, 0px));
+    }
+
+    .screen-footer {
+      position: absolute;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      z-index: 20;
+      /* Only footer handles safe-area inset */
+      padding-bottom: env(safe-area-inset-bottom, 0px);
+    }
+
+    .pad-top-safe {
+      padding-top: calc(1rem + env(safe-area-inset-top, 0px));
+      padding-left: env(safe-area-inset-left, 0px);
+      padding-right: env(safe-area-inset-right, 0px);
+    }
+
+    .pad-bottom-safe {
+      padding-bottom: calc(1rem + env(safe-area-inset-bottom, 0px));
+      padding-left: env(safe-area-inset-left, 0px);
+      padding-right: env(safe-area-inset-right, 0px);
+    }
+
+    .floating-button {
+      position: fixed;
+      z-index: 40;
+      bottom: calc(1.5rem + var(--sab, 0px));
+      left: 50%;
+      transform: translateX(-50%);
+    }
+
+    .floating-button.landscape {
+      bottom: calc(1rem + var(--sab, 0px));
     }
     
     /* User selection disabled by default for better mobile UX */

@@ -40,13 +40,13 @@ const PrinterItem = memo(({
       onClick={() => onSelect(printer)}
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
-      className={`w-full text-left group flex items-center bg-white rounded-2xl border border-gray-200 shadow-sm hover:shadow-md transition-all animate-slideUpFast ${isLandscape ? 'p-2 gap-3' : 'p-3 gap-3.5'}`}
+      className={`w-full text-left group flex items-center bg-white rounded-2xl border border-gray-200 shadow-sm hover:shadow-lg hover:border-blue-300 active:scale-95 transition-all duration-200 animate-slideUpFast cursor-pointer ${isLandscape ? 'p-2 gap-3' : 'p-3 gap-3.5'}`}
       style={{
         animationDelay: `${index * 30}ms`
       }}
     >
       
-      <div className={`rounded-xl bg-gradient-to-br from-blue-50 to-indigo-50 flex items-center justify-center overflow-hidden shrink-0 border border-gray-200 shadow-sm transition-all ${isHovered ? 'shadow-md' : ''} ${isLandscape ? 'size-10' : 'size-14'}`}>
+      <div className={`rounded-xl bg-gradient-to-br from-blue-50 to-indigo-50 flex items-center justify-center overflow-hidden shrink-0 border border-gray-200 shadow-sm transition-all duration-200 group-hover:scale-110 group-active:scale-100 ${isHovered ? 'shadow-md' : ''} ${isLandscape ? 'size-10' : 'size-14'}`}>
         <img src={printer.imageUrl} className="size-full object-cover" alt={printer.serialNumber} />
       </div>
       <div className="flex-1 min-w-0">
@@ -116,9 +116,9 @@ const GalleryScreen: React.FC<GalleryScreenProps> = ({
   );
 
   return (
-    <div className="flex flex-col h-full bg-white relative transition-all duration-300">
-      {/* Header */}
-      <header className={`pt-4 px-4 bg-white z-30 transition-all flex-shrink-0 ${isLandscape ? 'pb-2' : 'pb-4'}`}>
+    <div className="screen-container transition-all duration-300">
+      {/* Header with safe-area top padding */}
+      <header className={`screen-header px-4 bg-white z-30 transition-all flex-shrink-0 ${isLandscape ? 'pb-2' : 'pb-4'}`}>
         {/* Top row: Back button + Title + User + Settings */}
         <div className={`flex items-center gap-3 transition-all ${isLandscape ? 'mb-2 pt-2' : 'mb-3 pt-4'}`}>
           <button 
@@ -253,10 +253,7 @@ const GalleryScreen: React.FC<GalleryScreenProps> = ({
 
       {/* Printer list */}
       <main 
-        className={`flex-1 overflow-y-auto px-5 no-scrollbar transition-all bg-white ${isLandscape ? 'pt-3' : 'pt-5'}`}
-        style={{
-          paddingBottom: isLandscape ? '4.5rem' : '5rem'
-        }}
+        className={`screen-content px-5 no-scrollbar transition-all ${isLandscape ? 'landscape pt-3' : 'pt-5'}`}
       >
         <div className={`grid gap-3 transition-all ${isLandscape ? 'grid-cols-2 md:grid-cols-3' : 'grid-cols-1'}`}>
           {filteredPrinters.map((printer, idx) => (
@@ -273,10 +270,7 @@ const GalleryScreen: React.FC<GalleryScreenProps> = ({
 
       {/* Floating Action Button */}
       <div 
-        className="fixed left-1/2 -translate-x-1/2 z-40 pointer-events-auto transition-all"
-        style={{
-          bottom: isLandscape ? 'calc(1rem + max(0px, env(safe-area-inset-bottom, 0px)))' : 'calc(1.5rem + max(0px, env(safe-area-inset-bottom, 0px)))'
-        }}
+        className={`floating-button ${isLandscape ? 'landscape' : ''} z-40 pointer-events-auto transition-all`}
       >
         <button 
           onClick={onAdd}

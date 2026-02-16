@@ -349,7 +349,7 @@ const CameraScreen: React.FC<CameraScreenProps> = ({
   );
 
   return (
-    <div className="fixed inset-0 z-50 bg-black flex flex-col overflow-hidden touch-none safe-area-inset">
+    <div className="screen-container dark fixed inset-0 z-50 touch-none">
       <div className="relative flex-1 bg-black overflow-hidden flex items-center justify-center">
         {/* 摄像头错误提示 */}
         {cameraError && (
@@ -427,8 +427,7 @@ const CameraScreen: React.FC<CameraScreenProps> = ({
         {/* UI 覆盖层 */}
         <div className="absolute inset-0 z-10 flex flex-col pointer-events-none">
           <header 
-            className={`w-full flex items-center justify-between pointer-events-auto bg-gradient-to-b from-black/80 via-black/20 to-transparent transition-all duration-500 ${isLandscape ? 'p-4 px-12' : 'p-6'}`}
-            style={{ paddingTop: `calc(1rem + env(safe-area-inset-top, 0px))` }}
+            className={`pad-top-safe w-full flex items-center justify-between pointer-events-auto bg-gradient-to-b from-black/80 via-black/20 to-transparent transition-all duration-500 ${isLandscape ? 'p-4 px-12' : 'p-6'}`}
           >
             <button 
               onClick={onClose}
@@ -463,10 +462,7 @@ const CameraScreen: React.FC<CameraScreenProps> = ({
           <div className="flex-1"></div>
 
           <footer 
-            className={`w-full bg-gradient-to-t from-black/90 via-black/40 to-transparent flex flex-col items-center pointer-events-auto transition-all duration-500 ${isLandscape ? 'px-12 pt-2' : 'pt-6'}`}
-            style={{ 
-              paddingBottom: `calc(1rem + env(safe-area-inset-bottom, 0px))`
-            }}
+            className={`pad-bottom-safe w-full bg-gradient-to-t from-black/90 via-black/40 to-transparent flex flex-col items-center pointer-events-auto transition-all duration-500 ${isLandscape ? 'px-12 pt-1' : 'pt-4'}`}
           >
             <div className="w-full flex items-center justify-center">
                <button 

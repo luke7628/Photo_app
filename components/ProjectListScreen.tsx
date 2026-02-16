@@ -37,9 +37,9 @@ const ProjectListScreen: React.FC<ProjectListScreenProps> = ({
   }, [projects, printers]);
 
   return (
-    <div className="flex flex-col h-full bg-white overflow-hidden">
-      {/* Top Header */}
-      <header className="flex items-center justify-between py-2.5 sm:py-5 px-2 sm:px-6 bg-white border-b border-gray-200 shrink-0">
+    <div className="screen-container">
+      {/* Top Header with safe-area padding */}
+      <header className="screen-header px-2 sm:px-6 bg-white border-b border-gray-200 shrink-0 flex items-center justify-between py-2.5 sm:py-5">
         <div className="flex-1 min-w-0 pr-2">
           <div className="flex items-center gap-1.5 sm:gap-3 mb-0.5 sm:mb-1">
             <div className="flex-shrink-0 w-7 h-7 sm:w-12 sm:h-12 flex items-center justify-center rounded-lg sm:rounded-2xl bg-blue-50 border border-blue-100">
@@ -74,8 +74,7 @@ const ProjectListScreen: React.FC<ProjectListScreenProps> = ({
 
       {/* Projects Grid */}
       <main 
-        className="flex-1 overflow-y-auto px-2 sm:px-6 pt-3 sm:pt-6 custom-scrollbar bg-white"
-        style={{ paddingBottom: '2rem' }}
+        className="screen-content px-2 sm:px-6 pt-3 sm:pt-6 custom-scrollbar"
       >
         <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-2 sm:gap-4">
           
@@ -93,7 +92,7 @@ const ProjectListScreen: React.FC<ProjectListScreenProps> = ({
             <div key={project.id} className="relative group">
               <button 
                 onClick={() => onSelectProject(project.id)}
-                className="w-full aspect-square bg-white rounded-lg sm:rounded-xl shadow-sm border border-gray-200 hover:shadow-md hover:border-gray-300 active:scale-95 transition-all overflow-hidden flex flex-col text-left"
+                className="w-full aspect-square bg-white rounded-lg sm:rounded-xl shadow-sm border border-gray-200 hover:shadow-xl hover:border-blue-300 active:scale-95 transition-all duration-200 overflow-hidden flex flex-col text-left group cursor-pointer"
               >
                 {/* Thumbnail area */}
                 <div className="relative flex-1 w-full overflow-hidden">

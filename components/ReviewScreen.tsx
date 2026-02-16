@@ -173,7 +173,7 @@ const ReviewScreen: React.FC<ReviewScreenProps> = ({ imageUrl, data, isAnalyzing
   );
 
   return (
-    <div className="flex flex-col h-full w-full bg-[#f6f8f6] select-none touch-none" 
+    <div className="screen-container bg-[#f6f8f6] select-none touch-none" 
          onMouseMove={handleTouchMove} 
          onMouseUp={handleTouchEnd}
          onTouchMove={handleTouchMove} 
@@ -321,7 +321,7 @@ const ReviewScreen: React.FC<ReviewScreenProps> = ({ imageUrl, data, isAnalyzing
         </div>
       </main>
 
-      <footer className={`bg-white rounded-t-3xl shadow-[0_-15_50px_rgba(0,0,0,0.06)] shrink-0 z-20 transition-all duration-500 ${isLandscape ? 'pt-2 px-12' : 'pt-3 px-5'}`}>
+      <footer className={`bg-white rounded-t-3xl shadow-[0_-15_50px_rgba(0,0,0,0.06)] shrink-0 z-20 transition-all duration-500 ${isLandscape ? 'pt-1 px-12 pb-2' : 'pt-2 px-5 pb-2'}`}>
         <div className={`flex gap-4 ${isLandscape ? 'justify-center' : ''}`}>
           <button 
             onClick={onRetake}
@@ -337,12 +337,12 @@ const ReviewScreen: React.FC<ReviewScreenProps> = ({ imageUrl, data, isAnalyzing
             style={{
               ...rotationStyle,
               backgroundColor: hasValidData 
-                ? (isSingleRetake ? '#f59e0b' : '#3cb119')
+                ? (isSingleRetake ? '#f59e0b' : '#10b981')
                 : '#e5e7eb'
             }}
-            className={`active:scale-95 rounded-2xl flex items-center justify-center gap-2 transition-all shadow-xl disabled:opacity-50 ${isLandscape ? 'px-12 h-12' : 'flex-[2] h-14'} ${
+            className={`active:scale-95 rounded-lg sm:rounded-2xl flex items-center justify-center gap-2 transition-all duration-200 shadow-xl disabled:opacity-50 hover:shadow-2xl ${isLandscape ? 'px-12 h-12' : 'flex-[2] h-12'} ${
               hasValidData 
-              ? '' 
+              ? 'hover:brightness-110 active:brightness-95' 
               : 'text-gray-400 shadow-none'
             }`}
           >

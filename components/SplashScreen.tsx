@@ -2,7 +2,7 @@ import React from 'react';
 
 const SplashScreen: React.FC = () => {
   return (
-    <div className="relative flex h-full w-full flex-col items-center justify-between overflow-hidden">
+    <div className="screen-container relative items-center justify-between">
       {/* Dynamic gradient background with mesh effect */}
       <div className="absolute inset-0 bg-gradient-to-br from-blue-50/50 via-white to-sky-50/50">
         <div className="absolute inset-0">

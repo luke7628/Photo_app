@@ -21,8 +21,9 @@ const SearchScreen: React.FC<SearchScreenProps> = ({ printers, onBack, onPreview
   });
 
   return (
-    <div className="flex flex-col h-full bg-white relative">
-      <div className="sticky top-0 z-50 bg-white pt-14 pb-2 border-b border-slate-100">
+    <div className="screen-container">
+      <div className="sticky top-0 z-50 bg-white border-b border-slate-100">
+        <div className="screen-header pb-2"></div>
         <div className="flex items-center px-5 pb-4 justify-between">
           <div className="flex items-center gap-3">
             <button 
@@ -95,8 +96,7 @@ const SearchScreen: React.FC<SearchScreenProps> = ({ printers, onBack, onPreview
       </div>
 
       <div 
-        className="flex-1 overflow-y-auto no-scrollbar bg-slate-50/30"
-        style={{ paddingBottom: '2rem' }}
+        className="screen-content no-scrollbar bg-slate-50/30"
       >
         {filteredResults.length > 0 ? filteredResults.map((p) => (
           <div key={p.id} className="grid grid-cols-12 gap-2 items-center px-5 py-4 border-b border-slate-50 active:bg-primary/5 bg-white transition-colors cursor-pointer group">
