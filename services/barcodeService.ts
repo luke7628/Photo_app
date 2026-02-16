@@ -14,11 +14,45 @@ import { BrowserMultiFormatReader, BarcodeFormat, DecodeHintType } from '@zxing/
 
 let barcodeReader: BrowserMultiFormatReader | null = null;
 let preprocessedImageCache: { base64: string; processed: string } | null = null;
+let barcodeDetectorAvailable: boolean | null = null;
 
 interface BarcodeResult {
   type: 'barcode' | 'qrcode';
   value: string;
   format?: string;
+}
+
+/**
+ * 检测BarcodeDetector API是否可用
+ */
+function checkBarcodeDetectorSupport(): boolean {
+  if (barcodeDetectorAvailable !== null) {
+    return barcodeDetectorAvailable;
+  }
+
+  const BarcodeDetectorCtor = (window as any).BarcodeDetector;
+  barcodeDetectorAvailable = typeof BarcodeDetectorCtor !== 'undefined';
+  
+  console.log(`🔍 [BarcodeDetector] API ${barcodeDetectorAvailable ? '✅ 可用' : '❌ 不可用'}`);
+  console.log(`📱 [Device] UserAgent: ${navigator.userAgent}`);
+  console.log(`🌐 [Browser] ${getBrowserInfo()}`);
+  
+  return barcodeDetectorAvailable;
+}
+
+/**
+ * 获取浏览器信息
+ */
+function getBrowserInfo(): string {
+  const ua = navigator.userAgent;
+  if (ua.includes('CriOS')) return 'Chrome iOS';
+  if (ua.includes('FxiOS')) return 'Firefox iOS';
+  if (ua.includes('Safari') && ua.includes('iPhone')) return 'Safari iOS';
+  if (ua.includes('Safari') && ua.includes('Mac')) return 'Safari macOS';
+  if (ua.includes('Chrome')) return 'Chrome';
+  if (ua.includes('Firefox')) return 'Firefox';
+  if (ua.includes('Edge')) return 'Edge';
+  return 'Unknown';
 }
 
 function getReader() {
@@ -348,11 +382,22 @@ function estimateSharpness(imageData: ImageData): number {
  */
 async function decodeWithBarcodeDetector(base64Image: string, preprocessed: boolean = false): Promise<BarcodeResult[]> {
   const detected: BarcodeResult[] = [];
+  
+  // 检查API可用性
+  if (!checkBarcodeDetectorSupport()) {
+    if (!preprocessed) {
+      console.log('ℹ️ [BarcodeDetector] API不可用，跳过检测');
+    }
+    return detected;
+  }
+
   const BarcodeDetectorCtor = (window as any).BarcodeDetector;
-  if (!BarcodeDetectorCtor || !base64Image) return detected;
+  if (!base64Image) return detected;
 
   try {
     const img = await loadImageFromBase64(base64Image);
+    console.log(`🖼️ [BarcodeDetector] 图像加载成功: ${img.width}x${img.height}`);
+    
     const detector = new BarcodeDetectorCtor({
       formats: [
         'qr_code',
@@ -370,9 +415,13 @@ async function decodeWithBarcodeDetector(base64Image: string, preprocessed: bool
       ]
     });
 
+    console.log(`🔍 [BarcodeDetector] 开始检测 ${preprocessed ? '(预处理)' : '(原图)'}...`);
     const results = await detector.detect(img);
-    results.forEach((r: any) => {
+    console.log(`📊 [BarcodeDetector] 检测完成，找到 ${results.length} 个结果`);
+    
+    results.forEach((r: any, idx: number) => {
       const rawValue = (r.rawValue || '').trim();
+      console.log(`  [${idx}] 格式: ${r.format}, 值: ${rawValue ? rawValue.substring(0, 50) : '(空)'}`);
       if (!rawValue) return;
       detected.push({
         type: r.format === 'qr_code' ? 'qrcode' : 'barcode',
@@ -383,12 +432,15 @@ async function decodeWithBarcodeDetector(base64Image: string, preprocessed: bool
 
     if (detected.length > 0) {
       console.log(`✅ BarcodeDetector ${preprocessed ? '(preprocessed)' : '(raw)'} 识别成功:`, detected.map(d => `${d.value} (${d.format})`).join(', '));
+    } else {
+      console.log(`ℹ️ [BarcodeDetector] ${preprocessed ? '(预处理)' : '(原图)'} 未检测到条码`);
     }
 
     return detected;
-  } catch (error) {
-    if (!preprocessed) {
-      console.log('ℹ️ BarcodeDetector (raw) 失败');
+  } catch (error: any) {
+    console.error(`❌ [BarcodeDetector] ${preprocessed ? '(预处理)' : '(原图)'} 检测失败:`, error.message || error);
+    if (error.stack) {
+      console.error('Stack:', error.stack.split('\n').slice(0, 3).join('\n'));
     }
     return detected;
   }
@@ -402,14 +454,23 @@ async function decodeWithZXing(base64Image: string, preprocessed: boolean = fals
 
   try {
     const img = await loadImageFromBase64(base64Image);
+    console.log(`🖼️ [ZXing] 图像加载成功: ${img.width}x${img.height} ${preprocessed ? '(预处理)' : '(原图)'}`);
+    
     const reader = getReader();
+    console.log(`🔍 [ZXing] 开始解码 ${preprocessed ? '(预处理)' : '(原图)'}...`);
 
     // 尝试解码
     const result = await reader.decodeFromImageElement(img);
-    if (!result) return null;
+    if (!result) {
+      console.log(`ℹ️ [ZXing] ${preprocessed ? '(预处理)' : '(原图)'} 未检测到条码`);
+      return null;
+    }
 
     const text = result.getText?.()?.trim();
-    if (!text) return null;
+    if (!text) {
+      console.log(`⚠️ [ZXing] ${preprocessed ? '(预处理)' : '(原图)'} 检测到条码但无内容`);
+      return null;
+    }
 
     // 获取格式信息
     let format = 'UNKNOWN';
@@ -423,11 +484,12 @@ async function decodeWithZXing(base64Image: string, preprocessed: boolean = fals
       // Ignore format error
     }
 
-    console.log(`✅ ZXing ${preprocessed ? '(preprocessed)' : '(raw)'} 识别成功: ${text} (${format})`);
+    console.log(`✅ ZXing ${preprocessed ? '(preprocessed)' : '(raw)'} 识别成功: ${text.substring(0, 50)} (${format})`);
     return { text, format };
-  } catch (error) {
-    if (!preprocessed) {
-      console.log('ℹ️ ZXing (raw) 失败');
+  } catch (error: any) {
+    console.error(`❌ [ZXing] ${preprocessed ? '(预处理)' : '(原图)'} 解码失败:`, error.message || error);
+    if (error.name === 'NotFoundException') {
+      console.log(`ℹ️ [ZXing] ${preprocessed ? '(预处理)' : '(原图)'} 未找到条码`);
     }
     return null;
   }
@@ -455,6 +517,11 @@ export async function readBarcode(base64Image: string): Promise<BarcodeResult[]>
     }
 
     console.log('🔍 [readBarcode] 开始识别（移动优化：分辨率调整 → ROI裁剪 → 多引擎识别）');
+    console.log(`📊 [readBarcode] 原始图像大小: ${normalizedBase64.length} bytes`);
+    
+    // 检测浏览器能力
+    const barcodeDetectorSupported = checkBarcodeDetectorSupport();
+    console.log(`🔧 [readBarcode] 识别引擎: ${barcodeDetectorSupported ? 'BarcodeDetector + ZXing' : '仅 ZXing'}`);
 
     // 预优化阶段：分辨率调整（移动设备优化）
     console.log('📐 [readBarcode] 预优化：调整分辨率...');
