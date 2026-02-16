@@ -81,7 +81,7 @@ export const microsoftAuthService = {
         client_id: clientId,
         redirect_uri: redirectUri,
         code_verifier: codeVerifier,
-        scope: 'offline_access https://graph.microsoft.com/Files.ReadWrite.All https://graph.microsoft.com/User.Read'
+        scope: 'offline_access https://graph.microsoft.com/Files.ReadWrite.AppFolder https://graph.microsoft.com/User.Read'
       });
 
       const tokenEndpoint = `https://login.microsoftonline.com/${tenantId}/oauth2/v2.0/token`;
@@ -139,7 +139,7 @@ export const microsoftAuthService = {
         grant_type: 'refresh_token',
         refresh_token: refreshToken,
         client_id: clientId,
-        scope: 'https://graph.microsoft.com/.default offline_access'
+        scope: 'offline_access https://graph.microsoft.com/Files.ReadWrite.AppFolder https://graph.microsoft.com/User.Read'
       });
 
       const res = await fetch('https://login.microsoftonline.com/common/oauth2/v2.0/token', {
@@ -247,7 +247,7 @@ export const microsoftAuthService = {
       client_id: clientId,
       response_type: 'code',
       redirect_uri: redirectUri,
-      scope: 'offline_access https://graph.microsoft.com/Files.ReadWrite.All https://graph.microsoft.com/User.Read',
+      scope: 'offline_access https://graph.microsoft.com/Files.ReadWrite.AppFolder https://graph.microsoft.com/User.Read',
       response_mode: 'query',
       prompt: 'select_account' // 允许用户选择账户
     });
