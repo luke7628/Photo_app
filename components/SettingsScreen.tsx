@@ -16,7 +16,7 @@ const SettingsScreen: React.FC<SettingsScreenProps> = ({ settings, onUpdate, act
   const [showRebootOverlay, setShowRebootOverlay] = useState(false);
 
   // localStorage keys that should be preserved during app refresh
-  const USER_DATA_KEYS = ['printers', 'projects', 'settings', 'user'];
+  const USER_DATA_KEYS = ['printers', 'projects', 'settings', 'user', 'microsoft'];
 
   const updateField = (field: keyof UserPreferences, value: any) => {
     onUpdate({ ...settings, [field]: value });
