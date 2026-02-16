@@ -1,5 +1,6 @@
 
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import { Buffer } from 'buffer';
 import { AppScreen, Printer, Project, PHOTO_LABELS, PhotoSetItem, UserPreferences, MicrosoftUser, ViewMode } from './types';
 import { MOCK_PRINTERS, MOCK_PROJECTS } from './constants';
 import { storageService } from './services/storageService';
@@ -8,6 +9,11 @@ import { microsoftAuthService } from './services/microsoftAuthService';
 import { readBarcode } from './services/barcodeService';
 import { readBarcodeWithQuagga, initializeQuagga } from './services/quaggaService';
 import { inferModelFromPartNumber } from './src/utils/modelUtils';
+
+// 确保Buffer在全局可用（用于Quagga2）
+if (typeof window !== 'undefined') {
+  (window as any).Buffer = Buffer;
+}
 import SplashScreen from './components/SplashScreen';
 import GalleryScreen from './components/GalleryScreen';
 import SearchScreen from './components/SearchScreen';
@@ -17,67 +23,6 @@ import DetailsScreen from './components/DetailsScreen';
 import ImagePreviewScreen from './components/ImagePreviewScreen';
 import SettingsScreen from './components/SettingsScreen';
 import ProjectListScreen from './components/ProjectListScreen';
-
-// Temporary mobile debugging tool (will be removed before production)
-// Access it by adding ?debug=true to URL
-let erudaLoaded = false;
-const createDebugInitializer = (setStatus: (status: 'loading' | 'active' | 'error' | null) => void) => {
-  return async () => {
-    if (erudaLoaded) return;
-    
-    try {
-      const urlParams = new URLSearchParams(window.location.search);
-      const forceDebug = urlParams.has('debug');
-      const isDev = import.meta.env.DEV;
-      
-      // Enable if: ?debug=true in URL OR development mode
-      if (forceDebug || isDev) {
-        setStatus('loading');
-        console.log('🔧 [Debug] Initializing eruda debug tool...');
-        
-        const erudaModule = await import('eruda');
-        const eruda = erudaModule.default || erudaModule;
-        
-        if (!eruda || typeof eruda.init !== 'function') {
-          throw new Error('Eruda module not loaded correctly');
-        }
-        
-        eruda.init({
-          container: document.body,
-          tool: ['console', 'network', 'elements', 'resources', 'info'],
-          useShadowDom: true,
-          autoScale: true,
-          defaults: {
-            displaySize: 50,
-            transparency: 0.9
-          }
-        });
-        
-        erudaLoaded = true;
-        setStatus('active');
-        console.log('✅ [Debug] Eruda initialized successfully!');
-        console.log('📱 [Debug] Tap the floating button in bottom-right corner to open console');
-        
-        // Automatically open the console panel after a short delay
-        setTimeout(() => {
-          try {
-            if (eruda && typeof eruda.show === 'function') {
-              eruda.show();
-              console.log('🎯 [Debug] Eruda console opened automatically');
-            }
-          } catch (e) {
-            console.log('ℹ️ [Debug] Eruda button is ready - tap it to open console');
-          }
-        }, 1000);
-      } else {
-        console.log('ℹ️ [Debug] Debug mode not enabled. Add ?debug=true to URL to enable.');
-      }
-    } catch (error) {
-      setStatus('error');
-      console.error('❌ [Debug] Failed to load eruda:', error);
-    }
-  };
-};
 
 // !!! IMPORTANT CONFIGURATION !!!
 // MICROSOFT OneDrive SETUP (RECOMMENDED):
@@ -105,7 +50,6 @@ const App: React.FC = () => {
   const [detailsViewMode, setDetailsViewMode] = useState<ViewMode>(ViewMode.GRID);
   const [user, setUser] = useState<MicrosoftUser | null>(null);
   const [isMicrosoftReady, setIsMicrosoftReady] = useState(false);
-  const [debugToolStatus, setDebugToolStatus] = useState<'loading' | 'active' | 'error' | null>(null);
   const [settings, setSettings] = useState<UserPreferences>({
     defaultFlash: 'auto',
     skipReview: false,
@@ -136,12 +80,6 @@ const App: React.FC = () => {
     setShowToast(true);
     setTimeout(() => setShowToast(false), duration);
   };
-
-  // Initialize mobile debugging tool (temporary - will be removed)
-  useEffect(() => {
-    const initDebugTool = createDebugInitializer(setDebugToolStatus);
-    initDebugTool();
-  }, []);
 
   // Initialize Microsoft Auth
   useEffect(() => {
@@ -334,9 +272,8 @@ const App: React.FC = () => {
       const savedPrinters = await storageService.loadPrinters(); // Async IDB
       const savedUser = storageService.loadUser();
       const savedSettings = storageService.loadSettings();
-      // @ts-ignore - backward compatibility check for old 'drive' value
       const normalizedSettings = savedSettings?.cloudProvider === 'drive'
-        ? { ...savedSettings, cloudProvider: 'onedrive' as const }
+        ? { ...savedSettings, cloudProvider: 'onedrive' }
         : savedSettings;
       
       // 合并MOCK数据，确保测试项目存在
@@ -512,51 +449,56 @@ const App: React.FC = () => {
   const analyzeWithBarcode = async (base64Image: string): Promise<{ serialNumber: string; model: string; partNumber: string }> => {
     return new Promise<{ serialNumber: string; model: string; partNumber: string }>((resolve, reject) => {
       const timeout = setTimeout(() => {
-        console.warn('⏱️ [analyzeWithBarcode] Timeout after 15 seconds');
+        console.warn('⏱️ [analyzeWithBarcode] Timeout after 30 seconds');
         reject(new Error('Barcode recognition timeout'));
-      }, 15000); // 15秒超时
+      }, 30000);
 
       (async () => {
         try {
           console.log('📊 [analyzeWithBarcode] 开始...输入长度:', base64Image.length);
           console.log('📊 [analyzeWithBarcode] Base64前100字符:', base64Image.substring(0, 100));
           
-          // 初始化 Quagga2
+          let barcodeResults: any[] = [];
+          
+          // 策略1: 优先使用Quagga2（在iOS上对模糊/倾斜条码效果更好）
           try {
+            console.log('🔍 [analyzeWithBarcode] 策略1: 尝试Quagga2识别（iOS优化）...');
             await initializeQuagga();
-          } catch (error) {
-            console.warn('⚠️ [analyzeWithBarcode] Quagga2 初始化失败:', error);
+            const quaggaResults = await readBarcodeWithQuagga(base64Image);
+            console.log('✅ [analyzeWithBarcode] Quagga2识别成功:', quaggaResults.length, '个结果');
+            
+            barcodeResults = quaggaResults.map(r => ({
+              type: r.type as any,
+              value: r.value,
+              format: r.format,
+              confidence: r.confidence || 0.9,
+              localized: true,
+            }));
+          } catch (quaggaError) {
+            console.warn('⚠️ [analyzeWithBarcode] Quagga2失败，fallback到BarcodeDetector+ZXing:', quaggaError);
+            
+            // 策略2: Fallback到优化的4阶段识别（BarcodeDetector + ZXing）
+            console.log('🔍 [analyzeWithBarcode] 策略2: 使用BarcodeDetector+ZXing 4阶段识别...');
+            const legacyResults = await readBarcode(base64Image);
+            console.log('📊 [analyzeWithBarcode] 4阶段识别返回:', legacyResults.length, '个结果');
+            
+            barcodeResults = legacyResults.map(r => ({
+              type: r.type as any,
+              value: r.value,
+              format: r.format,
+              confidence: 0.8,
+              localized: false,
+            }));
           }
       
-      // 策略 1：优先使用 Quagga2（强大的定位能力）
-      console.log('🔍 [analyzeWithBarcode] 策略1：尝试 Quagga2...');
-      let barcodeResults = await readBarcodeWithQuagga(base64Image);
-      console.log('📊 [analyzeWithBarcode] Quagga2 返回:', barcodeResults.length, '个结果');
-      
-      // 策略 2：如果 Quagga2 失败，回退到 ZXing/BarcodeDetector
-      if (barcodeResults.length === 0) {
-        console.log('📍 [analyzeWithBarcode] Quagga2 未检测到，尝试备用方法（ZXing/BarcodeDetector）...');
-        const legacyResults = await readBarcode(base64Image);
-        console.log('📊 [analyzeWithBarcode] 备用方法返回:', legacyResults.length, '个结果');
-        
-        // 转换格式以兼容
-        barcodeResults = legacyResults.map(r => ({
-          type: r.type as any,
-          value: r.value,
-          format: r.format,
-          confidence: 0.5, // 备用方法没有置信度信息
-          localized: false, // 备用方法没有定位信息
-        }));
-      }
-      
-      if (barcodeResults.length === 0) {
-        console.warn('⚠️ [analyzeWithBarcode] 所有方法均未检测到条码');
-        displayToast('💡 Cannot detect barcode. Please: get closer, improve lighting, hold steady, try different angle.', 5000);
-      }
-      
-      let serialNumber = '';
-      let model = '';
-      let partNumber = '';
+          if (barcodeResults.length === 0) {
+            console.warn('⚠️ [analyzeWithBarcode] 所有方法均未检测到条码');
+            displayToast('💡 Cannot detect barcode. Please: get closer, improve lighting, hold steady, try different angle.', 5000);
+          }
+          
+          let serialNumber = '';
+          let model = '';
+          let partNumber = '';
 
       const parsePayload = (payload: string) => {
         console.log('📊 [parsePayload] 输入:', payload);
@@ -859,47 +801,15 @@ const App: React.FC = () => {
   return (
     <div className="app-container w-full h-full bg-transparent overflow-hidden flex flex-col">
       <div key={currentScreen} className="w-full h-full screen-enter flex flex-col overflow-hidden">
-        {(() => {
-          console.log('🖥️ [App] Rendering screen:', currentScreen, {
-            projects: projects?.length,
-            printers: printers?.length,
-            user: user?.displayName,
-            activeProjectId
-          });
-          
-          try {
-            switch (currentScreen) {
-              case AppScreen.SPLASH:
-                return <SplashScreen />;
-              case AppScreen.PROJECT_LIST:
-                return <ProjectListScreen projects={projects || []} printers={printers || []} onSelectProject={(id) => { setActiveProjectId(id); setCurrentScreen(AppScreen.GALLERY); }} onCreateProject={(name) => setProjects([{ id: `p-${Date.now()}`, name, printerIds: [], createdAt: new Date().toISOString() }, ...projects])} onRenameProject={(id, newName) => setProjects(prev => prev.map(p => p.id === id ? { ...p, name: newName } : p))} onDeleteProject={(id) => { setProjects(prev => prev.filter(p => p.id !== id)); setPrinters(prev => prev.filter(p => p.projectId !== id)); }} onOpenSettings={() => setCurrentScreen(AppScreen.SETTINGS)} user={user} onLogin={handleLogin} onLogout={handleLogout} />;
-              case AppScreen.GALLERY:
-                return <GalleryScreen user={user} activeProject={activeProject} onLogin={handleLogin} onLogout={handleLogout} printers={activePrinters} onSearch={() => setCurrentScreen(AppScreen.SEARCH)} onAdd={() => { setSessionIndex(0); setSessionPhotos([]); setSessionData(null); setIsSingleRetake(false); setSelectedPrinter(null); setCurrentScreen(AppScreen.CAMERA); }} onSelectPrinter={(p) => { setSelectedPrinter(p); setCurrentScreen(AppScreen.DETAILS); }} onPreviewImage={(url) => { setPreviewPhotos([{url, label: 'Preview', filename: 'p.jpg'}]); setPreviewIndex(0); setLastScreen(AppScreen.GALLERY); setCurrentScreen(AppScreen.PREVIEW); }} onOpenSettings={() => setCurrentScreen(AppScreen.SETTINGS)} onManualSync={performSyncCycle} onBackToProjects={() => setCurrentScreen(AppScreen.PROJECT_LIST)} />;
-              case AppScreen.CAMERA:
-                return <CameraScreen sessionIndex={sessionIndex} isSingleRetake={isSingleRetake} initialFlash={settings.defaultFlash} onClose={() => { if (sessionPhotos.length > 0 && sessionData) finalizeSession(sessionPhotos, sessionData); else { setCurrentScreen(isSingleRetake ? lastScreen : AppScreen.GALLERY); setIsSingleRetake(false); } }} onCapture={handleCapture} />;
-              case AppScreen.REVIEW:
-                return <ReviewScreen imageUrl={capturedImage!} data={sessionData!} isAnalyzing={isAnalyzing} sessionIndex={sessionIndex} isSingleRetake={isSingleRetake} onRetake={() => setCurrentScreen(AppScreen.CAMERA)} onUpdateData={(newData) => { setSessionData(newData); if (sessionIndex === 0 && !isSingleRetake) { setBaseSerialNumber(newData.serialNumber); setBasePartNumber(newData.partNumber || ''); } }} onConfirm={() => processConfirmation(capturedImage!, sessionData || { serialNumber: 'Manual_SN', model: 'ZT411' })} onBack={handleReviewBack} />;
-              case AppScreen.DETAILS:
-                return <DetailsScreen printer={selectedPrinter!} viewMode={detailsViewMode} setViewMode={setDetailsViewMode} onBack={() => setCurrentScreen(AppScreen.GALLERY)} onAddPhoto={(idx) => { setSessionIndex(idx); setIsSingleRetake(true); setSessionData({ serialNumber: selectedPrinter!.serialNumber, model: selectedPrinter!.model, partNumber: selectedPrinter!.partNumber }); setLastScreen(AppScreen.DETAILS); setCurrentScreen(AppScreen.CAMERA); }} onPreviewImage={(photos, index) => { setPreviewPhotos(photos); setPreviewIndex(index); setLastScreen(AppScreen.DETAILS); setCurrentScreen(AppScreen.PREVIEW); }} onManualSync={performSyncCycle} onUpdatePrinter={updatePrinter} onAllPhotosComplete={() => { setSessionIndex(0); setSessionPhotos([]); setSessionData(null); setBaseSerialNumber(''); }} isSyncing={selectedPrinter?.isSyncing} user={user} onLogin={handleLogin} onLogout={handleLogout} />;
-              case AppScreen.PREVIEW:
-                return <ImagePreviewScreen photos={previewPhotos} initialIndex={previewIndex} onBack={() => setCurrentScreen(lastScreen)} onRetake={(idx) => { setSessionIndex(idx); setIsSingleRetake(true); if (selectedPrinter) setSessionData({ serialNumber: selectedPrinter.serialNumber, model: selectedPrinter.model }); setCurrentScreen(AppScreen.CAMERA); }} onReplace={(idx, b64) => { if (!selectedPrinter) return; const currentPhotos = selectedPrinter.photos || []; const updatedPhotos = [...currentPhotos]; updatedPhotos[idx] = { ...updatedPhotos[idx], url: b64, isSynced: false }; const updatedPrinter = { ...selectedPrinter, photos: updatedPhotos, imageUrl: idx === 0 ? b64 : selectedPrinter.imageUrl, syncedCount: updatedPhotos.filter(p => p.isSynced).length }; setPrinters(prev => prev.map(p => p.id === selectedPrinter.id ? updatedPrinter : p)); setSelectedPrinter(updatedPrinter); setPreviewPhotos(updatedPhotos); }} />;
-              case AppScreen.SETTINGS:
-                return <SettingsScreen settings={settings} onUpdate={setSettings} activeProject={activeProject} user={user} onBack={() => setCurrentScreen(activeProjectId ? AppScreen.GALLERY : AppScreen.PROJECT_LIST)} />;
-              case AppScreen.SEARCH:
-                return <SearchScreen printers={printers} onBack={() => setCurrentScreen(AppScreen.GALLERY)} onPreviewImage={(url) => { setPreviewPhotos([{url, label: 'Search', filename: 's.jpg'}]); setPreviewIndex(0); setLastScreen(AppScreen.SEARCH); setCurrentScreen(AppScreen.PREVIEW); }} />;
-              default:
-                console.error('❌ [App] Unknown screen:', currentScreen);
-                return <div style={{ padding: '20px', color: 'red' }}>Unknown screen: {currentScreen}</div>;
-            }
-          } catch (error) {
-            console.error('❌ [App] Error rendering screen:', currentScreen, error);
-            return <div style={{ padding: '20px', backgroundColor: '#fee', border: '2px solid #c00' }}>
-              <h3>Screen Render Error</h3>
-              <p>Screen: {currentScreen}</p>
-              <p>Error: {String(error)}</p>
-            </div>;
-          }
-        })()}
+        {currentScreen === AppScreen.SPLASH && <SplashScreen />}
+        {currentScreen === AppScreen.PROJECT_LIST && <ProjectListScreen projects={projects} printers={printers} onSelectProject={(id) => { setActiveProjectId(id); setCurrentScreen(AppScreen.GALLERY); }} onCreateProject={(name) => setProjects([{ id: `p-${Date.now()}`, name, printerIds: [], createdAt: new Date().toISOString() }, ...projects])} onRenameProject={(id, newName) => setProjects(prev => prev.map(p => p.id === id ? { ...p, name: newName } : p))} onDeleteProject={(id) => { setProjects(prev => prev.filter(p => p.id !== id)); setPrinters(prev => prev.filter(p => p.projectId !== id)); }} onOpenSettings={() => setCurrentScreen(AppScreen.SETTINGS)} user={user} onLogin={handleLogin} onLogout={handleLogout} />}
+        {currentScreen === AppScreen.GALLERY && <GalleryScreen user={user} activeProject={activeProject} onLogin={handleLogin} onLogout={handleLogout} printers={activePrinters} onSearch={() => setCurrentScreen(AppScreen.SEARCH)} onAdd={() => { setSessionIndex(0); setSessionPhotos([]); setSessionData(null); setIsSingleRetake(false); setSelectedPrinter(null); setCurrentScreen(AppScreen.CAMERA); }} onSelectPrinter={(p) => { setSelectedPrinter(p); setCurrentScreen(AppScreen.DETAILS); }} onPreviewImage={(url) => { setPreviewPhotos([{url, label: 'Preview', filename: 'p.jpg'}]); setPreviewIndex(0); setLastScreen(AppScreen.GALLERY); setCurrentScreen(AppScreen.PREVIEW); }} onOpenSettings={() => setCurrentScreen(AppScreen.SETTINGS)} onManualSync={performSyncCycle} onBackToProjects={() => setCurrentScreen(AppScreen.PROJECT_LIST)} />}
+        {currentScreen === AppScreen.CAMERA && <CameraScreen sessionIndex={sessionIndex} isSingleRetake={isSingleRetake} initialFlash={settings.defaultFlash} onClose={() => { if (sessionPhotos.length > 0 && sessionData) finalizeSession(sessionPhotos, sessionData); else { setCurrentScreen(isSingleRetake ? lastScreen : AppScreen.GALLERY); setIsSingleRetake(false); } }} onCapture={handleCapture} />}
+        {currentScreen === AppScreen.REVIEW && <ReviewScreen imageUrl={capturedImage!} data={sessionData!} isAnalyzing={isAnalyzing} sessionIndex={sessionIndex} isSingleRetake={isSingleRetake} onRetake={() => setCurrentScreen(AppScreen.CAMERA)} onUpdateData={(newData) => { setSessionData(newData); if (sessionIndex === 0 && !isSingleRetake) { setBaseSerialNumber(newData.serialNumber); setBasePartNumber(newData.partNumber || ''); } }} onConfirm={() => processConfirmation(capturedImage!, sessionData || { serialNumber: 'Manual_SN', model: 'ZT411' })} onBack={handleReviewBack} />}
+        {currentScreen === AppScreen.DETAILS && <DetailsScreen printer={selectedPrinter!} viewMode={detailsViewMode} setViewMode={setDetailsViewMode} onBack={() => setCurrentScreen(AppScreen.GALLERY)} onAddPhoto={(idx) => { setSessionIndex(idx); setIsSingleRetake(true); setSessionData({ serialNumber: selectedPrinter!.serialNumber, model: selectedPrinter!.model, partNumber: selectedPrinter!.partNumber }); setLastScreen(AppScreen.DETAILS); setCurrentScreen(AppScreen.CAMERA); }} onPreviewImage={(photos, index) => { setPreviewPhotos(photos); setPreviewIndex(index); setLastScreen(AppScreen.DETAILS); setCurrentScreen(AppScreen.PREVIEW); }} onManualSync={performSyncCycle} onUpdatePrinter={updatePrinter} onAllPhotosComplete={() => { setSessionIndex(0); setSessionPhotos([]); setSessionData(null); setBaseSerialNumber(''); }} isSyncing={selectedPrinter?.isSyncing} user={user} onLogin={handleLogin} onLogout={handleLogout} />}
+        {currentScreen === AppScreen.PREVIEW && <ImagePreviewScreen photos={previewPhotos} initialIndex={previewIndex} onBack={() => setCurrentScreen(lastScreen)} onRetake={(idx) => { setSessionIndex(idx); setIsSingleRetake(true); if (selectedPrinter) setSessionData({ serialNumber: selectedPrinter.serialNumber, model: selectedPrinter.model }); setCurrentScreen(AppScreen.CAMERA); }} onReplace={(idx, b64) => { if (!selectedPrinter) return; const currentPhotos = selectedPrinter.photos || []; const updatedPhotos = [...currentPhotos]; updatedPhotos[idx] = { ...updatedPhotos[idx], url: b64, isSynced: false }; const updatedPrinter = { ...selectedPrinter, photos: updatedPhotos, imageUrl: idx === 0 ? b64 : selectedPrinter.imageUrl, syncedCount: updatedPhotos.filter(p => p.isSynced).length }; setPrinters(prev => prev.map(p => p.id === selectedPrinter.id ? updatedPrinter : p)); setSelectedPrinter(updatedPrinter); setPreviewPhotos(updatedPhotos); }} />}
+        {currentScreen === AppScreen.SETTINGS && <SettingsScreen settings={settings} onUpdate={setSettings} activeProject={activeProject} user={user} onBack={() => setCurrentScreen(activeProjectId ? AppScreen.GALLERY : AppScreen.PROJECT_LIST)} />}
+        {currentScreen === AppScreen.SEARCH && <SearchScreen printers={printers} onBack={() => setCurrentScreen(AppScreen.GALLERY)} onPreviewImage={(url) => { setPreviewPhotos([{url, label: 'Search', filename: 's.jpg'}]); setPreviewIndex(0); setLastScreen(AppScreen.SEARCH); setCurrentScreen(AppScreen.PREVIEW); }} />}
       </div>
 
       {/* Toast Notification */}
@@ -908,24 +818,6 @@ const App: React.FC = () => {
           <div className="bg-gray-900/95 backdrop-blur-lg text-white px-6 py-4 rounded-2xl shadow-2xl border border-gray-700/50 flex items-center gap-3 max-w-sm animate-out fade-out slide-out-to-top-4 duration-300" style={{animation: 'none'}}>
             <span className="material-symbols-outlined text-blue-400 text-2xl animate-bounce">info</span>
             <p className="text-sm font-medium leading-snug">{toastMessage}</p>
-          </div>
-        </div>
-      )}
-
-      {/* Debug Tool Status Indicator */}
-      {debugToolStatus && (
-        <div className="fixed top-4 left-4 z-[9998] animate-in fade-in duration-500">
-          <div className={`px-3 py-2 rounded-lg shadow-lg border flex items-center gap-2 text-xs font-medium ${
-            debugToolStatus === 'loading' ? 'bg-yellow-500/90 text-yellow-950 border-yellow-600' :
-            debugToolStatus === 'active' ? 'bg-green-500/90 text-green-950 border-green-600' :
-            'bg-red-500/90 text-red-950 border-red-600'
-          }`}>
-            <span className="material-symbols-outlined text-base">
-              {debugToolStatus === 'loading' ? 'hourglass_empty' : debugToolStatus === 'active' ? 'bug_report' : 'error'}
-            </span>
-            <span>
-              {debugToolStatus === 'loading' ? 'Loading Debug...' : debugToolStatus === 'active' ? 'Debug Active ✓' : 'Debug Failed'}
-            </span>
           </div>
         </div>
       )}

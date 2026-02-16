@@ -13,6 +13,17 @@ export default defineConfig({
     alias: {
       '@': path.resolve(__dirname, '.'),
       '@ericblade/quagga2': path.resolve(__dirname, 'node_modules/@ericblade/quagga2/lib/quagga.js'),
+      buffer: 'buffer',
+    }
+  },
+  define: {
+    'global': 'globalThis',
+  },
+  optimizeDeps: {
+    esbuildOptions: {
+      define: {
+        global: 'globalThis'
+      }
     }
   },
   ssr: {
