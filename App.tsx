@@ -443,7 +443,7 @@ const App: React.FC = () => {
       
       if (barcodeResults.length === 0) {
         console.warn('⚠️ [analyzeWithBarcode] 未检测到任何条码/二维码');
-        displayToast('⚠️ No barcode detected. Please check lighting and focus.', 4000);
+        displayToast('💡 No barcode found. Tips: Get closer, check lighting, hold steady, and try different angle.', 5000);
       }
       
       let serialNumber = '';
@@ -569,7 +569,7 @@ const App: React.FC = () => {
           .then(result => { 
             console.log('📸 [handleCapture] 分析成功，结果:', result);
             if (!result.serialNumber && !result.partNumber) {
-              displayToast('⚠️ No barcode detected. Please enter manually or retake.', 4000);
+              displayToast('💡 Could not read barcode. Enter SN/PN manually or retake the photo.', 4500);
             }
             setBaseSerialNumber(result.serialNumber);
             setBasePartNumber(result.partNumber || '');
@@ -618,7 +618,7 @@ const App: React.FC = () => {
           .then(result => { 
             console.log('📸 [handleCapture] 分析成功，设置sessionData:', result);
             if (!result.serialNumber && !result.partNumber) {
-              displayToast('⚠️ No barcode detected. Please enter manually or retake.', 4000);
+              displayToast('💡 Could not read barcode. Enter SN/PN manually or retake the photo.', 4500);
             }
             setBaseSerialNumber(result.serialNumber);
             setBasePartNumber(result.partNumber || '');
