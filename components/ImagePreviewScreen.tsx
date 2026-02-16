@@ -281,7 +281,7 @@ const ImagePreviewScreen: React.FC<ImagePreviewScreenProps> = ({
       <footer 
         className="absolute bottom-0 inset-x-0 pt-10 px-6 bg-gradient-to-t from-black/80 via-transparent z-20"
         style={{ 
-          paddingBottom: 0
+          paddingBottom: `calc(1rem + env(safe-area-inset-bottom, 0px))`
         }}
       >
         <div className="flex gap-4">
@@ -302,8 +302,6 @@ const ImagePreviewScreen: React.FC<ImagePreviewScreenProps> = ({
               </button>
             </>          )}
         </div>
-        {/* Safe Area Fill */}
-        <div style={{ height: 'env(safe-area-inset-bottom, 1.5rem)', width: '100vw', marginLeft: 'calc(-1.5rem)', backgroundColor: '#000000' }} />
       </footer>
     </div>
   );
