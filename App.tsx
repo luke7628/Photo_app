@@ -569,11 +569,20 @@ const App: React.FC = () => {
 
           // 优先级2：Zebra 典型序列号格式（字母+数字组合，长度8-20）
           if (!serialNumber) {
-            // 匹配：至少包含1个字母和数字的组合，长度8-20位
-            const zebraSerial = cleaned.match(/(?<![A-Z0-9])([A-Z]{2,4}\d{6,}|[A-Z0-9]{2}[A-Z]\d{6,}|\d{2,4}[A-Z]{2,4}\d{6,})(?![A-Z0-9])/i);
-            if (zebraSerial && zebraSerial[1].length >= 8 && zebraSerial[1].length <= 20) {
-              serialNumber = zebraSerial[1];
-              console.log('✅ [parsePayload] 识别为序列号（Zebra格式）:', serialNumber);
+            // 匹配模式：数字+字母+数字 (如 99UZ21902791)
+            const pattern1 = cleaned.match(/(?<![A-Z0-9])(\d{2,4}[A-Z]{2,4}\d{6,})(?![A-Z0-9])/i);
+            if (pattern1 && pattern1[1].length >= 8 && pattern1[1].length <= 20) {
+              serialNumber = pattern1[1];
+              console.log('✅ [parsePayload] 识别为序列号（格式: 数字+字母+数字）:', serialNumber);
+            }
+          }
+          
+          // 优先级2.5：其他Zebra格式（字母开头）
+          if (!serialNumber) {
+            const pattern2 = cleaned.match(/(?<![A-Z0-9])([A-Z]{2,4}\d{6,}|[A-Z0-9]{2}[A-Z]\d{6,})(?![A-Z0-9])/i);
+            if (pattern2 && pattern2[1].length >= 8 && pattern2[1].length <= 20) {
+              serialNumber = pattern2[1];
+              console.log('✅ [parsePayload] 识别为序列号（格式: 字母+数字）:', serialNumber);
             }
           }
 

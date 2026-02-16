@@ -518,39 +518,64 @@ export async function readBarcode(base64Image: string): Promise<BarcodeResult[]>
 
     console.log('🔍 [readBarcode] 开始识别（移动优化：分辨率调整 → ROI裁剪 → 多引擎识别）');
     console.log(`📊 [readBarcode] 原始图像大小: ${normalizedBase64.length} bytes`);
+    console.log(`📱 [readBarcode] 设备: ${navigator.userAgent}`);
+    console.log(`🖼️ [readBarcode] 屏幕: ${window.screen.width}x${window.screen.height}`);
     
     // 检测浏览器能力
     const barcodeDetectorSupported = checkBarcodeDetectorSupport();
-    console.log(`🔧 [readBarcode] 识别引擎: ${barcodeDetectorSupported ? 'BarcodeDetector + ZXing' : '仅 ZXing'}`);
+    console.log(`🔧 [readBarcode] BarcodeDetector API: ${barcodeDetectorSupported ? '✅ 支持' : '❌ 不支持（将仅使用ZXing）'}`);
+    
+    // 检查ZXing是否可用
+    try {
+      const testReader = getReader();
+      console.log(`🔧 [readBarcode] ZXing库: ✅ 已加载`);
+    } catch (e) {
+      console.error(`❌ [readBarcode] ZXing库加载失败:`, e);
+    }
 
     // 预优化阶段：分辨率调整（移动设备优化）
     console.log('📐 [readBarcode] 预优化：调整分辨率...');
     let optimizedBase64 = await optimizeResolution(normalizedBase64, 1600);
+    console.log(`📊 [readBarcode] 优化后大小: ${optimizedBase64.length} bytes`);
 
     // 第一阶段：尝试识别原图（全图）
     console.log('📍 [readBarcode] 第一阶段：识别原始图像（全图）');
 
     // 1a. 尝试 BarcodeDetector
-    console.log('  ├─ 尝试 BarcodeDetector API (全图)...');
-    let detectorResults = await decodeWithBarcodeDetector(optimizedBase64, false);
-    detectorResults.forEach(r => addUniqueResult(results, r));
+    if (barcodeDetectorSupported) {
+      console.log('  ├─ 尝试 BarcodeDetector API (全图)...');
+      try {
+        let detectorResults = await decodeWithBarcodeDetector(optimizedBase64, false);
+        console.log(`  │  └─ BarcodeDetector返回 ${detectorResults.length} 个结果`);
+        detectorResults.forEach(r => addUniqueResult(results, r));
 
-    if (results.length > 0) {
-      console.log('✅ [readBarcode] BarcodeDetector 成功识别！');
-      return results;
+        if (results.length > 0) {
+          console.log('✅ [readBarcode] BarcodeDetector 成功识别！', results);
+          return results;
+        }
+      } catch (e) {
+        console.error('  │  └─ ❌ BarcodeDetector异常:', e);
+      }
+    } else {
+      console.log('  ├─ ⏭️ BarcodeDetector不可用，跳过');
     }
 
     // 1b. 尝试 ZXing（更多格式支持）
     console.log('  ├─ 尝试 ZXing (全图)...');
-    let zxingResult = await decodeWithZXing(optimizedBase64, false);
-    if (zxingResult) {
-      addUniqueResult(results, {
-        type: 'barcode',
-        value: zxingResult.text,
-        format: zxingResult.format
-      });
-      console.log('✅ [readBarcode] ZXing 成功识别！');
-      return results;
+    try {
+      let zxingResult = await decodeWithZXing(optimizedBase64, false);
+      console.log(`  │  └─ ZXing返回:`, zxingResult ? `成功 (${zxingResult.text.substring(0, 50)}...)` : '未检测到');
+      if (zxingResult) {
+        addUniqueResult(results, {
+          type: 'barcode',
+          value: zxingResult.text,
+          format: zxingResult.format
+        });
+        console.log('✅ [readBarcode] ZXing 成功识别！', results);
+        return results;
+      }
+    } catch (e) {
+      console.error('  │  └─ ❌ ZXing异常:', e);
     }
 
     console.log('⏳ [readBarcode] 全图识别失败，尝试 ROI 裁剪...');
