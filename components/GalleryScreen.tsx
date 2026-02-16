@@ -275,7 +275,7 @@ const GalleryScreen: React.FC<GalleryScreenProps> = ({
       <div 
         className="fixed left-1/2 -translate-x-1/2 z-40 pointer-events-auto transition-all"
         style={{
-          bottom: isLandscape ? 'calc(1rem + env(safe-area-inset-bottom, 0px))' : 'calc(1.5rem + env(safe-area-inset-bottom, 0px))'
+          bottom: isLandscape ? 'calc(1rem + max(0px, env(safe-area-inset-bottom, 0px)))' : 'calc(1.5rem + max(0px, env(safe-area-inset-bottom, 0px)))'
         }}
       >
         <button 
