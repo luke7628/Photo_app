@@ -1,15 +1,16 @@
 
-import React, { useState } from 'react';
-import { UserPreferences, Project } from '../types';
+import React, { useState, useEffect } from 'react';
+import { UserPreferences, Project, MicrosoftUser } from '../types';
 
 interface SettingsScreenProps {
   settings: UserPreferences;
   onUpdate: (settings: UserPreferences) => void;
   activeProject?: Project;
+  user: MicrosoftUser | null;
   onBack: () => void;
 }
 
-const SettingsScreen: React.FC<SettingsScreenProps> = ({ settings, onUpdate, activeProject, onBack }) => {
+const SettingsScreen: React.FC<SettingsScreenProps> = ({ settings, onUpdate, activeProject, user, onBack }) => {
   const [isReloading, setIsReloading] = useState(false);
   const [reloadProgress, setReloadProgress] = useState(0);
   const [showRebootOverlay, setShowRebootOverlay] = useState(false);
@@ -17,6 +18,21 @@ const SettingsScreen: React.FC<SettingsScreenProps> = ({ settings, onUpdate, act
   const updateField = (field: keyof UserPreferences, value: any) => {
     onUpdate({ ...settings, [field]: value });
   };
+
+  // Auto-update cloudProvider based on login status
+  useEffect(() => {
+    if (user) {
+      // Logged in with Microsoft -> set to OneDrive
+      if (settings.cloudProvider !== 'onedrive') {
+        updateField('cloudProvider', 'onedrive');
+      }
+    } else {
+      // Not logged in -> set to none
+      if (settings.cloudProvider !== 'none') {
+        updateField('cloudProvider', 'none');
+      }
+    }
+  }, [user]);
 
   const handleReload = async () => {
     setIsReloading(true);
@@ -211,21 +227,15 @@ const SettingsScreen: React.FC<SettingsScreenProps> = ({ settings, onUpdate, act
             <div className="flex items-center justify-between">
               <div className="flex-1">
                 <p className="text-sm font-semibold text-gray-900">Cloud Provider</p>
-                <p className="text-xs text-gray-500 mt-0.5">Choose cloud storage service</p>
+                <p className="text-xs text-gray-500 mt-0.5">{user ? 'Auto-set based on login' : 'Login to enable cloud sync'}</p>
               </div>
               <div className="flex bg-gray-100 p-1 rounded-lg ml-4">
-                {[
-                  { value: 'none', label: 'None' },
-                  { value: 'onedrive', label: 'OneDrive' }
-                ].map(provider => (
-                  <button
-                    key={provider.value}
-                    onClick={() => updateField('cloudProvider', provider.value)}
-                    className={`px-2.5 sm:px-3 py-1 rounded-md text-xs font-semibold whitespace-nowrap transition-all ${settings.cloudProvider === provider.value ? 'bg-white text-blue-500 shadow-sm' : 'text-gray-500'}`}
-                  >
-                    {provider.label}
-                  </button>
-                ))}
+                <div className={`px-2.5 sm:px-3 py-1 rounded-md text-xs font-semibold whitespace-nowrap ${settings.cloudProvider === 'none' ? 'bg-white text-blue-500 shadow-sm' : 'text-gray-500'}`}>
+                  None
+                </div>
+                <div className={`px-2.5 sm:px-3 py-1 rounded-md text-xs font-semibold whitespace-nowrap ${settings.cloudProvider === 'onedrive' ? 'bg-white text-blue-500 shadow-sm' : 'text-gray-500'}`}>
+                  OneDrive
+                </div>
               </div>
             </div>
             <div className="h-px bg-gray-100"></div>
