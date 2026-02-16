@@ -96,7 +96,7 @@ const SearchScreen: React.FC<SearchScreenProps> = ({ printers, onBack, onPreview
 
       <div 
         className="flex-1 overflow-y-auto no-scrollbar bg-slate-50/30"
-        style={{ paddingBottom: 'calc(2rem + env(safe-area-inset-bottom, 0px))' }}
+        style={{ paddingBottom: '2rem' }}
       >
         {filteredResults.length > 0 ? filteredResults.map((p) => (
           <div key={p.id} className="grid grid-cols-12 gap-2 items-center px-5 py-4 border-b border-slate-50 active:bg-primary/5 bg-white transition-colors cursor-pointer group">

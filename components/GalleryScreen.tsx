@@ -255,9 +255,7 @@ const GalleryScreen: React.FC<GalleryScreenProps> = ({
       <main 
         className={`flex-1 overflow-y-auto px-5 no-scrollbar transition-all bg-white ${isLandscape ? 'pt-3' : 'pt-5'}`}
         style={{
-          paddingBottom: isLandscape 
-            ? 'calc(5rem + env(safe-area-inset-bottom, 0px))' 
-            : 'calc(7rem + env(safe-area-inset-bottom, 0px))'
+          paddingBottom: isLandscape ? '4.5rem' : '6rem'
         }}
       >
         <div className={`grid gap-3 transition-all ${isLandscape ? 'grid-cols-2 md:grid-cols-3' : 'grid-cols-1'}`}>
