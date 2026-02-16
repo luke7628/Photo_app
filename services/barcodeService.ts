@@ -179,6 +179,42 @@ function normalizeBase64(base64Image: string): string {
 }
 
 /**
+ * 裁剪图像指定区域
+ * @param base64Image - Base64 编码的图像
+ * @param x - 起始X坐标比例 (0-1)
+ * @param y - 起始Y坐标比例 (0-1)
+ * @param width - 宽度比例 (0-1)
+ * @param height - 高度比例 (0-1)
+ * @returns 裁剪后的 Base64 图像
+ */
+async function cropToRegion(base64Image: string, x: number, y: number, width: number, height: number): Promise<string> {
+  if (!base64Image) return base64Image;
+
+  try {
+    const img = await loadImageFromBase64(base64Image);
+    const canvas = document.createElement('canvas');
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return base64Image;
+
+    const cropX = Math.floor(img.width * x);
+    const cropY = Math.floor(img.height * y);
+    const cropWidth = Math.floor(img.width * width);
+    const cropHeight = Math.floor(img.height * height);
+
+    canvas.width = cropWidth;
+    canvas.height = cropHeight;
+    ctx.drawImage(img, cropX, cropY, cropWidth, cropHeight, 0, 0, cropWidth, cropHeight);
+
+    const croppedBase64 = canvas.toDataURL('image/jpeg', 0.95).split(',')[1];
+    console.log(`✂️ [cropToRegion] 原图: ${img.width}x${img.height} → 裁剪: (${(y*100).toFixed(0)}%-${((y+height)*100).toFixed(0)}%高) → 输出: ${cropWidth}x${cropHeight}px`);
+    return croppedBase64;
+  } catch (error) {
+    console.error('❌ [cropToRegion] 裁剪失败:', error);
+    return base64Image;
+  }
+}
+
+/**
  * ROI (Region of Interest) 裁剪：只处理图像中心区域
  * 移动设备优化：减少处理区域，提升速度和准确度
  * @param base64Image - Base64 编码的图像
@@ -610,14 +646,15 @@ async function decodeWithZXing(base64Image: string, preprocessed: boolean = fals
 }
 
 /**
- * 主识别函数：多层策略，自动重试和预处理
+ * 主识别函数：多区域扫描策略
  * 
  * 识别流程：
- * 1. 尝试原图识别（BarcodeDetector + ZXing）
- * 2. 如果失败，自动应用预处理并再次尝试（BarcodeDetector + ZXing）
- * 3. 返回识别结果或详细的失败建议
+ * 1. 全图识别（ZXing + BarcodeDetector）
+ * 2. 横向多区域扫描（顶部→上部→中上→中下→底部）
+ * 3. 每个区域：原图识别 + 预处理识别
+ * 4. 去重后返回所有结果
  * 
- * @param base64Image - Base64 编码的图像
+ * @param base64Image - Base64 编码的图像（保持原始分辨率）
  * @returns 条形码结果数组
  */
 export async function readBarcode(base64Image: string): Promise<BarcodeResult[]> {
@@ -630,43 +667,174 @@ export async function readBarcode(base64Image: string): Promise<BarcodeResult[]>
       return results;
     }
 
-    console.log('🔍 [readBarcode] 开始识别（移动优化：分辨率调整 → ROI裁剪 → 多引擎识别）');
+    console.log('🔍 [readBarcode] 开始多区域扫描（保持原始分辨率）');
     console.log(`📊 [readBarcode] 原始图像大小: ${normalizedBase64.length} bytes`);
-    console.log(`📱 [readBarcode] 设备: ${navigator.userAgent}`);
+    console.log(`📱 [readBarcode] 设备: ${navigator.userAgent.substring(0, 80)}...`);
     console.log(`🖼️ [readBarcode] 屏幕: ${window.screen.width}x${window.screen.height}`);
     
     // 检测浏览器能力
     const barcodeDetectorSupported = checkBarcodeDetectorSupport();
     console.log(`🔧 [readBarcode] BarcodeDetector API: ${barcodeDetectorSupported ? '✅ 支持' : '❌ 不支持（将仅使用ZXing）'}`);
+    console.log(`🔧 [readBarcode] ZXing库: ✅ 已加载`);
+
+    // ========== 第一阶段：全图扫描 ==========
+    console.log('📍 [readBarcode] 第一阶段：全图扫描');
     
-    // 检查ZXing是否可用
-    try {
-      const testReader = getReader();
-      console.log(`🔧 [readBarcode] ZXing库: ✅ 已加载`);
-    } catch (e) {
-      console.error(`❌ [readBarcode] ZXing库加载失败:`, e);
+    // 1a. BarcodeDetector (全图)
+    if (barcodeDetectorSupported) {
+      console.log('  ├─ BarcodeDetector (全图)...');
+      try {
+        const detectorResults = await decodeWithBarcodeDetector(normalizedBase64, false);
+        detectorResults.forEach(r => addUniqueResult(results, r));
+        console.log(`  │  └─ 找到 ${detectorResults.length} 个条码`);
+      } catch (e) {
+        console.error('  │  └─ ❌ 异常:', e);
+      }
     }
 
-    // 预优化阶段：分辨率调整（移动设备优化）
-    console.log('📐 [readBarcode] 预优化：调整分辨率...');
-    let optimizedBase64 = await optimizeResolution(normalizedBase64, 1600);
-    console.log(`📊 [readBarcode] 优化后大小: ${optimizedBase64.length} bytes`);
+    // 1b. ZXing (全图)
+    console.log('  ├─ ZXing (全图)...');
+    try {
+      const zxingResult = await decodeWithZXing(normalizedBase64, false);
+      if (zxingResult) {
+        addUniqueResult(results, {
+          type: 'barcode',
+          value: zxingResult.text,
+          format: zxingResult.format
+        });
+        console.log(`  │  └─ ✅ 识别: ${zxingResult.text.substring(0, 30)}`);
+      } else {
+        console.log(`  │  └─ 未检测到`);
+      }
+    } catch (e) {
+      console.error('  │  └─ ❌ 异常:', e);
+    }
 
-    // 第一阶段：尝试识别原图（全图）
-    console.log('📍 [readBarcode] 第一阶段：识别原始图像（全图）');
+    // 1c. ZXing (全图预处理)
+    console.log('  └─ ZXing (全图+预处理)...');
+    try {
+      const preprocessed = await preprocessImageForDetection(normalizedBase64);
+      const zxingResultPreprocessed = await decodeWithZXing(preprocessed, true);
+      if (zxingResultPreprocessed) {
+        addUniqueResult(results, {
+          type: 'barcode',
+          value: zxingResultPreprocessed.text,
+          format: zxingResultPreprocessed.format
+        });
+        console.log(`     └─ ✅ 识别: ${zxingResultPreprocessed.text.substring(0, 30)}`);
+      } else {
+        console.log(`     └─ 未检测到`);
+      }
+    } catch (e) {
+      console.error('     └─ ❌ 异常:', e);
+    }
 
-    // 1a. 尝试 BarcodeDetector
-    if (barcodeDetectorSupported) {
-      console.log('  ├─ 尝试 BarcodeDetector API (全图)...');
+    console.log(`✅ [readBarcode] 第一阶段完成，已找到 ${results.length} 个条码`);
+    
+    // ========== 第二阶段：多区域扫描 ==========
+    // 定义扫描区域（Y轴百分比：起始%, 高度%）
+    const scanRegions = [
+      { name: '顶部20%', y: 0, h: 0.2 },
+      { name: '上部20-40%', y: 0.2, h: 0.2 },
+      { name: '中上40-60%', y: 0.4, h: 0.2 },
+      { name: '中下60-80%', y: 0.6, h: 0.2 },
+      { name: '底部80-100%', y: 0.8, h: 0.2 },
+    ];
+    
+    console.log(`📍 [readBarcode] 第二阶段：横向多区域扫描 (${scanRegions.length}个区域)`);
+    
+    for (const region of scanRegions) {
+      console.log(`  ▶ 扫描区域: ${region.name}`);
+      
       try {
-        let detectorResults = await decodeWithBarcodeDetector(optimizedBase64, false);
+        // 裁剪区域
+        const regionBase64 = await cropToRegion(normalizedBase64, 0, region.y, 1, region.h);
+        
+        // 2a. ZXing (原图)
+        const zxingRegionResult = await decodeWithZXing(regionBase64, false);
+        if (zxingRegionResult) {
+          addUniqueResult(results, {
+            type: 'barcode',
+            value: zxingRegionResult.text,
+            format: zxingRegionResult.format
+          });
+          console.log(`    ├─ ✅ 原图识别: ${zxingRegionResult.text.substring(0, 30)}`);
+        } else {
+          // 2b. ZXing (预处理) - 仅在原图失败时使用
+          const preprocessedRegion = await preprocessImageForDetection(regionBase64);
+          const zxingPreprocessedResult = await decodeWithZXing(preprocessedRegion, true);
+          if (zxingPreprocessedResult) {
+            addUniqueResult(results, {
+              type: 'barcode',
+              value: zxingPreprocessedResult.text,
+              format: zxingPreprocessedResult.format
+            });
+            console.log(`    └─ ✅ 预处理识别: ${zxingPreprocessedResult.text.substring(0, 30)}`);
+          } else {
+            console.log(`    └─ 未检测到`);
+          }
+        }
+      } catch (e) {
+        console.error(`    └─ ❌ ${region.name} 扫描异常:`, e);
+      }
+    }
+
+    console.log(`✅ [readBarcode] 第二阶段完成，共找到 ${results.length} 个条码`);
+    
+    // ========== 结果汇总 ==========
+    if (results.length > 0) {
+      console.log(`🎉 [readBarcode] 识别成功！共找到 ${results.length} 个条码:`);
+      results.forEach((r, idx) => {
+        console.log(`   ${idx + 1}. [${r.format}] ${r.value.substring(0, 50)}`);
+      });
+      return results;
+    }
+
+    // 所有扫描都失败，分析原因并提供建议
+    console.warn('❌ [readBarcode] 所有识别方法均失败，正在分析原因...');
+
+    try {
+      const { score, issues } = await assessImageQuality(normalizedBase64);
+      console.warn(`📊 [readBarcode] 图像质量分数: ${score}/100, 问题: ${issues.length > 0 ? issues.join(', ') : '无明显问题'}`);
+
+      let suggestion = '💡 Cannot detect barcode. ';
+      
+      if (issues.length > 0) {
+        suggestion += `Photo issue: ${issues.join(', ')}. `;
+      }
+
+      if (score < 40) {
+        suggestion += 'Please: (1) Get closer to the barcode, (2) Improve lighting - avoid shadows and glare, (3) Hold steady, (4) Ensure barcode is in focus.';
+      } else if (score < 70) {
+        suggestion += 'Please: (1) Improve lighting, (2) Get a bit closer, (3) Try different angle, (4) Focus on barcode.';
+      } else if (issues.includes('Low contrast')) {
+        suggestion += 'Barcode has low contrast. Try different lighting or angle.';
+      } else {
+        suggestion += 'Barcode may be at an angle, damaged, or too small. Try: different angle, better focus, or get closer.';
+      }
+
+      console.warn('💭 [readBarcode] 建议:', suggestion);
+    } catch (assessError) {
+      console.warn('⚠️ [readBarcode] 质量分析失败，但继续提示用户');
+    }
+
+    return results; // 返回空数组
+  } catch (error) {
+    console.error('❌ [readBarcode] 识别异常:', error);
+    return results;
+  }
+}
+
+/**
+ * 清理资源
+ */
+export function resetBarcodeReader() {
+  if (barcodeReader) {
+    barcodeReader.reset();
+  }
+}
         console.log(`  │  └─ BarcodeDetector返回 ${detectorResults.length} 个结果`);
         detectorResults.forEach(r => addUniqueResult(results, r));
-
-        if (results.length > 0) {
-          console.log('✅ [readBarcode] BarcodeDetector 成功识别！', results);
-          return results;
-        }
       } catch (e) {
         console.error('  │  └─ ❌ BarcodeDetector异常:', e);
       }
@@ -685,11 +853,182 @@ export async function readBarcode(base64Image: string): Promise<BarcodeResult[]>
           value: zxingResult.text,
           format: zxingResult.format
         });
-        console.log('✅ [readBarcode] ZXing 成功识别！', results);
-        return results;
+        console.log('✅ [readBarcode] ZXing识别到1个条码，继续扫描...', results);
       }
     } catch (e) {
       console.error('  │  └─ ❌ ZXing异常:', e);
+    }
+    
+    // 1c. 尝试扫描上1/3区域
+    console.log('  ├─ 尝试 ZXing (上1/3区域)...');
+    try {
+      const topThirdBase64 = await cropToRegion(optimizedBase64, 0, 0, 1, 0.35);
+      let topResult = await decodeWithZXing(topThirdBase64, false);
+      if (topResult) {
+        addUniqueResult(results, {
+          type: 'barcode',
+          value: topResult.text,
+          format: topResult.format
+        });
+        console.log(`✅ [readBarcode] 上1/3识别: ${topResult.text.substring(0, 30)}`);
+      } else {
+        console.log('  │  └─ ℹ️ 上1/3未检测到');
+      }
+    } catch (e) {
+      console.error('  │  └─ ❌ 上1/3异常:', e);
+    }
+    
+    // 1d. 尝试扫描中1/3区域
+    console.log('  ├─ 尝试 ZXing (中1/3区域)...');
+    try {
+      const midThirdBase64 = await cropToRegion(optimizedBase64, 0, 0.33, 1, 0.34);
+      let midResult = await decodeWithZXing(midThirdBase64, false);
+      if (midResult) {
+        addUniqueResult(results, {
+          type: 'barcode',
+          value: midResult.text,
+          format: midResult.format
+        });
+        console.log(`✅ [readBarcode] 中1/3识别: ${midResult.text.substring(0, 30)}`);
+      } else {
+        console.log('  │  └─ ℹ️ 中1/3未检测到');
+      }
+    } catch (e) {
+      console.error('  │  └─ ❌ 中1/3异常:', e);
+    }
+    
+    // 1e. 尝试扫描下1/3区域（Part Number通常在底部）
+    console.log('  ├─ 尝试 ZXing (下1/3区域)...');
+    try {
+      const bottomThirdBase64 = await cropToRegion(optimizedBase64, 0, 0.67, 1, 0.33);
+      console.log('  │  ├─ 下1/3裁剪完成，开始识别...');
+      let bottomResult = await decodeWithZXing(bottomThirdBase64, false);
+      if (bottomResult) {
+        addUniqueResult(results, {
+          type: 'barcode',
+          value: bottomResult.text,
+          format: bottomResult.format
+        });
+        console.log(`✅ [readBarcode] 下1/3识别成功: ${bottomResult.text}`);
+      } else {
+        console.log('  │  └─ ⚠️ 下1/3未检测到条码，尝试预处理...');
+        // 对下1/3区域进行预处理后再次尝试
+        const preprocessedBottom = await preprocessImageForDetection(bottomThirdBase64);
+        bottomResult = await decodeWithZXing(preprocessedBottom, true);
+        if (bottomResult) {
+          addUniqueResult(results, {
+            type: 'barcode',
+            value: bottomResult.text,
+            format: bottomResult.format
+          });
+          console.log(`✅ [readBarcode] 下1/3预处理后识别成功: ${bottomResult.text}`);
+        } else {
+          console.log('  │  └─ ❌ 下1/3预处理后仍未检测到');
+        }
+      }
+    } catch (e) {
+      console.error('  │  └─ ❌ 下1/3异常:', e);
+    }
+    
+    // 1f. 重点扫描底部40%区域（PN条码通常在此）
+    console.log('  ├─ 尝试 ZXing (底部40%区域 + 增强处理)...');
+    try {
+      const bottom40Base64 = await cropToRegion(optimizedBase64, 0, 0.6, 1, 0.4);
+      console.log('  │  ├─ 底部40%裁剪完成...');
+      
+      // 第一次尝试：原图
+      let bottom40Result = await decodeWithZXing(bottom40Base64, false);
+      if (bottom40Result) {
+        addUniqueResult(results, {
+          type: 'barcode',
+          value: bottom40Result.text,
+          format: bottom40Result.format
+        });
+        console.log(`✅ [readBarcode] 底部40%识别: ${bottom40Result.text}`);
+      } else {
+        console.log('  │  ├─ 底部40%原图未检测到，应用预处理...');
+        
+        // 第二次尝试：预处理
+        const preprocessedBottom40 = await preprocessImageForDetection(bottom40Base64);
+        bottom40Result = await decodeWithZXing(preprocessedBottom40, true);
+        if (bottom40Result) {
+          addUniqueResult(results, {
+            type: 'barcode',
+            value: bottom40Result.text,
+            format: bottom40Result.format
+          });
+          console.log(`✅ [readBarcode] 底部40%预处理后识别: ${bottom40Result.text}`);
+        } else {
+          console.log('  │  └─ ⚠️ 底部40%预处理后仍未检测到');
+        }
+      }
+    } catch (e) {
+      console.error('  │  └─ ❌ 底部40%异常:', e);
+    }
+    
+    // 1g. 尝试扫描最下方20%区域（最后一道防线）
+    console.log('  └─ 尝试 ZXing (最下方20%区域)...');
+    try {
+      const bottomBase64 = await cropToRegion(optimizedBase64, 0, 0.8, 1, 0.2);
+      let bottomResult = await decodeWithZXing(bottomBase64, false);
+      if (bottomResult) {
+        addUniqueResult(results, {
+          type: 'barcode',
+          value: bottomResult.text,
+          format: bottomResult.format
+        });
+        console.log(`✅ [readBarcode] 最下方20%识别: ${bottomResult.text}`);
+      } else {
+        console.log('     └─ ℹ️ 最下方20%未检测到');
+      }
+    } catch (e) {
+      console.error('     └─ ❌ 最下方20%异常:', e);
+    }
+    
+    // 如果已经找到条码，返回结果
+    if (results.length > 0) {
+      console.log(`✅ [readBarcode] 第一阶段完成，共识别 ${results.length} 个条码:`, results);
+      return results;
+    }
+    
+    // 1h. 📌 高分辨率底部扫描（针对小条码）
+    console.log('🔍 [readBarcode] 1h: 使用原始高分辨率图像扫描底部50%（针对小PN条码）...');
+    try {
+      const highResBottomBase64 = await cropToRegion(normalizedBase64, 0, 0.5, 1, 0.5);
+      console.log('     ├─ 高分辨率底部裁剪完成，开始识别...');
+      
+      let highResBottomResult = await decodeWithZXing(highResBottomBase64, false);
+      if (highResBottomResult) {
+        addUniqueResult(results, {
+          type: 'barcode',
+          value: highResBottomResult.text,
+          format: highResBottomResult.format
+        });
+        console.log(`✅ [readBarcode] 高分辨率底部识别成功: ${highResBottomResult.text}`);
+      } else {
+        console.log('     ├─ 高分辨率底部原图未检测到，应用预处理...');
+        // 对高分辨率底部区域预处理
+        const preprocessedHighResBottom = await preprocessImageForDetection(highResBottomBase64);
+        highResBottomResult = await decodeWithZXing(preprocessedHighResBottom, true);
+        if (highResBottomResult) {
+          addUniqueResult(results, {
+            type: 'barcode',
+            value: highResBottomResult.text,
+            format: highResBottomResult.format
+          });
+          console.log(`✅ [readBarcode] 高分辨率底部预处理后识别成功: ${highResBottomResult.text}`);
+        } else {
+          console.log('     └─ ⚠️ 高分辨率底部预处理后仍未检测到');
+        }
+      }
+    } catch (e) {
+      console.error('     └─ ❌ 高分辨率底部扫描异常:', e);
+    }
+    
+    // 如果高分辨率扫描找到了新条码，返回
+    if (results.length > 0) {
+      console.log(`✅ [readBarcode] 高分辨率扫描完成，共识别 ${results.length} 个条码:`, results);
+      return results;
     }
 
     console.log('⏳ [readBarcode] 全图识别失败，尝试 ROI 裁剪...');
@@ -703,11 +1042,6 @@ export async function readBarcode(base64Image: string): Promise<BarcodeResult[]>
     detectorResults = await decodeWithBarcodeDetector(roiBase64, false);
     detectorResults.forEach(r => addUniqueResult(results, r));
 
-    if (results.length > 0) {
-      console.log('✅ [readBarcode] ROI+BarcodeDetector 成功！');
-      return results;
-    }
-
     // 2b. ROI + ZXing
     console.log('  ├─ 尝试 ROI + ZXing...');
     zxingResult = await decodeWithZXing(roiBase64, false);
@@ -717,7 +1051,12 @@ export async function readBarcode(base64Image: string): Promise<BarcodeResult[]>
         value: zxingResult.text,
         format: zxingResult.format
       });
-      console.log('✅ [readBarcode] ROI+ZXing 成功！');
+      console.log('✅ [readBarcode] ROI+ZXing 识别到条码，继续扫描...');
+    }
+    
+    // 如果已经找到条码，返回（ROI阶段）
+    if (results.length > 0) {
+      console.log(`✅ [readBarcode] ROI阶段完成，共识别 ${results.length} 个条码`);
       return results;
     }
 
@@ -732,11 +1071,6 @@ export async function readBarcode(base64Image: string): Promise<BarcodeResult[]>
     detectorResults = await decodeWithBarcodeDetector(preprocessedBase64, true);
     detectorResults.forEach(r => addUniqueResult(results, r));
 
-    if (results.length > 0) {
-      console.log('✅ [readBarcode] ROI+预处理+BarcodeDetector 成功！');
-      return results;
-    }
-
     // 3b. 预处理后尝试 ZXing
     console.log('  └─ 尝试 ROI+预处理 + ZXing...');
     zxingResult = await decodeWithZXing(preprocessedBase64, true);
@@ -746,7 +1080,12 @@ export async function readBarcode(base64Image: string): Promise<BarcodeResult[]>
         value: zxingResult.text,
         format: zxingResult.format
       });
-      console.log('✅ [readBarcode] ROI+预处理+ZXing 成功！');
+      console.log('✅ [readBarcode] ROI+预处理+ZXing 识别到条码');
+    }
+    
+    // 如果已经找到条码，返回（预处理阶段）
+    if (results.length > 0) {
+      console.log(`✅ [readBarcode] 预处理阶段完成，共识别 ${results.length} 个条码`);
       return results;
     }
 
@@ -759,11 +1098,6 @@ export async function readBarcode(base64Image: string): Promise<BarcodeResult[]>
     detectorResults = await decodeWithBarcodeDetector(fullPreprocessedBase64, true);
     detectorResults.forEach(r => addUniqueResult(results, r));
 
-    if (results.length > 0) {
-      console.log('✅ [readBarcode] 全图预处理+BarcodeDetector 成功！');
-      return results;
-    }
-
     // 4b. 全图预处理 + ZXing
     console.log('  └─ 尝试 全图预处理 + ZXing...');
     zxingResult = await decodeWithZXing(fullPreprocessedBase64, true);
@@ -773,11 +1107,16 @@ export async function readBarcode(base64Image: string): Promise<BarcodeResult[]>
         value: zxingResult.text,
         format: zxingResult.format
       });
-      console.log('✅ [readBarcode] 全图预处理+ZXing 成功！');
+      console.log('✅ [readBarcode] 全图预处理+ZXing 识别到条码！');
+    }
+    
+    // 所有阶段完成，返回结果
+    if (results.length > 0) {
+      console.log(`✅ [readBarcode] 所有阶段完成，共识别 ${results.length} 个条码:`, results);
       return results;
     }
 
-    // 所有阶段都失败，分析原因并提供建议
+    // 所有扫描都失败，分析原因并提供建议
     console.warn('❌ [readBarcode] 所有识别方法均失败，正在分析原因...');
 
     try {

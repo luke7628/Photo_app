@@ -1,21 +1,16 @@
 
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
-import { Buffer } from 'buffer';
 import { AppScreen, Printer, Project, PHOTO_LABELS, PhotoSetItem, UserPreferences, MicrosoftUser, ViewMode } from './types';
 import { MOCK_PRINTERS, MOCK_PROJECTS } from './constants';
 import { storageService } from './services/storageService';
 import { oneDriveService } from './services/oneDriveService';
 import { microsoftAuthService } from './services/microsoftAuthService';
 import { readBarcode } from './services/barcodeService';
-import { readBarcodeWithQuagga, initializeQuagga } from './services/quaggaService';
 import { inferModelFromPartNumber } from './src/utils/modelUtils';
 import eruda from 'eruda';
 
-// 确保Buffer在全局可用（用于Quagga2）
+// 初始化移动端调试工具（开发环境）
 if (typeof window !== 'undefined') {
-  (window as any).Buffer = Buffer;
-  
-  // 初始化移动端调试工具（开发环境）
   if (import.meta.env.DEV || window.location.hostname === 'luke7628.github.io') {
     eruda.init();
     console.log('🔧 [Eruda] 移动端调试工具已启动');
@@ -465,55 +460,22 @@ const App: React.FC = () => {
           console.log('📊 [analyzeWithBarcode] 开始...输入长度:', base64Image.length);
           console.log('📊 [analyzeWithBarcode] Base64前100字符:', base64Image.substring(0, 100));
           
-          let barcodeResults: any[] = [];
+          // 直接使用 ZXing 多区域识别
+          console.log('🔍 [analyzeWithBarcode] 使用 ZXing 多区域识别...');
+          const legacyResults = await readBarcode(base64Image);
+          console.log('📊 [analyzeWithBarcode] ZXing返回:', legacyResults.length, '个结果');
+          console.log('📊 [analyzeWithBarcode] ZXing结果详情:', JSON.stringify(legacyResults, null, 2));
           
-          // 策略1: 优先使用Quagga2（在iOS上对模糊/倾斜条码效果更好）
-          console.log('🔍 [analyzeWithBarcode] 策略1: 尝试Quagga2识别（iOS优化）...');
-          try {
-            await initializeQuagga();
-            console.log('✅ [analyzeWithBarcode] Quagga2初始化成功');
-            const quaggaResults = await readBarcodeWithQuagga(base64Image);
-            console.log('📊 [analyzeWithBarcode] Quagga2返回:', quaggaResults.length, '个结果');
-            
-            if (quaggaResults.length > 0) {
-              console.log('✅ [analyzeWithBarcode] Quagga2识别成功！');
-              console.log('📊 [analyzeWithBarcode] Quagga2结果详情:', JSON.stringify(quaggaResults, null, 2));
-              
-              barcodeResults = quaggaResults.map(r => ({
-                type: r.type as any,
-                value: r.value,
-                format: r.format,
-                confidence: r.confidence || 0.9,
-                localized: true,
-              }));
-            } else {
-              console.warn('⚠️ [analyzeWithBarcode] Quagga2返回0结果，将尝试BarcodeDetector+ZXing');
-            }
-          } catch (quaggaError) {
-            console.warn('⚠️ [analyzeWithBarcode] Quagga2异常，将尝试BarcodeDetector+ZXing');
-            console.error('Quagga2 Error:', quaggaError);
-            console.error('Quagga2 Error message:', (quaggaError as any)?.message);
-            console.error('Quagga2 Error stack:', (quaggaError as any)?.stack);
-          }
-          
-          // 策略2: 如果Quagga2失败或返回0结果，使用BarcodeDetector+ZXing 4阶段识别
-          if (barcodeResults.length === 0) {
-            console.log('🔍 [analyzeWithBarcode] 策略2: 使用BarcodeDetector+ZXing 4阶段识别...');
-            const legacyResults = await readBarcode(base64Image);
-            console.log('📊 [analyzeWithBarcode] 4阶段识别返回:', legacyResults.length, '个结果');
-            console.log('📊 [analyzeWithBarcode] 4阶段结果详情:', JSON.stringify(legacyResults, null, 2));
-            
-            barcodeResults = legacyResults.map(r => ({
-              type: r.type as any,
-              value: r.value,
-              format: r.format,
-              confidence: 0.8,
-              localized: false,
-            }));
-          }
+          const barcodeResults = legacyResults.map(r => ({
+            type: r.type as any,
+            value: r.value,
+            format: r.format,
+            confidence: 0.9,
+            localized: false,
+          }));
       
           if (barcodeResults.length === 0) {
-            console.warn('⚠️ [analyzeWithBarcode] 所有方法均未检测到条码');
+            console.warn('⚠️ [analyzeWithBarcode] 未检测到条码');
             displayToast('💡 Cannot detect barcode. Please: get closer, improve lighting, hold steady, try different angle.', 5000);
           } else {
             console.log('✅ [analyzeWithBarcode] 成功检测到', barcodeResults.length, '个条码');
