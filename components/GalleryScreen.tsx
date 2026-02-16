@@ -116,7 +116,7 @@ const GalleryScreen: React.FC<GalleryScreenProps> = ({
   );
 
   return (
-    <div className="flex flex-col max-h-screen bg-white relative transition-all duration-300 overflow-hidden">
+    <div className="flex flex-col h-full bg-white relative transition-all duration-300">
       {/* Header */}
       <header className={`pt-4 px-4 bg-white z-30 transition-all flex-shrink-0 ${isLandscape ? 'pb-2' : 'pb-4'}`}>
         {/* Top row: Back button + Title + User + Settings */}
