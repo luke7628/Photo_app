@@ -6,6 +6,7 @@ import { storageService } from './services/storageService';
 import { oneDriveService } from './services/oneDriveService';
 import { microsoftAuthService } from './services/microsoftAuthService';
 import { readBarcode } from './services/barcodeService';
+import { readBarcodeWithQuagga, initializeQuagga } from './services/quaggaService';
 import SplashScreen from './components/SplashScreen';
 import GalleryScreen from './components/GalleryScreen';
 import SearchScreen from './components/SearchScreen';
@@ -438,12 +439,37 @@ const App: React.FC = () => {
       console.log('📊 [analyzeWithBarcode] 开始...输入长度:', base64Image.length);
       console.log('📊 [analyzeWithBarcode] Base64前100字符:', base64Image.substring(0, 100));
       
-      const barcodeResults = await readBarcode(base64Image);
-      console.log('📊 [analyzeWithBarcode] readBarcode 返回:', barcodeResults.length, '个结果');
+      // 初始化 Quagga2
+      try {
+        await initializeQuagga();
+      } catch (error) {
+        console.warn('⚠️ [analyzeWithBarcode] Quagga2 初始化失败:', error);
+      }
+      
+      // 策略 1：优先使用 Quagga2（强大的定位能力）
+      console.log('🔍 [analyzeWithBarcode] 策略1：尝试 Quagga2...');
+      let barcodeResults = await readBarcodeWithQuagga(base64Image);
+      console.log('📊 [analyzeWithBarcode] Quagga2 返回:', barcodeResults.length, '个结果');
+      
+      // 策略 2：如果 Quagga2 失败，回退到 ZXing/BarcodeDetector
+      if (barcodeResults.length === 0) {
+        console.log('📍 [analyzeWithBarcode] Quagga2 未检测到，尝试备用方法（ZXing/BarcodeDetector）...');
+        const legacyResults = await readBarcode(base64Image);
+        console.log('📊 [analyzeWithBarcode] 备用方法返回:', legacyResults.length, '个结果');
+        
+        // 转换格式以兼容
+        barcodeResults = legacyResults.map(r => ({
+          type: r.type as any,
+          value: r.value,
+          format: r.format,
+          confidence: 0.5, // 备用方法没有置信度信息
+          localized: false, // 备用方法没有定位信息
+        }));
+      }
       
       if (barcodeResults.length === 0) {
-        console.warn('⚠️ [analyzeWithBarcode] 未检测到任何条码/二维码');
-        displayToast('💡 No barcode found. Tips: Get closer, check lighting, hold steady, and try different angle.', 5000);
+        console.warn('⚠️ [analyzeWithBarcode] 所有方法均未检测到条码');
+        displayToast('💡 Cannot detect barcode. Please: get closer, improve lighting, hold steady, try different angle.', 5000);
       }
       
       let serialNumber = '';
@@ -535,7 +561,10 @@ const App: React.FC = () => {
             console.log('⚠️ [analyzeWithBarcode] 跳过空值结果');
             continue;
           }
-          console.log('[analyzeWithBarcode] ' + (result.type === 'qrcode' ? 'QR码内容:' : '条形码内容:'), result.value);
+          const typeStr = result.type === 'qrcode' ? 'QR码' : '条形码';
+          const confStr = (result as any).confidence ? ` (置信度: ${((result as any).confidence * 100).toFixed(0)}%)` : '';
+          const locStr = (result as any).localized ? ' [已定位]' : '';
+          console.log(`[analyzeWithBarcode] ${typeStr}内容:`, result.value, `${result.format || ''}${confStr}${locStr}`);
           parsePayload(result.value);
         }
       } else {
