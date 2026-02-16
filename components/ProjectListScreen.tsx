@@ -37,10 +37,7 @@ const ProjectListScreen: React.FC<ProjectListScreenProps> = ({
   }, [projects, printers]);
 
   return (
-    <div 
-      className="flex flex-col h-full bg-white overflow-hidden"
-      style={{ paddingBottom: 'env(safe-area-inset-bottom, 0px)' }}
-    >
+    <div className="flex flex-col h-full bg-white overflow-hidden">
       {/* Top Header */}
       <header className="flex items-center justify-between py-2.5 sm:py-5 px-2 sm:px-6 bg-white border-b border-gray-200 shrink-0">
         <div className="flex-1 min-w-0 pr-2">

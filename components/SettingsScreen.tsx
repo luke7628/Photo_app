@@ -85,10 +85,7 @@ const SettingsScreen: React.FC<SettingsScreenProps> = ({ settings, onUpdate, act
   const displayPath = `${cloudServiceName}${settings.drivePath}${projectName}/${settings.useSubfoldersBySN ? 'SN_123456/' : ''}`;
 
   return (
-    <div 
-      className="flex flex-col h-full bg-white"
-      style={{ paddingBottom: 'env(safe-area-inset-bottom, 0px)' }}
-    >
+    <div className="flex flex-col h-full bg-white">
       {isReloading && (
         <div className="fixed inset-0 z-[999] bg-black/50 backdrop-blur-sm flex flex-col items-center justify-center animate-fadeIn">
           <div className="bg-white rounded-2xl p-8 shadow-2xl w-full mx-4 max-w-sm">
