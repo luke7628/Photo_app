@@ -82,19 +82,13 @@ function normalizeBase64(base64Image: string): string {
 }
 
 /**
- * 图像预处理：增强对比度 + 锐化，用于改善弱光/模糊图像的条码识别
+ * 图像预处理：增强条码识别效果
+ * 简化方案：对比度增强 + 亮度调整（避免复杂的锐化操作）
  * @param base64Image - Base64 编码的图像
- * @param intensity - 处理强度（0.5=弱, 1.0=中, 2.0=强）
  * @returns 处理后的 Base64 图像
  */
-async function preprocessImageForDetection(base64Image: string, intensity: number = 1.0): Promise<string> {
+async function preprocessImageForDetection(base64Image: string): Promise<string> {
   if (!base64Image) return base64Image;
-
-  // 查询缓存（同一张照片不需要重复预处理）
-  if (preprocessedImageCache?.base64 === base64Image && intensity === 1.0) {
-    console.log('📸 [preprocess] 使用缓存的预处理图像');
-    return preprocessedImageCache.processed;
-  }
 
   try {
     const img = await loadImageFromBase64(base64Image);
@@ -112,80 +106,42 @@ async function preprocessImageForDetection(base64Image: string, intensity: numbe
     const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
     const data = imageData.data;
 
-    // 1. 对比度增强（CLAHE-like简化版）：扩展亮度分布
-    const contrastAmount = 1.3 * intensity;
+    // 1. 对比度增强：扩展亮度分布，使条码线条更清晰
+    const contrastFactor = 1.4; // 增强 40%
     for (let i = 0; i < data.length; i += 4) {
       const r = data[i];
       const g = data[i + 1];
       const b = data[i + 2];
 
-      // 对比度公式：增强亮部和暗部的差异
-      data[i] = Math.min(255, Math.max(0, (r - 128) * contrastAmount + 128));
-      data[i + 1] = Math.min(255, Math.max(0, (g - 128) * contrastAmount + 128));
-      data[i + 2] = Math.min(255, Math.max(0, (b - 128) * contrastAmount + 128));
+      // 对比度公式：(value - 128) * factor + 128
+      data[i] = Math.min(255, Math.max(0, (r - 128) * contrastFactor + 128));
+      data[i + 1] = Math.min(255, Math.max(0, (g - 128) * contrastFactor + 128));
+      data[i + 2] = Math.min(255, Math.max(0, (b - 128) * contrastFactor + 128));
     }
 
-    // 2. 锐化（Unsharp mask）：增强边界，使条码条纹更清晰
-    if (intensity >= 0.8) {
-      const sharpAmount = 0.8 * intensity;
-      const kernel = [-1, -1, -1, -1, 12 + sharpAmount * 4, -1, -1, -1, -1];
-      const kernelSum = kernel.reduce((a, b) => a + b, 0) || 1;
-      const output = new ImageData(canvas.width, canvas.height);
-
-      for (let y = 1; y < canvas.height - 1; y++) {
-        for (let x = 1; x < canvas.width - 1; x++) {
-          let r = 0, g = 0, b = 0;
-
-          for (let ky = -1; ky <= 1; ky++) {
-            for (let kx = -1; kx <= 1; kx++) {
-              const idx = ((y + ky) * canvas.width + (x + kx)) * 4;
-              const ki = (ky + 1) * 3 + (kx + 1);
-              const weight = kernel[ki];
-
-              r += data[idx] * weight;
-              g += data[idx + 1] * weight;
-              b += data[idx + 2] * weight;
-            }
-          }
-
-          const outIdx = (y * canvas.width + x) * 4;
-          output.data[outIdx] = Math.min(255, Math.max(0, r / kernelSum));
-          output.data[outIdx + 1] = Math.min(255, Math.max(0, g / kernelSum));
-          output.data[outIdx + 2] = Math.min(255, Math.max(0, b / kernelSum));
-          output.data[outIdx + 3] = 255;
-        }
-      }
-
-      // 复制计算结果回原数据（边界像素保留）
-      for (let i = 4 * (canvas.width + 1); i < output.data.length - 4 * (canvas.width + 1); i += 4) {
-        data[i] = output.data[i];
-        data[i + 1] = output.data[i + 1];
-        data[i + 2] = output.data[i + 2];
-      }
+    // 2. 计算亮度并根据需要调整
+    let brightnessSum = 0;
+    for (let i = 0; i < data.length; i += 4) {
+      brightnessSum += data[i] * 0.299 + data[i + 1] * 0.587 + data[i + 2] * 0.114;
     }
+    const brightness = brightnessSum / (data.length / 4);
 
-    // 3. 亮度调整（如果图像太暗，增加亮度）
-    const brightness = calculateBrightness(imageData);
+    // 如果图像太暗，增加亮度
     if (brightness < 100) {
-      const brightnessBoost = (130 - brightness) / 255 * 20 * intensity;
+      const brightnessBoost = Math.min(40, (130 - brightness) * 0.3);
       for (let i = 0; i < data.length; i += 4) {
         data[i] = Math.min(255, data[i] + brightnessBoost);
         data[i + 1] = Math.min(255, data[i + 1] + brightnessBoost);
         data[i + 2] = Math.min(255, data[i + 2] + brightnessBoost);
       }
-      console.log(`🔆 [preprocess] 图像较暗（亮度${brightness}），已增强`);
+      console.log(`🔆 [preprocess] 图像较暗（亮度${brightness.toFixed(0)}），已增加亮度+${brightnessBoost.toFixed(0)}`);
     }
 
     // 将处理后的图像数据写回 Canvas
     ctx.putImageData(imageData, 0, 0);
     const processedBase64 = canvas.toDataURL('image/jpeg', 0.95).split(',')[1];
 
-    // 缓存处理结果（仅 intensity=1.0）
-    if (intensity === 1.0 && preprocessedImageCache) {
-      preprocessedImageCache = { base64: base64Image, processed: processedBase64 };
-    }
-
-    console.log(`✨ [preprocess] 图像已处理（强度${intensity}）`);
+    console.log(`✨ [preprocess] 图像已优化（亮度${brightness.toFixed(0)}, 对比度因子${contrastFactor}）`);
     return processedBase64;
   } catch (error) {
     console.warn('⚠️ [preprocess] 预处理失败，使用原图:', error);
@@ -194,32 +150,33 @@ async function preprocessImageForDetection(base64Image: string, intensity: numbe
 }
 
 /**
- * 计算图像平均亮度（用于判断是否需要亮度增强）
+ * 计算图像亮度（0-255）
  */
 function calculateBrightness(imageData: ImageData): number {
   const data = imageData.data;
   let sum = 0;
-  const sampleSize = Math.min(data.length / 4, 500); // 最多采样500个像素
-
-  for (let i = 0; i < data.length && i / 4 < sampleSize; i += 4) {
+  
+  for (let i = 0; i < data.length; i += 4) {
     sum += data[i] * 0.299 + data[i + 1] * 0.587 + data[i + 2] * 0.114;
   }
 
-  return Math.round(sum / sampleSize);
+  return Math.round(sum / (data.length / 4));
 }
 
 /**
- * 检测图像质量：判断是否太模糊或过度曝光
+ * 检测图像质量：简化版，只评估基本特征
  */
 async function assessImageQuality(base64Image: string): Promise<{ score: number; issues: string[] }> {
   try {
     const img = await loadImageFromBase64(base64Image);
     const canvas = document.createElement('canvas');
-    canvas.width = Math.min(img.width, 480); // 降采样以加快计算
+    
+    // 降采样以加快计算
+    canvas.width = Math.min(img.width, 480);
     canvas.height = Math.min(img.height, 480);
 
     const ctx = canvas.getContext('2d');
-    if (!ctx) return { score: 0, issues: ['Cannot access canvas context'] };
+    if (!ctx) return { score: 75, issues: [] }; // 默认中等质量
 
     ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
     const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
@@ -227,84 +184,70 @@ async function assessImageQuality(base64Image: string): Promise<{ score: number;
     const issues: string[] = [];
     let score = 100;
 
-    // 检测：过度曝光（白色像素过多）
+    // 1. 检测亮度
     const brightness = calculateBrightness(imageData);
     if (brightness > 220) {
       issues.push('Overexposed');
-      score -= 30;
+      score -= 25;
     } else if (brightness < 50) {
       issues.push('Too dark');
       score -= 30;
+    } else if (brightness < 80) {
+      issues.push('Dim lighting');
+      score -= 15;
     }
 
-    // 检测：模糊（边界对比度太弱）
-    const sharpness = estimateSharpness(imageData);
-    if (sharpness < 10) {
-      issues.push('Blurry');
-      score -= 25;
+    // 2. 检测对比度（通过检查像素亮度的分布范围）
+    const data = imageData.data;
+    let minBrightness = 255;
+    let maxBrightness = 0;
+
+    for (let i = 0; i < data.length; i += 4) {
+      const pixelBrightness = data[i] * 0.299 + data[i + 1] * 0.587 + data[i + 2] * 0.114;
+      minBrightness = Math.min(minBrightness, pixelBrightness);
+      maxBrightness = Math.max(maxBrightness, pixelBrightness);
     }
 
-    // 检测：对比度太低
-    const contrast = calculateContrast(imageData);
-    if (contrast < 30) {
+    const contrastRange = maxBrightness - minBrightness;
+    if (contrastRange < 30) {
       issues.push('Low contrast');
       score -= 20;
     }
 
-    console.log(`📊 [assessQuality] 亮度=${brightness}, 锐度=${sharpness.toFixed(1)}, 对比度=${contrast}, 综合分=${score}`);
+    console.log(`📊 [assessQuality] 亮度=${brightness}, 对比度范围=${contrastRange.toFixed(0)}, 综合分=${score}`);
     return { score: Math.max(0, score), issues };
   } catch (error) {
-    console.warn('⚠️ [assessQuality] 质量评估失败:', error);
-    return { score: 50, issues: ['Assessment failed'] }; // 假设中等质量
+    console.warn('⚠️ [assessQuality] 质量评估异常:', error);
+    return { score: 75, issues: [] }; // 假设中等质量，继续尝试
   }
 }
 
 /**
- * 估计图像锐度（基于拉普拉斯算子的Variance）
+ * 估计图像锐度（简化版，基于边界检测）
  */
 function estimateSharpness(imageData: ImageData): number {
   const data = imageData.data;
   const width = imageData.width;
   const height = imageData.height;
-  let gradientSum = 0;
-  let count = 0;
+  let edgeCount = 0;
 
-  // 采样边界计算（性能优化）
-  for (let y = 1; y < height - 1; y += 2) {
-    for (let x = 1; x < width - 1; x += 2) {
-      const idx = (y * width + x) * 4;
-      const centerIntensity = data[idx] * 0.299 + data[idx + 1] * 0.587 + data[idx + 2] * 0.114;
+  // 采样计算边界像素数量（简单方法：亮度变化>30的像素）  
+  for (let i = 0; i < data.length; i += 4) {
+    const y = Math.floor((i / 4) / width);
+    const x = (i / 4) % width;
+    
+    if (x === 0 || x === width - 1 || y === 0 || y === height - 1) continue; // 跳过边界
 
-      const laplacian =
-        Math.abs(centerIntensity - (data[(y - 1) * width + x] * 0.299 + data[(y - 1) * width + x + 1] * 0.587 + data[(y - 1) * width + x + 2] * 0.114)) +
-        Math.abs(centerIntensity - (data[(y + 1) * width + x] * 0.299 + data[(y + 1) * width + x + 1] * 0.587 + data[(y + 1) * width + x + 2] * 0.114));
-
-      gradientSum += laplacian;
-      count++;
+    const brightness1 = data[i] * 0.299 + data[i + 1] * 0.587 + data[i + 2] * 0.114;
+    const rightIdx = i + 4;
+    const brightness2 = data[rightIdx] * 0.299 + data[rightIdx + 1] * 0.587 + data[rightIdx + 2] * 0.114;
+    
+    if (Math.abs(brightness1 - brightness2) > 30) {
+      edgeCount++;
     }
   }
 
-  return count > 0 ? gradientSum / count : 0;
-}
-
-/**
- * 计算图像对比度
- */
-function calculateContrast(imageData: ImageData): number {
-  const data = imageData.data;
-  const intensities: number[] = [];
-
-  // 采样计算
-  for (let i = 0; i < data.length; i += 4) {
-    const intensity = data[i] * 0.299 + data[i + 1] * 0.587 + data[i + 2] * 0.114;
-    intensities.push(intensity);
-  }
-
-  intensities.sort((a, b) => a - b);
-  const q1 = intensities[Math.floor(intensities.length * 0.25)];
-  const q3 = intensities[Math.floor(intensities.length * 0.75)];
-
-  return q3 - q1; // 四分位差作为对比度指标
+  return (edgeCount / (data.length / 4)) * 100; // 返回百分比
 }
 
 /**
@@ -398,13 +341,12 @@ async function decodeWithZXing(base64Image: string, preprocessed: boolean = fals
 }
 
 /**
- * 主识别函数：多层策略，自动选择最佳方案
+ * 主识别函数：多层策略，自动重试和预处理
  * 
  * 识别流程：
- * 1. 评估图像质量（检测模糊、过曝、对比度）
- * 2. 尝试原图识别（BarcodeDetector → ZXing）
- * 3. 如果失败且质量问题被发现，自动应用预处理并重试
- * 4. 返回识别结果或详细的失败原因
+ * 1. 尝试原图识别（BarcodeDetector + ZXing）
+ * 2. 如果失败，自动应用预处理并再次尝试（BarcodeDetector + ZXing）
+ * 3. 返回识别结果或详细的失败建议
  * 
  * @param base64Image - Base64 编码的图像
  * @returns 条形码结果数组
@@ -419,29 +361,23 @@ export async function readBarcode(base64Image: string): Promise<BarcodeResult[]>
       return results;
     }
 
-    console.log('🔍 [readBarcode] 开始识别（多层次策略：评估质量 → 原图 → 预处理）');
+    console.log('🔍 [readBarcode] 开始识别（相机拍摄 → 预处理 → 多引擎识别）');
 
-    // 第一步：评估图像质量（非阻塞）
-    const { score: qualityScore, issues } = await assessImageQuality(normalizedBase64);
-    const hasQualityIssues = qualityScore < 70;
+    // 第一阶段：尝试识别原图
+    console.log('📍 [readBarcode] 第一阶段：识别原始图像');
 
-    if (hasQualityIssues) {
-      console.log(`⚠️ [readBarcode] 图像质量一般（分数${qualityScore}/100）：${issues.join(', ')}`);
-    } else {
-      console.log(`✅ [readBarcode] 图像质量良好（分数${qualityScore}/100）`);
-    }
-
-    // 第二步：尝试原图识别（最快）
-    console.log('📍 [readBarcode] 尝试1：原图 → BarcodeDetector');
+    // 1a. 尝试 BarcodeDetector
+    console.log('  ├─ 尝试 BarcodeDetector API...');
     let detectorResults = await decodeWithBarcodeDetector(normalizedBase64, false);
     detectorResults.forEach(r => addUniqueResult(results, r));
 
     if (results.length > 0) {
-      return results; // 成功！直接返回
+      console.log('✅ [readBarcode] BarcodeDetector 成功识别！');
+      return results;
     }
 
-    // 第二步 B：如果 BarcodeDetector 失败，尝试 ZXing 原图
-    console.log('📍 [readBarcode] 尝试2：原图 → ZXing');
+    // 1b. 尝试 ZXing（更多格式支持）
+    console.log('  ├─ 尝试 ZXing...');
     let zxingResult = await decodeWithZXing(normalizedBase64, false);
     if (zxingResult) {
       addUniqueResult(results, {
@@ -449,54 +385,68 @@ export async function readBarcode(base64Image: string): Promise<BarcodeResult[]>
         value: zxingResult.text,
         format: zxingResult.format
       });
-      return results; // 成功！
+      console.log('✅ [readBarcode] ZXing 成功识别！');
+      return results;
     }
 
-    // 第三步：如果原图失败，应用预处理后重试
-    if (hasQualityIssues || qualityScore < 85) {
-      console.log(`📍 [readBarcode] 尝试3：应用预处理（质量${qualityScore}） → BarcodeDetector`);
-      const preprocessedBase64 = await preprocessImageForDetection(normalizedBase64, 1.0);
-      detectorResults = await decodeWithBarcodeDetector(preprocessedBase64, true);
-      detectorResults.forEach(r => addUniqueResult(results, r));
+    console.log('⏳ [readBarcode] 原图识别失败，尝试预处理...');
 
-      if (results.length > 0) {
-        return results; // 成功！
+    // 第二阶段：应用预处理并重试
+    console.log('📍 [readBarcode] 第二阶段：预处理并识别');
+    const preprocessedBase64 = await preprocessImageForDetection(normalizedBase64);
+
+    // 2a. 预处理后尝试 BarcodeDetector
+    console.log('  ├─ 尝试预处理图像 + BarcodeDetector API...');
+    detectorResults = await decodeWithBarcodeDetector(preprocessedBase64, true);
+    detectorResults.forEach(r => addUniqueResult(results, r));
+
+    if (results.length > 0) {
+      console.log('✅ [readBarcode] 预处理+BarcodeDetector 成功！');
+      return results;
+    }
+
+    // 2b. 预处理后尝试 ZXing
+    console.log('  └─ 尝试预处理图像 + ZXing...');
+    zxingResult = await decodeWithZXing(preprocessedBase64, true);
+    if (zxingResult) {
+      addUniqueResult(results, {
+        type: 'barcode',
+        value: zxingResult.text,
+        format: zxingResult.format
+      });
+      console.log('✅ [readBarcode] 预处理+ZXing 成功！');
+      return results;
+    }
+
+    // 第三阶段：所有方法都失败，分析原因并提供建议
+    console.warn('❌ [readBarcode] 所有识别方法均失败，正在分析原因...');
+
+    try {
+      const { score, issues } = await assessImageQuality(normalizedBase64);
+      console.warn(`📊 [readBarcode] 图像质量分数: ${score}/100, 问题: ${issues.length > 0 ? issues.join(', ') : '无明显问题'}`);
+
+      let suggestion = '💡 Cannot detect barcode. ';
+      
+      if (issues.length > 0) {
+        suggestion += `Photo issue: ${issues.join(', ')}. `;
       }
 
-      // 第三步 B：预处理后尝试 ZXing
-      console.log(`📍 [readBarcode] 尝试4：应用预处理（质量${qualityScore}） → ZXing`);
-      zxingResult = await decodeWithZXing(preprocessedBase64, true);
-      if (zxingResult) {
-        addUniqueResult(results, {
-          type: 'barcode',
-          value: zxingResult.text,
-          format: zxingResult.format
-        });
-        return results; // 成功！
+      if (score < 40) {
+        suggestion += 'Please: (1) Get closer to the barcode, (2) Improve lighting - avoid shadows and glare, (3) Hold steady, (4) Ensure barcode is in focus.';
+      } else if (score < 70) {
+        suggestion += 'Please: (1) Improve lighting, (2) Get a bit closer, (3) Try different angle, (4) Focus on barcode.';
+      } else if (issues.includes('Low contrast')) {
+        suggestion += 'Barcode has low contrast. Try different lighting or angle.';
+      } else {
+        suggestion += 'Barcode may be at an angle, damaged, or too small. Try: different angle, better focus, or get closer.';
       }
+
+      console.warn('💭 [readBarcode] 建议:', suggestion);
+    } catch (assessError) {
+      console.warn('⚠️ [readBarcode] 质量分析失败，但继续提示用户');
     }
 
-    // 第四步：所有方法都失败，提供诊断信息
-    console.warn('❌ [readBarcode] 所有识别方法均失败');
-    let suggestion = '❌ Cannot detect barcode. ';
-
-    if (issues.length > 0) {
-      suggestion += `Issues detected: ${issues.join(', ')}. `;
-    }
-
-    if (qualityScore < 50) {
-      suggestion += 'Try: get closer, improve lighting (not too bright), focus on the barcode.';
-    } else if (qualityScore < 70) {
-      suggestion += 'Try: improve lighting and focus, or take a steadier photo.';
-    } else if (issues.includes('Blurry')) {
-      suggestion += 'Image is blurry. Please hold steady and refocus.';
-    } else {
-      suggestion += 'Barcode may not be readable from this angle. Try different angle or get closer.';
-    }
-
-    console.warn('💡 [readBarcode] 建议:', suggestion);
-
-    return results;
+    return results; // 返回空数组
   } catch (error) {
     console.error('❌ [readBarcode] 识别异常:', error);
     return results;
