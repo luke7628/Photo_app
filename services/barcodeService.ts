@@ -459,8 +459,33 @@ async function decodeWithZXing(base64Image: string, preprocessed: boolean = fals
     const reader = getReader();
     console.log(`🔍 [ZXing] 开始解码 ${preprocessed ? '(预处理)' : '(原图)'}...`);
 
-    // 尝试解码
-    const result = await reader.decodeFromImageElement(img);
+    // iOS兼容：使用canvas而不是直接从img元素解码
+    const canvas = document.createElement('canvas');
+    canvas.width = img.width;
+    canvas.height = img.height;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) {
+      console.error('❌ [ZXing] Canvas context获取失败');
+      return null;
+    }
+    ctx.drawImage(img, 0, 0);
+    console.log(`🖼️ [ZXing] 已绘制到canvas: ${canvas.width}x${canvas.height}`);
+
+    // 尝试从canvas解码
+    let result;
+    try {
+      result = await reader.decodeFromCanvas(canvas);
+    } catch (canvasError) {
+      console.warn(`⚠️ [ZXing] decodeFromCanvas失败，尝试decodeFromImageElement:`, canvasError);
+      // 备用方案
+      try {
+        result = await reader.decodeFromImageElement(img);
+      } catch (imgError) {
+        console.error(`❌ [ZXing] decodeFromImageElement也失败:`, imgError);
+        throw canvasError; // 抛出原始错误
+      }
+    }
+    
     if (!result) {
       console.log(`ℹ️ [ZXing] ${preprocessed ? '(预处理)' : '(原图)'} 未检测到条码`);
       return null;
@@ -488,6 +513,8 @@ async function decodeWithZXing(base64Image: string, preprocessed: boolean = fals
     return { text, format };
   } catch (error: any) {
     console.error(`❌ [ZXing] ${preprocessed ? '(预处理)' : '(原图)'} 解码失败:`, error.message || error);
+    console.error(`❌ [ZXing] 错误名称:`, error.name);
+    console.error(`❌ [ZXing] 错误详情:`, error);
     if (error.name === 'NotFoundException') {
       console.log(`ℹ️ [ZXing] ${preprocessed ? '(预处理)' : '(原图)'} 未找到条码`);
     }
