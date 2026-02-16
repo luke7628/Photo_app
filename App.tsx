@@ -19,24 +19,53 @@ import SettingsScreen from './components/SettingsScreen';
 import ProjectListScreen from './components/ProjectListScreen';
 
 // Temporary mobile debugging tool (will be removed before production)
-// Access it by adding ?debug=true to URL or shake device
+// Access it by adding ?debug=true to URL
 let erudaLoaded = false;
-const initDebugTool = async () => {
-  if (erudaLoaded) return;
-  const urlParams = new URLSearchParams(window.location.search);
-  const debugMode = urlParams.has('debug') || import.meta.env.DEV;
-  
-  if (debugMode) {
+const createDebugInitializer = (setStatus: (status: 'loading' | 'active' | 'error' | null) => void) => {
+  return async () => {
+    if (erudaLoaded) return;
+    
     try {
-      const eruda = await import('eruda');
-      eruda.default.init();
-      erudaLoaded = true;
-      console.log('🐛 [Debug] Eruda initialized - mobile debugging enabled');
-      console.log('💡 [Debug] Tap the console icon in bottom-right corner to view logs');
+      const urlParams = new URLSearchParams(window.location.search);
+      const forceDebug = urlParams.has('debug');
+      const isDev = import.meta.env.DEV;
+      
+      // Enable if: ?debug=true in URL OR development mode
+      if (forceDebug || isDev) {
+        setStatus('loading');
+        console.log('🔧 [Debug] Initializing eruda debug tool...');
+        const eruda = await import('eruda');
+        eruda.default.init({
+          container: document.body,
+          tool: ['console', 'network', 'elements', 'resources', 'info'],
+          useShadowDom: true,
+          autoScale: true,
+          defaults: {
+            displaySize: 50,
+            transparency: 0.9
+          }
+        });
+        erudaLoaded = true;
+        setStatus('active');
+        console.log('✅ [Debug] Eruda initialized successfully!');
+        console.log('📱 [Debug] Look for floating button in bottom-right corner');
+        console.log('💡 [Debug] If you don\'t see it, tap anywhere on screen twice');
+        
+        // Force show after a delay
+        setTimeout(() => {
+          if ((window as any).eruda) {
+            (window as any).eruda.show();
+            console.log('🎯 [Debug] Eruda panel shown automatically');
+          }
+        }, 1000);
+      } else {
+        console.log('ℹ️ [Debug] Debug mode not enabled. Add ?debug=true to URL to enable.');
+      }
     } catch (error) {
-      console.error('Failed to load eruda:', error);
+      setStatus('error');
+      console.error('❌ [Debug] Failed to load eruda:', error);
     }
-  }
+  };
 };
 
 // !!! IMPORTANT CONFIGURATION !!!
@@ -65,6 +94,7 @@ const App: React.FC = () => {
   const [detailsViewMode, setDetailsViewMode] = useState<ViewMode>(ViewMode.GRID);
   const [user, setUser] = useState<MicrosoftUser | null>(null);
   const [isMicrosoftReady, setIsMicrosoftReady] = useState(false);
+  const [debugToolStatus, setDebugToolStatus] = useState<'loading' | 'active' | 'error' | null>(null);
   const [settings, setSettings] = useState<UserPreferences>({
     defaultFlash: 'auto',
     skipReview: false,
@@ -98,6 +128,7 @@ const App: React.FC = () => {
 
   // Initialize mobile debugging tool (temporary - will be removed)
   useEffect(() => {
+    const initDebugTool = createDebugInitializer(setDebugToolStatus);
     initDebugTool();
   }, []);
 
@@ -833,6 +864,24 @@ const App: React.FC = () => {
           <div className="bg-gray-900/95 backdrop-blur-lg text-white px-6 py-4 rounded-2xl shadow-2xl border border-gray-700/50 flex items-center gap-3 max-w-sm animate-out fade-out slide-out-to-top-4 duration-300" style={{animation: 'none'}}>
             <span className="material-symbols-outlined text-blue-400 text-2xl animate-bounce">info</span>
             <p className="text-sm font-medium leading-snug">{toastMessage}</p>
+          </div>
+        </div>
+      )}
+
+      {/* Debug Tool Status Indicator */}
+      {debugToolStatus && (
+        <div className="fixed top-4 left-4 z-[9998] animate-in fade-in duration-500">
+          <div className={`px-3 py-2 rounded-lg shadow-lg border flex items-center gap-2 text-xs font-medium ${
+            debugToolStatus === 'loading' ? 'bg-yellow-500/90 text-yellow-950 border-yellow-600' :
+            debugToolStatus === 'active' ? 'bg-green-500/90 text-green-950 border-green-600' :
+            'bg-red-500/90 text-red-950 border-red-600'
+          }`}>
+            <span className="material-symbols-outlined text-base">
+              {debugToolStatus === 'loading' ? 'hourglass_empty' : debugToolStatus === 'active' ? 'bug_report' : 'error'}
+            </span>
+            <span>
+              {debugToolStatus === 'loading' ? 'Loading Debug...' : debugToolStatus === 'active' ? 'Debug Active ✓' : 'Debug Failed'}
+            </span>
           </div>
         </div>
       )}
