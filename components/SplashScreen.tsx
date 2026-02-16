@@ -75,10 +75,6 @@ const SplashScreen: React.FC = () => {
         </div>
       </div>
 
-      {/* Bottom text with fade in */}
-      <div className="pt-4 flex items-center justify-center text-center px-6 animate-fadeIn" style={{animationDelay: '600ms'}}>
-        <p className="text-sm text-gray-500 font-medium tracking-wide">Ready to use</p>
-      </div>
     </div>
   );
 };
