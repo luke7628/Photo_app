@@ -18,6 +18,27 @@ import ImagePreviewScreen from './components/ImagePreviewScreen';
 import SettingsScreen from './components/SettingsScreen';
 import ProjectListScreen from './components/ProjectListScreen';
 
+// Temporary mobile debugging tool (will be removed before production)
+// Access it by adding ?debug=true to URL or shake device
+let erudaLoaded = false;
+const initDebugTool = async () => {
+  if (erudaLoaded) return;
+  const urlParams = new URLSearchParams(window.location.search);
+  const debugMode = urlParams.has('debug') || import.meta.env.DEV;
+  
+  if (debugMode) {
+    try {
+      const eruda = await import('eruda');
+      eruda.default.init();
+      erudaLoaded = true;
+      console.log('🐛 [Debug] Eruda initialized - mobile debugging enabled');
+      console.log('💡 [Debug] Tap the console icon in bottom-right corner to view logs');
+    } catch (error) {
+      console.error('Failed to load eruda:', error);
+    }
+  }
+};
+
 // !!! IMPORTANT CONFIGURATION !!!
 // MICROSOFT OneDrive SETUP (RECOMMENDED):
 // Configure these in .env.local (Vite env vars).
@@ -74,6 +95,11 @@ const App: React.FC = () => {
     setShowToast(true);
     setTimeout(() => setShowToast(false), duration);
   };
+
+  // Initialize mobile debugging tool (temporary - will be removed)
+  useEffect(() => {
+    initDebugTool();
+  }, []);
 
   // Initialize Microsoft Auth
   useEffect(() => {
