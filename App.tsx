@@ -9,10 +9,17 @@ import { microsoftAuthService } from './services/microsoftAuthService';
 import { readBarcode } from './services/barcodeService';
 import { readBarcodeWithQuagga, initializeQuagga } from './services/quaggaService';
 import { inferModelFromPartNumber } from './src/utils/modelUtils';
+import eruda from 'eruda';
 
 // 确保Buffer在全局可用（用于Quagga2）
 if (typeof window !== 'undefined') {
   (window as any).Buffer = Buffer;
+  
+  // 初始化移动端调试工具（开发环境）
+  if (import.meta.env.DEV || window.location.hostname === 'luke7628.github.io') {
+    eruda.init();
+    console.log('🔧 [Eruda] 移动端调试工具已启动');
+  }
 }
 import SplashScreen from './components/SplashScreen';
 import GalleryScreen from './components/GalleryScreen';
@@ -464,8 +471,10 @@ const App: React.FC = () => {
           try {
             console.log('🔍 [analyzeWithBarcode] 策略1: 尝试Quagga2识别（iOS优化）...');
             await initializeQuagga();
+            console.log('✅ [analyzeWithBarcode] Quagga2初始化成功');
             const quaggaResults = await readBarcodeWithQuagga(base64Image);
             console.log('✅ [analyzeWithBarcode] Quagga2识别成功:', quaggaResults.length, '个结果');
+            console.log('📊 [analyzeWithBarcode] Quagga2结果详情:', JSON.stringify(quaggaResults, null, 2));
             
             barcodeResults = quaggaResults.map(r => ({
               type: r.type as any,
@@ -475,12 +484,16 @@ const App: React.FC = () => {
               localized: true,
             }));
           } catch (quaggaError) {
-            console.warn('⚠️ [analyzeWithBarcode] Quagga2失败，fallback到BarcodeDetector+ZXing:', quaggaError);
+            console.warn('⚠️ [analyzeWithBarcode] Quagga2失败，fallback到BarcodeDetector+ZXing');
+            console.error('Quagga2 Error:', quaggaError);
+            console.error('Quagga2 Error message:', (quaggaError as any)?.message);
+            console.error('Quagga2 Error stack:', (quaggaError as any)?.stack);
             
             // 策略2: Fallback到优化的4阶段识别（BarcodeDetector + ZXing）
             console.log('🔍 [analyzeWithBarcode] 策略2: 使用BarcodeDetector+ZXing 4阶段识别...');
             const legacyResults = await readBarcode(base64Image);
             console.log('📊 [analyzeWithBarcode] 4阶段识别返回:', legacyResults.length, '个结果');
+            console.log('📊 [analyzeWithBarcode] 4阶段结果详情:', JSON.stringify(legacyResults, null, 2));
             
             barcodeResults = legacyResults.map(r => ({
               type: r.type as any,
@@ -494,6 +507,8 @@ const App: React.FC = () => {
           if (barcodeResults.length === 0) {
             console.warn('⚠️ [analyzeWithBarcode] 所有方法均未检测到条码');
             displayToast('💡 Cannot detect barcode. Please: get closer, improve lighting, hold steady, try different angle.', 5000);
+          } else {
+            console.log('✅ [analyzeWithBarcode] 成功检测到', barcodeResults.length, '个条码');
           }
           
           let serialNumber = '';
@@ -604,9 +619,13 @@ const App: React.FC = () => {
       clearTimeout(timeout);
       resolve({ serialNumber, model, partNumber });
         } catch (error) {
-          console.error('❌ [analyzeWithBarcode] 条形码识别失败:', error);
+          console.error('❌ [analyzeWithBarcode] 条形码识别失败');
+          console.error('Error object:', error);
+          console.error('Error message:', (error as any)?.message);
+          console.error('Error stack:', (error as any)?.stack);
+          console.error('Error name:', (error as any)?.name);
           clearTimeout(timeout);
-          reject(new Error('Barcode recognition failed'));
+          reject(error);
         }
       })();
     });
@@ -614,6 +633,9 @@ const App: React.FC = () => {
 
   const handleCapture = (base64: string) => {
     console.log('📸 [handleCapture] 收到图像，长度:', base64.length);
+    console.log('📸 [handleCapture] Base64前缀:', base64.substring(0, 50));
+    console.log('📸 [handleCapture] sessionIndex:', sessionIndex, 'isSingleRetake:', isSingleRetake);
+    console.log('📸 [handleCapture] settings.skipReview:', settings.skipReview);
     setCapturedImage(base64);
     
     if (settings.skipReview) {
@@ -622,9 +644,10 @@ const App: React.FC = () => {
         console.log('📸 [handleCapture] skipReview=true，sessionIndex=0， 开始分析...');
         setIsAnalyzing(true);
         const cleanBase64 = base64.split(',')[1];
+        console.log('📸 [handleCapture] 清理后Base64长度:', cleanBase64.length);
         analyzeWithBarcode(cleanBase64)
           .then(result => { 
-            console.log('📸 [handleCapture] 分析成功，结果:', result);
+            console.log('📸 [handleCapture] ✅ 分析成功，结果:', result);
             if (!result.serialNumber && !result.partNumber) {
               displayToast('💡 Could not read barcode. Enter SN/PN manually or retake the photo.', 4500);
             }
@@ -639,7 +662,11 @@ const App: React.FC = () => {
             }, 300);
           })
           .catch((error) => { 
-            console.error('📸 [handleCapture] 分析失败:', error);
+            console.error('📸 [handleCapture] ❌ 分析失败');
+            console.error('Error:', error);
+            console.error('Error type:', typeof error);
+            console.error('Error message:', error?.message);
+            console.error('Error stack:', error?.stack);
             displayToast('❌ Barcode recognition failed. Please enter manually.', 4000);
             const fallbackData = { serialNumber: "", model: "ZT411", partNumber: "" };
             setBaseSerialNumber("");
