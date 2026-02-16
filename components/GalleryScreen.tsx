@@ -139,23 +139,38 @@ const GalleryScreen: React.FC<GalleryScreenProps> = ({
                 <button 
                   onClick={() => setShowUserMenu(!showUserMenu)} 
                   style={rotationStyle} 
-                  className={`${isLandscape ? 'size-9' : 'size-11'} rounded-full border-2 border-blue-400 p-0.5 overflow-hidden active:scale-90 transition-all hover:border-blue-500`}
+                  className={`${isLandscape ? 'size-9' : 'size-11'} rounded-full border-2 border-blue-400 bg-blue-500 flex items-center justify-center text-white font-bold overflow-hidden active:scale-90 transition-all hover:border-blue-500`}
                 >
-                  <img src={user.photoUrl} className="size-full rounded-full object-cover" alt="User" />
+                  {user.photoUrl ? (
+                    <img 
+                      src={user.photoUrl} 
+                      className="size-full rounded-full object-cover" 
+                      alt={user.name}
+                      onError={(e) => {
+                        // Hide broken image, show initials instead
+                        e.currentTarget.style.display = 'none';
+                      }}
+                    />
+                  ) : null}
+                  <span className={`${user.photoUrl ? 'absolute inset-0 flex items-center justify-center' : ''} text-sm`}>
+                    {user.name.charAt(0).toUpperCase()}
+                  </span>
                 </button>
                 {showUserMenu && (
-                  <div className="absolute top-12 right-0 w-44 bg-white shadow-xl rounded-xl border border-gray-200 overflow-hidden z-50">
-                    <div className="px-4 py-3 border-b border-gray-100">
-                      <p className="text-xs font-medium text-gray-600">{user.email}</p>
+                  <div className="absolute top-12 right-0 w-48 bg-white shadow-2xl rounded-xl border border-gray-100 overflow-hidden z-50 animate-in fade-in zoom-in-95 duration-200">
+                    <div className="px-4 py-3 border-b border-gray-50">
+                      <p className="text-xs font-semibold text-gray-900 truncate">{user.name}</p>
+                      <p className="text-xs text-gray-500 truncate mt-0.5">{user.email}</p>
                     </div>
                     <button 
                       onClick={() => {
                         onLogout();
                         setShowUserMenu(false);
                       }}
-                      className="w-full px-4 py-3 text-left text-sm font-medium text-red-600 hover:bg-red-50 transition-colors"
+                      className="w-full px-4 py-3 text-left flex items-center gap-2 text-red-600 hover:bg-red-50 transition-colors"
                     >
-                      Sign Out
+                      <span className="material-symbols-outlined text-base">logout</span>
+                      <span className="text-sm font-medium">Sign Out</span>
                     </button>
                   </div>
                 )}

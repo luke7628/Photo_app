@@ -232,7 +232,7 @@ const DetailsScreen: React.FC<DetailsScreenProps> = ({
           <div className="flex items-center gap-1.5">
             {user ? (
               <>
-                <UserAvatar user={user} onLogout={onLogout} variant="mobile" />
+                <UserAvatar user={user} onLogout={onLogout} variant="desktop" />
                 <button 
                   onClick={onManualSync}
                   className={`size-10 flex items-center justify-center rounded-xl transition-all ${isSyncing ? 'text-primary bg-background-dark/10' : 'bg-gray-50 text-gray-400 hover:text-sage'}`}

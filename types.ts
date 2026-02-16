@@ -21,7 +21,7 @@ export interface UserPreferences {
 export interface MicrosoftUser {
   name: string;
   email: string;
-  photoUrl: string;
+  photoUrl?: string;
 }
 
 export interface Project {
