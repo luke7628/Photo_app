@@ -426,16 +426,23 @@ const App: React.FC = () => {
   }, [settings.autoUpload, settings.cloudProvider, user, performSyncCycle]);
 
   const analyzeWithBarcode = async (base64Image: string): Promise<{ serialNumber: string; model: string; partNumber: string }> => {
-    try {
-      console.log('📊 [analyzeWithBarcode] 开始...输入长度:', base64Image.length);
-      console.log('📊 [analyzeWithBarcode] Base64前100字符:', base64Image.substring(0, 100));
-      
-      // 初始化 Quagga2
-      try {
-        await initializeQuagga();
-      } catch (error) {
-        console.warn('⚠️ [analyzeWithBarcode] Quagga2 初始化失败:', error);
-      }
+    return new Promise<{ serialNumber: string; model: string; partNumber: string }>((resolve, reject) => {
+      const timeout = setTimeout(() => {
+        console.warn('⏱️ [analyzeWithBarcode] Timeout after 15 seconds');
+        reject(new Error('Barcode recognition timeout'));
+      }, 15000); // 15秒超时
+
+      (async () => {
+        try {
+          console.log('📊 [analyzeWithBarcode] 开始...输入长度:', base64Image.length);
+          console.log('📊 [analyzeWithBarcode] Base64前100字符:', base64Image.substring(0, 100));
+          
+          // 初始化 Quagga2
+          try {
+            await initializeQuagga();
+          } catch (error) {
+            console.warn('⚠️ [analyzeWithBarcode] Quagga2 初始化失败:', error);
+          }
       
       // 策略 1：优先使用 Quagga2（强大的定位能力）
       console.log('🔍 [analyzeWithBarcode] 策略1：尝试 Quagga2...');
@@ -568,11 +575,15 @@ const App: React.FC = () => {
       if (!model) model = 'ZT411';
       
       console.log('📊 [analyzeWithBarcode] 最终返回:', { serialNumber, model, partNumber });
-      return { serialNumber, model, partNumber };
-    } catch (error) {
-      console.error('❌ [analyzeWithBarcode] 条形码识别失败:', error);
-      throw new Error('Barcode recognition failed');
-    }
+      clearTimeout(timeout);
+      resolve({ serialNumber, model, partNumber });
+        } catch (error) {
+          console.error('❌ [analyzeWithBarcode] 条形码识别失败:', error);
+          clearTimeout(timeout);
+          reject(new Error('Barcode recognition failed'));
+        }
+      })();
+    });
   };
 
   const handleCapture = (base64: string) => {
