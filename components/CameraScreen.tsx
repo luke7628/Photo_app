@@ -464,7 +464,9 @@ const CameraScreen: React.FC<CameraScreenProps> = ({
 
           <footer 
             className={`w-full bg-gradient-to-t from-black/90 via-black/40 to-transparent flex flex-col items-center pointer-events-auto transition-all duration-500 ${isLandscape ? 'px-12 pt-2' : 'pt-6'}`}
-            style={{ paddingBottom: `env(safe-area-inset-bottom, 1.5rem)` }}
+            style={{ 
+              paddingBottom: 0
+            }}
           >
             <div className="w-full flex items-center justify-center">
                <button 
@@ -478,6 +480,8 @@ const CameraScreen: React.FC<CameraScreenProps> = ({
                 <div className="absolute inset-1.5 rounded-full bg-white group-active:bg-primary transition-colors"></div>
               </button>
             </div>
+            {/* Safe Area Fill */}
+            <div style={{ height: 'env(safe-area-inset-bottom, 1.5rem)', width: '100vw', marginLeft: 'calc(-50vw + 50%)', backgroundColor: '#000000' }} />
           </footer>
         </div>
       </div>

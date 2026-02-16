@@ -280,7 +280,9 @@ const ImagePreviewScreen: React.FC<ImagePreviewScreenProps> = ({
 
       <footer 
         className="absolute bottom-0 inset-x-0 pt-10 px-6 bg-gradient-to-t from-black/80 via-transparent z-20"
-        style={{ paddingBottom: `env(safe-area-inset-bottom, 1.5rem)` }}
+        style={{ 
+          paddingBottom: 0
+        }}
       >
         <div className="flex gap-4">
           {isCropping ? (
@@ -298,9 +300,10 @@ const ImagePreviewScreen: React.FC<ImagePreviewScreenProps> = ({
               <button onClick={() => fileInputRef.current?.click()} className="flex-1 h-14 bg-primary text-background-dark rounded-2xl flex items-center justify-center gap-2 font-black text-xs uppercase tracking-widest shadow-lg shadow-primary/20 active:scale-95">
                 <span className="material-symbols-outlined text-[20px]">add_photo_alternate</span> Replace
               </button>
-            </>
-          )}
+            </>          )}
         </div>
+        {/* Safe Area Fill */}
+        <div style={{ height: 'env(safe-area-inset-bottom, 1.5rem)', width: '100vw', marginLeft: 'calc(-1.5rem)', backgroundColor: '#000000' }} />
       </footer>
     </div>
   );
