@@ -116,7 +116,7 @@ const GalleryScreen: React.FC<GalleryScreenProps> = ({
   );
 
   return (
-    <div className="flex flex-col h-full bg-white relative transition-all duration-300">
+    <div className="flex flex-col max-h-screen bg-white relative transition-all duration-300 overflow-hidden">
       {/* Header */}
       <header className={`pt-4 px-4 bg-white z-30 transition-all flex-shrink-0 ${isLandscape ? 'pb-2' : 'pb-4'}`}>
         {/* Top row: Back button + Title + User + Settings */}
@@ -255,7 +255,7 @@ const GalleryScreen: React.FC<GalleryScreenProps> = ({
       <main 
         className={`flex-1 overflow-y-auto px-5 no-scrollbar transition-all bg-white ${isLandscape ? 'pt-3' : 'pt-5'}`}
         style={{
-          paddingBottom: isLandscape ? '4.5rem' : '5.5rem'
+          paddingBottom: isLandscape ? '5rem' : '6rem'
         }}
       >
         <div className={`grid gap-3 transition-all ${isLandscape ? 'grid-cols-2 md:grid-cols-3' : 'grid-cols-1'}`}>
