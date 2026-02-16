@@ -1,8 +1,8 @@
 
 import React, { useRef, useState, useEffect, useCallback, useMemo } from 'react';
 import { PHOTO_LABELS } from '../types';
-import { useDeviceOrientation } from '../hooks/useDeviceOrientation';
-import { getRotationStyle } from '../services/styleService';
+import { useDeviceOrientation } from '../src/hooks/useDeviceOrientation';
+import { getRotationStyle } from '../src/services/styleService';
 
 interface CameraScreenProps {
   sessionIndex: number;

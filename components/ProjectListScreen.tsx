@@ -37,7 +37,7 @@ const ProjectListScreen: React.FC<ProjectListScreenProps> = ({
   }, [projects, printers]);
 
   return (
-    <div className="flex flex-col h-full bg-gray-50 overflow-hidden">
+    <div className="flex flex-col h-full bg-white overflow-hidden">
       {/* Top Header */}
       <header className="flex items-center justify-between py-2.5 sm:py-5 px-2 sm:px-6 bg-white border-b border-gray-200 shrink-0">
         <div className="flex-1 min-w-0 pr-2">
@@ -73,7 +73,7 @@ const ProjectListScreen: React.FC<ProjectListScreenProps> = ({
       </header>
 
       {/* Projects Grid */}
-      <main className="flex-1 overflow-y-auto px-2 sm:px-6 pt-3 sm:pt-6 custom-scrollbar">
+      <main className="flex-1 overflow-y-auto px-2 sm:px-6 pt-3 sm:pt-6 custom-scrollbar bg-white">
         <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-2 sm:gap-4">
           
           {/* Create New Project Card */}

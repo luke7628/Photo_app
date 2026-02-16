@@ -1,8 +1,8 @@
 
 import React, { useState, useMemo, memo, useEffect } from 'react';
 import { Printer, MicrosoftUser, Project } from '../types';
-import { useDeviceOrientation } from '../hooks/useDeviceOrientation';
-import { getRotationOnlyStyle, getResponsiveSize, getResponsiveValue } from '../services/styleService';
+import { useDeviceOrientation } from '../src/hooks/useDeviceOrientation';
+import { getRotationOnlyStyle, getResponsiveSize, getResponsiveValue } from '../src/services/styleService';
 
 interface GalleryScreenProps {
   user: MicrosoftUser | null;
@@ -116,7 +116,7 @@ const GalleryScreen: React.FC<GalleryScreenProps> = ({
   );
 
   return (
-    <div className="flex flex-col h-full bg-gray-50 relative transition-all duration-300">
+    <div className="flex flex-col h-full bg-white relative transition-all duration-300">
       {/* Header */}
       <header className={`pt-4 px-4 bg-white border-b border-gray-200 z-30 transition-all ${isLandscape ? 'pb-2' : 'pb-4'}`}>
         {/* Top row: Back button + Title + User + Settings */}

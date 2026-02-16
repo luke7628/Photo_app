@@ -7,7 +7,7 @@ import { oneDriveService } from './services/oneDriveService';
 import { microsoftAuthService } from './services/microsoftAuthService';
 import { readBarcode } from './services/barcodeService';
 import { readBarcodeWithQuagga, initializeQuagga } from './services/quaggaService';
-import { inferModelFromPartNumber } from './utils/modelUtils';
+import { inferModelFromPartNumber } from './src/utils/modelUtils';
 import SplashScreen from './components/SplashScreen';
 import GalleryScreen from './components/GalleryScreen';
 import SearchScreen from './components/SearchScreen';

@@ -1,9 +1,9 @@
 
 import React, { useState, useRef, useEffect, useMemo } from 'react';
 import { PHOTO_LABELS } from '../types';
-import { useDeviceOrientation } from '../hooks/useDeviceOrientation';
-import { getRotationStyle, getResponsiveSize } from '../services/styleService';
-import { inferModelFromPartNumber, isPrinterDataValid } from '../utils/modelUtils';
+import { useDeviceOrientation } from '../src/hooks/useDeviceOrientation';
+import { getRotationStyle, getResponsiveSize } from '../src/services/styleService';
+import { inferModelFromPartNumber, isPrinterDataValid } from '../src/utils/modelUtils';
 
 interface ReviewScreenProps {
   imageUrl: string;
