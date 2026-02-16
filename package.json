@@ -6,23 +6,9 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
-    "build:web": "cross-env VITE_BASE_URL=/Photo_app/ vite build",
-    "build:mobile": "VITE_CAPACITOR=true vite build && npx cap sync",
-    "preview": "vite preview",
-    "ios:build": "npm run build:mobile && npx cap open ios",
-    "android:build": "npm run build:mobile && npx cap open android",
-    "sync:ios": "npx cap sync ios",
-    "sync:android": "npx cap sync android",
-    "sync:both": "npx cap sync"
+    "preview": "vite preview"
   },
   "dependencies": {
-    "@capacitor/android": "^8.1.0",
-    "@capacitor/app": "^8.0.1",
-    "@capacitor/camera": "^8.0.1",
-    "@capacitor/cli": "^8.1.0",
-    "@capacitor/core": "^8.1.0",
-    "@capacitor/ios": "^8.1.0",
-    "@capacitor/keyboard": "^8.0.0",
     "@ericblade/quagga2": "^1.12.1",
     "@zxing/library": "^0.21.3",
     "jsqr": "^1.4.0",

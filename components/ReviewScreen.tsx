@@ -1,6 +1,9 @@
 
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useMemo } from 'react';
 import { PHOTO_LABELS } from '../types';
+import { useDeviceOrientation } from '../hooks/useDeviceOrientation';
+import { getRotationStyle, getResponsiveSize } from '../services/styleService';
+import { inferModelFromPartNumber, isPrinterDataValid } from '../utils/modelUtils';
 
 interface ReviewScreenProps {
   imageUrl: string;
@@ -38,28 +41,15 @@ const ReviewScreen: React.FC<ReviewScreenProps> = ({ imageUrl, data, isAnalyzing
   const [shakeError, setShakeError] = useState(false);
   const [modalError, setModalError] = useState(false);
 
+  // 使用共享 Hook 监听设备方向（消除重复代码）
+  const { rotation: uiRotationHook } = useDeviceOrientation();
+
+  // 更新本地状态以保持向后兼容
   useEffect(() => {
-    const handleOrientation = (e: DeviceOrientationEvent) => {
-      const { beta, gamma } = e;
-      if (beta === null || gamma === null) return;
-      if (Math.abs(gamma) > 40) {
-        setUiRotation(gamma > 0 ? -90 : 90);
-      } else {
-        setUiRotation(0);
-      }
-    };
-    window.addEventListener('deviceorientation', handleOrientation);
-    return () => window.removeEventListener('deviceorientation', handleOrientation);
-  }, []);
+    setUiRotation(uiRotationHook);
+  }, [uiRotationHook]);
 
-  const hasValidData = !isAnalyzing && data?.serialNumber && data.serialNumber.trim().length > 0 && data?.partNumber && data.partNumber.trim().length > 0;
-
-  const inferModelFromPartNumber = (value: string): string => {
-    const upper = value.toUpperCase();
-    if (upper.includes('ZT421')) return 'ZT421';
-    if (upper.includes('ZT411')) return 'ZT411';
-    return 'ZT411';
-  };
+  const hasValidData = !isAnalyzing && isPrinterDataValid(data);
 
   const handleOpenEdit = () => {
     if (isAnalyzing) return;
@@ -177,10 +167,10 @@ const ReviewScreen: React.FC<ReviewScreenProps> = ({ imageUrl, data, isAnalyzing
   };
 
   const isLandscape = uiRotation !== 0;
-  const rotationStyle = {
-    transform: `rotate(${uiRotation}deg) scale(${isLandscape ? 0.8 : 1})`,
-    transition: 'transform 0.5s cubic-bezier(0.34, 1.56, 0.64, 1)'
-  };
+  const rotationStyle = useMemo(
+    () => getRotationStyle(uiRotation, isLandscape ? 0.8 : 1),
+    [uiRotation, isLandscape]
+  );
 
   return (
     <div className="flex flex-col h-full w-full bg-[#f6f8f6] select-none touch-none" 

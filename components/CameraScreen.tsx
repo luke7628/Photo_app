@@ -1,6 +1,8 @@
 
-import React, { useRef, useState, useEffect, useCallback } from 'react';
+import React, { useRef, useState, useEffect, useCallback, useMemo } from 'react';
 import { PHOTO_LABELS } from '../types';
+import { useDeviceOrientation } from '../hooks/useDeviceOrientation';
+import { getRotationStyle } from '../services/styleService';
 
 interface CameraScreenProps {
   sessionIndex: number;
@@ -30,20 +32,13 @@ const CameraScreen: React.FC<CameraScreenProps> = ({
   const streamRef = useRef<MediaStream | null>(null);
   const [retryCount, setRetryCount] = useState(0);
 
-  // 陀螺仪处理 UI 元素的旋转
+  // 使用共享 Hook 监听设备方向（消除重复代码）
+  const { rotation: uiRotationHook } = useDeviceOrientation();
+
+  // 更新本地状态以保持向后兼容
   useEffect(() => {
-    const handleOrientation = (e: DeviceOrientationEvent) => {
-      const { beta, gamma } = e;
-      if (beta === null || gamma === null) return;
-      if (Math.abs(gamma) > 40) {
-        setUiRotation(gamma > 0 ? -90 : 90);
-      } else {
-        setUiRotation(0);
-      }
-    };
-    window.addEventListener('deviceorientation', handleOrientation);
-    return () => window.removeEventListener('deviceorientation', handleOrientation);
-  }, []);
+    setUiRotation(uiRotationHook as OrientationAngle);
+  }, [uiRotationHook]);
 
   // 同步闪光灯状态到硬件
   useEffect(() => {
@@ -348,10 +343,10 @@ const CameraScreen: React.FC<CameraScreenProps> = ({
   };
 
   const isLandscape = uiRotation !== 0;
-  const rotationStyle = {
-    transform: `rotate(${uiRotation}deg) scale(${isLandscape ? 0.85 : 1})`,
-    transition: 'transform 0.5s cubic-bezier(0.34, 1.56, 0.64, 1)'
-  };
+  const rotationStyle = useMemo(
+    () => getRotationStyle(uiRotation, isLandscape ? 0.85 : 1),
+    [uiRotation, isLandscape]
+  );
 
   return (
     <div className="fixed inset-0 z-50 bg-black flex flex-col overflow-hidden touch-none safe-area-inset">

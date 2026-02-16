@@ -14,12 +14,6 @@ A modern web application for capturing and managing printer documentation photos
 
 📸 **12-Photo Documentation**: Structured photo capture workflow for complete printer documentation
 🎨 **Modern UI**: Clean, Apple-inspired interface with smooth animations
-📱 **Cross-Platform Support (Capacitor)**:
-- **Web** - Modern browsers
-- **iOS** - iPhone and iPad (iOS 13+)
-- **Android** - Android phones and tablets (Android 8+)
-- Native camera integration and permission management
-- Offline photo storage and synchronization
 
 ### Recognition Performance
 
@@ -31,20 +25,6 @@ Optimized for **Zebra Printer Labels** (such as ZT411/ZT421):
 - ✅ Fast response time <100ms
 
 ## Quick Start
-
-### 📱 Mobile Users (iOS and Android)
-
-**Fastest way to get started (5 minutes):**
-
-See [MOBILE_QUICKSTART.md](./MOBILE_QUICKSTART.md) - Complete iOS and Android build steps.
-
-**Detailed Build Guides:**
-
-- [MOBILE_BUILD_GUIDE.md](./MOBILE_BUILD_GUIDE.md) - Complete iOS/Android build and release guide
-- [CAPACITOR_GUIDE.md](./CAPACITOR_GUIDE.md) - Capacitor configuration and native feature integration
-- [MOBILE_PLATFORM_CONFIG.md](./MOBILE_PLATFORM_CONFIG.md) - Platform-specific configuration and initialization
-
-### 💻 Web Users
 
 ## Setup Instructions
 
@@ -58,8 +38,10 @@ npm install
 
 Use Microsoft OneDrive (or choose local-only storage).
 
-#### Microsoft OneDrive (Recommended)
-- **See [MICROSOFT_SETUP.md](./MICROSOFT_SETUP.md)**
+**For OneDrive integration:**
+- Set `VITE_MICROSOFT_CLIENT_ID` in `.env.local`
+- Set `VITE_MICROSOFT_TENANT_ID` (default: "common")
+- Set `VITE_MICROSOFT_REDIRECT_URI` (defaults to current origin)
 
 ### 3. Run Development Server
 
@@ -67,51 +49,53 @@ Use Microsoft OneDrive (or choose local-only storage).
 npm run dev
 ```
 
-The app will be available at `http://localhost:3000`
+The app will be available at `http://localhost:3000/Photo_app/`
 
-### 3b. Mobile Development (Optional)
-
-#### Build iOS App
-```bash
-# Option 1: Automatically open Xcode
-npm run ios:build
-
-# Option 2: Step by step
-npm run build
-npm run sync:ios
-npx cap open ios
-```
-
-#### Build Android App
-```bash
-# Option 1: Automatically open Android Studio
-npm run android:build
-
-# Option 2: Step by step
-npm run build
-npm run sync:android
-npx cap open android
-```
-
-### 4. Build for Production
+### 4. Build for Production (Web)
 
 ```bash
-npm run build
+npm run build:web
 ```
 
-#### Mobile Release
+Output will be in the `dist/` folder.
 
-To publish iOS or Android apps:
-- **iOS Release**: See [MOBILE_BUILD_GUIDE.md](./MOBILE_BUILD_GUIDE.md) section "iOS Release Build"
-- **Android Release**: See [MOBILE_BUILD_GUIDE.md](./MOBILE_BUILD_GUIDE.md) section "Android Release Build"
+## Project Structure
+
+```
+src/
+├── App.tsx                 # Main application component
+├── index.tsx              # Entry point
+├── types.ts               # TypeScript interfaces
+├── constants.ts           # App constants
+├── components/            # React components
+│   ├── SplashScreen.tsx
+│   ├── CameraScreen.tsx
+│   ├── ReviewScreen.tsx
+│   ├── GalleryScreen.tsx
+│   ├── DetailsScreen.tsx
+│   └── ...
+├── services/              # Business logic
+│   ├── barcodeService.ts
+│   ├── quaggaService.ts
+│   ├── microsoftAuthService.ts
+│   ├── oneDriveService.ts
+│   └── storageService.ts
+└── styles/                # CSS styles
+    └── theme.css
+
+Config files:
+├── vite.config.ts         # Vite configuration
+├── tailwind.config.js     # Tailwind CSS
+├── tsconfig.json          # TypeScript config
+└── package.json           # Dependencies & scripts
+```
 
 ## Available Commands
 
-### Web Development
 ```bash
-npm run dev       # Start development server
-npm run build     # Production build
-npm run preview   # Preview production build
+npm run dev           # Start development server (localhost:3000)
+npm run build:web     # Build for production web deployment
+npm run preview       # Preview production build locally
 ```
 
 ### Mobile Development
@@ -223,15 +207,14 @@ If barcode recognition fails, you can always manually enter the information:
 
 ## Tech Stack
 
-- **React 19** + **TypeScript**
-- **Vite** - Fast build tool
+- **React 19** + **TypeScript** - UI framework
+- **Vite** - Fast build tool & dev server
 - **Tailwind CSS** - Utility-first styling
-- **Recognition Stack**:
-  - **BarcodeDetector API** - Native barcode/QR code reader
-  - **ZXing** - Barcode/QR code library (fallback)
-  - Custom image processing for optimal recognition
-- **Microsoft Graph API** - OneDrive integration
-- **Capacitor** - Cross-platform mobile framework
+- **Barcode Recognition**:
+  - **Quagga2** - Advanced barcode detection
+  - **ZXing** - Fallback barcode/QR code library
+  - **jsQR** - Pure JavaScript QR code reader
+- **Cloud Storage**: Microsoft Graph API for OneDrive
 - **IndexedDB** - Local data persistence
 
 ## License

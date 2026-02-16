@@ -7,6 +7,7 @@ import { oneDriveService } from './services/oneDriveService';
 import { microsoftAuthService } from './services/microsoftAuthService';
 import { readBarcode } from './services/barcodeService';
 import { readBarcodeWithQuagga, initializeQuagga } from './services/quaggaService';
+import { inferModelFromPartNumber } from './utils/modelUtils';
 import SplashScreen from './components/SplashScreen';
 import GalleryScreen from './components/GalleryScreen';
 import SearchScreen from './components/SearchScreen';
@@ -423,16 +424,6 @@ const App: React.FC = () => {
     }
     return () => clearInterval(interval);
   }, [settings.autoUpload, settings.cloudProvider, user, performSyncCycle]);
-
-  /**
-   * 简化的条形码识别
-   * 只使用本地条形码/QR码读取，不依赖云端或OCR
-   */
-  const inferModelFromPartNumber = (partNumber: string): 'ZT411' | 'ZT421' => {
-    const upper = partNumber.toUpperCase();
-    if (upper.includes('ZT421')) return 'ZT421';
-    return 'ZT411';
-  };
 
   const analyzeWithBarcode = async (base64Image: string): Promise<{ serialNumber: string; model: string; partNumber: string }> => {
     try {

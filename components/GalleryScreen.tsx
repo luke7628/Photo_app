@@ -1,6 +1,8 @@
 
 import React, { useState, useMemo, memo, useEffect } from 'react';
 import { Printer, MicrosoftUser, Project } from '../types';
+import { useDeviceOrientation } from '../hooks/useDeviceOrientation';
+import { getRotationOnlyStyle, getResponsiveSize, getResponsiveValue } from '../services/styleService';
 
 interface GalleryScreenProps {
   user: MicrosoftUser | null;
@@ -38,23 +40,11 @@ const PrinterItem = memo(({
       onClick={() => onSelect(printer)}
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
+      className={`w-full text-left group flex items-center bg-white rounded-2xl border border-gray-200 shadow-sm hover:shadow-md transition-all animate-slideUpFast ${isLandscape ? 'p-2 gap-3' : 'p-3 gap-3.5'}`}
       style={{
-        animation: `slideUp 0.3s ease-out ${index * 30}ms both`
+        animationDelay: `${index * 30}ms`
       }}
-      className={`w-full text-left group flex items-center bg-white rounded-2xl border border-gray-200 shadow-sm hover:shadow-md transition-all ${isLandscape ? 'p-2 gap-3' : 'p-3 gap-3.5'}`}
     >
-      <style>{`
-        @keyframes slideUp {
-          from {
-            opacity: 0;
-            transform: translateY(12px);
-          }
-          to {
-            opacity: 1;
-            transform: translateY(0);
-          }
-        }
-      `}</style>
       
       <div className={`rounded-xl bg-gradient-to-br from-blue-50 to-indigo-50 flex items-center justify-center overflow-hidden shrink-0 border border-gray-200 shadow-sm transition-all ${isHovered ? 'shadow-md' : ''} ${isLandscape ? 'size-10' : 'size-14'}`}>
         <img src={printer.imageUrl} className="size-full object-cover" alt={printer.serialNumber} />
@@ -99,18 +89,13 @@ const GalleryScreen: React.FC<GalleryScreenProps> = ({
   const [showUserMenu, setShowUserMenu] = useState(false);
   const [uiRotation, setUiRotation] = useState(0);
 
-  useEffect(() => {
-    const handleOrientation = (e: DeviceOrientationEvent) => {
-      const { gamma } = e;
-      if (gamma === null) return;
-      if (Math.abs(gamma) > 40) setUiRotation(gamma > 0 ? -90 : 90);
-      else setUiRotation(0);
-    };
-    window.addEventListener('deviceorientation', handleOrientation);
-    return () => window.removeEventListener('deviceorientation', handleOrientation);
-  }, []);
+  // 使用共享 Hook 监听设备方向（消除重复代码）
+  const { rotation: uiRotationHook, isLandscape } = useDeviceOrientation();
 
-  const isLandscape = uiRotation !== 0;
+  // 更新本地状态以保持向后兼容
+  useEffect(() => {
+    setUiRotation(uiRotationHook);
+  }, [uiRotationHook]);
   const filteredPrinters = useMemo(() => {
     let result = filter === 'ALL' ? printers : printers.filter(p => p.model === filter);
     if (searchTerm.trim()) {
@@ -125,7 +110,10 @@ const GalleryScreen: React.FC<GalleryScreenProps> = ({
     return result;
   }, [printers, filter, searchTerm]);
 
-  const rotationStyle = { transform: `rotate(${uiRotation}deg)`, transition: 'transform 0.3s cubic-bezier(0.4, 0, 0.2, 1)' };
+  const rotationStyle = useMemo(
+    () => getRotationOnlyStyle(uiRotation),
+    [uiRotation]
+  );
 
   return (
     <div className="flex flex-col h-full bg-gray-50 relative transition-all duration-300">

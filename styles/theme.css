@@ -369,6 +369,17 @@ input, textarea {
   }
 }
 
+@keyframes slideUpFast {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
 @keyframes slideRight {
   from {
     opacity: 0;
@@ -390,6 +401,10 @@ input, textarea {
 
 .animate-slideUp {
   animation: slideUp 600ms cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.animate-slideUpFast {
+  animation: slideUpFast 300ms ease-out;
 }
 
 .animate-slideRight {

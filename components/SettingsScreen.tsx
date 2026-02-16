@@ -1,7 +1,6 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { UserPreferences, Project } from '../types';
-import { Capacitor } from '@capacitor/core';
 
 interface SettingsScreenProps {
   settings: UserPreferences;
@@ -14,9 +13,6 @@ const SettingsScreen: React.FC<SettingsScreenProps> = ({ settings, onUpdate, act
   const [isReloading, setIsReloading] = useState(false);
   const [reloadProgress, setReloadProgress] = useState(0);
   const [showRebootOverlay, setShowRebootOverlay] = useState(false);
-
-  // localStorage keys that should be preserved during app refresh
-  const USER_DATA_KEYS = ['printers', 'projects', 'settings', 'user', 'microsoft'];
 
   const updateField = (field: keyof UserPreferences, value: any) => {
     onUpdate({ ...settings, [field]: value });
@@ -52,63 +48,30 @@ const SettingsScreen: React.FC<SettingsScreenProps> = ({ settings, onUpdate, act
   };
 
   /**
-   * Reload the application with platform-specific cache clearing
-   * - Native apps: Clear caches and reload with cache-busting timestamp
-   * - Web apps: Clear service workers and force reload
+   * Clear caches and reload the web application
    */
   const reloadApp = async () => {
-    const isNative = Capacitor.isNativePlatform();
-    
     try {
-      if (isNative) {
-        // Native mobile: Clear caches and reload
-        console.log('Reloading native app...');
-        
-        // Clear all Cache API caches
-        if ('caches' in window) {
-          const cacheNames = await caches.keys();
-          await Promise.all(
-            cacheNames.map(cacheName => caches.delete(cacheName))
-          );
-          console.log('Cache cleared:', cacheNames.length, 'caches');
-        }
-        
-        // Clear localStorage cache entries while preserving user data
-        const allKeys = Object.keys(localStorage);
-        allKeys.forEach(key => {
-          if (!USER_DATA_KEYS.some(preserve => key.includes(preserve))) {
-            localStorage.removeItem(key);
-          }
-        });
-        
-        // Reload with cache-busting timestamp
-        const timestamp = Date.now();
-        window.location.href = `${window.location.origin}${window.location.pathname}?t=${timestamp}`;
-      } else {
-        // Web: Clear service workers and caches, then reload
-        console.log('Reloading web app...');
-        
-        // Clear all Cache API caches
-        if ('caches' in window) {
-          const cacheNames = await caches.keys();
-          await Promise.all(
-            cacheNames.map(cacheName => caches.delete(cacheName))
-          );
-          console.log('Cache cleared:', cacheNames.length, 'caches');
-        }
-        
-        // Unregister all service workers
-        if ('serviceWorker' in navigator) {
-          const registrations = await navigator.serviceWorker.getRegistrations();
-          await Promise.all(
-            registrations.map(registration => registration.unregister())
-          );
-          console.log('Service workers unregistered:', registrations.length);
-        }
-        
-        // Force reload bypassing cache
-        window.location.reload();
+      // Clear all Cache API caches
+      if ('caches' in window) {
+        const cacheNames = await caches.keys();
+        await Promise.all(
+          cacheNames.map(cacheName => caches.delete(cacheName))
+        );
+        console.log('✓ Cache cleared:', cacheNames.length, 'caches');
       }
+
+      // Unregister all service workers
+      if ('serviceWorker' in navigator) {
+        const registrations = await navigator.serviceWorker.getRegistrations();
+        await Promise.all(
+          registrations.map(registration => registration.unregister())
+        );
+        console.log('✓ Service workers unregistered:', registrations.length);
+      }
+
+      // Force reload bypassing cache
+      window.location.reload();
     } catch (error) {
       console.error('Failed to reload app:', error);
       // Fallback: simple reload
