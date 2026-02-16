@@ -147,9 +147,24 @@ const App: React.FC = () => {
 
   useEffect(() => {
     const storedCode = localStorage.getItem(MICROSOFT_AUTH_CODE_KEY);
+    const timestamp = localStorage.getItem('microsoft_auth_timestamp');
+    
     if (storedCode) {
-      localStorage.removeItem(MICROSOFT_AUTH_CODE_KEY);
-      exchangeAuthCode(storedCode);
+      console.log('🔐 [App] Found stored auth code in localStorage');
+      
+      // Check if code is still valid (within 5 minutes)
+      const isValid = !timestamp || (Date.now() - parseInt(timestamp)) < 5 * 60 * 1000;
+      
+      if (isValid) {
+        console.log('✅ [App] Auth code is valid, exchanging...');
+        localStorage.removeItem(MICROSOFT_AUTH_CODE_KEY);
+        localStorage.removeItem('microsoft_auth_timestamp');
+        exchangeAuthCode(storedCode);
+      } else {
+        console.warn('⚠️ [App] Auth code expired, removing...');
+        localStorage.removeItem(MICROSOFT_AUTH_CODE_KEY);
+        localStorage.removeItem('microsoft_auth_timestamp');
+      }
     }
   }, [exchangeAuthCode]);
 

@@ -47,17 +47,63 @@
       border-radius: 0.5rem;
       margin-top: 1rem;
     }
+    .button {
+      background: white;
+      color: #667eea;
+      border: none;
+      padding: 0.75rem 1.5rem;
+      border-radius: 0.5rem;
+      font-weight: 600;
+      cursor: pointer;
+      margin-top: 1rem;
+      font-size: 0.875rem;
+      transition: all 0.2s;
+    }
+    .button:hover {
+      background: rgba(255, 255, 255, 0.9);
+      transform: scale(1.05);
+    }
+    .button:active {
+      transform: scale(0.95);
+    }
   </style>
 </head>
 <body>
   <div class="container">
-    <div class="spinner"></div>
-    <h1>Authentication Successful</h1>
-    <p>Redirecting back to app...</p>
+    <div id="spinner" class="spinner"></div>
+    <h1 id="title">Authentication Successful</h1>
+    <p id="message">Redirecting back to app...</p>
     <div id="error" class="error" style="display: none;"></div>
+    <button id="closeButton" class="button" style="display: none;" onclick="handleClose()">Close & Return to App</button>
   </div>
 
   <script>
+    // Get base URL for redirect (remove /auth-callback.html)
+    const getAppUrl = () => {
+      const pathParts = window.location.pathname.split('/');
+      pathParts.pop(); // Remove auth-callback.html
+      return window.location.origin + pathParts.join('/') + '/';
+    };
+
+    const handleClose = () => {
+      console.log('🔐 [auth-callback] Manual close triggered');
+      // Try to close window
+      window.close();
+      
+      // If still open after 100ms, redirect to app
+      setTimeout(() => {
+        console.log('🔐 [auth-callback] Window did not close, redirecting...');
+        window.location.href = getAppUrl();
+      }, 100);
+    };
+
+    const redirectToApp = (delay = 2000) => {
+      console.log(`🔐 [auth-callback] Redirecting to app in ${delay}ms`);
+      setTimeout(() => {
+        window.location.href = getAppUrl();
+      }, delay);
+    };
+
     (function() {
       console.log('🔐 [auth-callback] Page loaded');
       
@@ -76,10 +122,14 @@
 
         if (error) {
           console.error('❌ [auth-callback] OAuth error:', error, errorDescription);
+          document.getElementById('spinner').style.display = 'none';
+          document.getElementById('title').textContent = 'Authentication Error';
+          document.getElementById('message').textContent = errorDescription || error;
           document.getElementById('error').style.display = 'block';
-          document.getElementById('error').textContent = `Authentication Error: ${error} - ${errorDescription || 'Unknown error'}`;
+          document.getElementById('error').textContent = `Error: ${error}`;
+          document.getElementById('closeButton').style.display = 'block';
           
-          // Notify opener window about error
+          // Notify opener window about error (if exists)
           if (window.opener) {
             window.opener.postMessage({
               type: 'microsoft_auth_error',
@@ -88,56 +138,70 @@
             }, window.location.origin);
           }
           
-          // Close after 3 seconds
-          setTimeout(() => {
-            window.close();
-          }, 3000);
+          // Auto redirect to app after 3 seconds
+          redirectToApp(3000);
           return;
         }
 
         if (!code) {
           console.error('❌ [auth-callback] No authorization code found in URL');
+          document.getElementById('spinner').style.display = 'none';
+          document.getElementById('title').textContent = 'No Authorization Code';
+          document.getElementById('message').textContent = 'Please try logging in again.';
           document.getElementById('error').style.display = 'block';
-          document.getElementById('error').textContent = 'No authorization code received. Please try again.';
+          document.getElementById('error').textContent = 'No authorization code received.';
+          document.getElementById('closeButton').style.display = 'block';
           
-          // Close after 3 seconds
-          setTimeout(() => {
-            window.close();
-          }, 3000);
+          // Auto redirect to app after 3 seconds
+          redirectToApp(3000);
           return;
         }
 
-        console.log('✅ [auth-callback] Authorization code found, sending to main window');
+        console.log('✅ [auth-callback] Authorization code found');
 
-        // Send code to parent window
-        if (window.opener) {
+        // Method 1: Try postMessage if opener exists
+        if (window.opener && !window.opener.closed) {
           console.log('📤 [auth-callback] Posting message to opener with code');
           window.opener.postMessage({
             type: 'microsoft_auth_success',
             code: code
           }, window.location.origin);
           
-          console.log('✅ [auth-callback] Message sent, closing window in 500ms');
+          console.log('✅ [auth-callback] Message sent, attempting to close window');
           
-          // Close popup after short delay to ensure message is received
+          // Try to close popup
           setTimeout(() => {
-            console.log('🔐 [auth-callback] Closing window');
             window.close();
-          }, 500);
+            
+            // If window didn't close (mobile scenario), redirect
+            setTimeout(() => {
+              console.log('🔐 [auth-callback] Window still open, redirecting to app');
+              window.location.href = getAppUrl();
+            }, 500);
+          }, 300);
         } else {
-          console.error('❌ [auth-callback] No opener window found');
-          document.getElementById('error').style.display = 'block';
-          document.getElementById('error').textContent = 'Could not communicate with main window. Please close this window manually.';
+          // Method 2: Store code in localStorage and redirect (mobile fallback)
+          console.log('📦 [auth-callback] No opener found, using localStorage method');
+          localStorage.setItem('microsoft_auth_code', code);
+          localStorage.setItem('microsoft_auth_timestamp', Date.now().toString());
+          
+          document.getElementById('message').textContent = 'Redirecting to app...';
+          document.getElementById('closeButton').style.display = 'block';
+          
+          // Auto redirect after 1 second
+          redirectToApp(1000);
         }
       } catch (err) {
         console.error('❌ [auth-callback] Unexpected error:', err);
+        document.getElementById('spinner').style.display = 'none';
+        document.getElementById('title').textContent = 'Error Occurred';
+        document.getElementById('message').textContent = err.message;
         document.getElementById('error').style.display = 'block';
         document.getElementById('error').textContent = `Unexpected error: ${err.message}`;
+        document.getElementById('closeButton').style.display = 'block';
         
-        // Close after 3 seconds
-        setTimeout(() => {
-          window.close();
-        }, 3000);
+        // Auto redirect to app after 3 seconds
+        redirectToApp(3000);
       }
     })();
   </script>
