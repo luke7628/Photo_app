@@ -94,25 +94,88 @@ function addUniqueResult(results: BarcodeResult[], next: BarcodeResult) {
  * 辅助函数：从 base64 加载图片
  */
 async function loadImageFromBase64(base64Image: string): Promise<HTMLImageElement> {
-  const img = new Image();
-  img.src = `data:image/jpeg;base64,${base64Image}`;
-  await new Promise((resolve, reject) => {
-    img.onload = resolve;
-    img.onerror = reject;
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    
+    // iOS兼容：设置crossOrigin避免安全策略问题
+    img.crossOrigin = 'anonymous';
+    
+    // 超时机制：5秒后如果还未加载则失败
+    const timeout = setTimeout(() => {
+      reject(new Error('Image load timeout after 5 seconds'));
+    }, 5000);
+    
+    img.onload = () => {
+      clearTimeout(timeout);
+      console.log(`✅ [loadImage] 图像加载成功: ${img.width}x${img.height}, naturalWidth: ${img.naturalWidth}x${img.naturalHeight}`);
+      
+      // 验证图像确实加载了数据
+      if (img.width === 0 || img.height === 0) {
+        reject(new Error(`Image loaded but has zero dimensions: ${img.width}x${img.height}`));
+        return;
+      }
+      
+      resolve(img);
+    };
+    
+    img.onerror = (error) => {
+      clearTimeout(timeout);
+      console.error('❌ [loadImage] 图像加载失败:', error);
+      console.error('❌ [loadImage] img.src长度:', img.src.length);
+      console.error('❌ [loadImage] img.src前100字符:', img.src.substring(0, 100));
+      reject(new Error(`Failed to load image from base64: ${error}`));
+    };
+    
+    // 设置src触发加载（最后设置，确保事件监听器已就位）
+    img.src = `data:image/jpeg;base64,${base64Image}`;
+    console.log(`🔄 [loadImage] 开始加载图像，base64长度: ${base64Image.length}, src长度: ${img.src.length}`);
   });
-  return img;
 }
 
 /**
  * 辅助函数：标准化 base64 字符串
  */
 function normalizeBase64(base64Image: string): string {
-  if (!base64Image) return '';
-  if (base64Image.startsWith('data:')) {
-    const parts = base64Image.split(',');
-    return parts[1] || '';
+  if (!base64Image) {
+    console.warn('⚠️ [normalizeBase64] 输入为空');
+    return '';
   }
-  return base64Image;
+  
+  let base64 = base64Image;
+  
+  // 如果包含data URI前缀，提取纯base64部分
+  if (base64.startsWith('data:')) {
+    const parts = base64.split(',');
+    if (parts.length < 2) {
+      console.error('❌ [normalizeBase64] data URI格式错误:', base64.substring(0, 100));
+      return '';
+    }
+    base64 = parts[1];
+    console.log('📊 [normalizeBase64] 从data URI提取base64，长度:', base64.length);
+  }
+  
+  // 移除所有空白字符（换行、空格、制表符）
+  const originalLength = base64.length;
+  base64 = base64.replace(/\s/g, '');
+  if (base64.length !== originalLength) {
+    console.log(`📊 [normalizeBase64] 清理了空白字符: ${originalLength} → ${base64.length} bytes`);
+  }
+  
+  // 验证base64字符合法性（只包含A-Z, a-z, 0-9, +, /, =）
+  const invalidChars = base64.match(/[^A-Za-z0-9+/=]/g);
+  if (invalidChars) {
+    console.error('❌ [normalizeBase64] 发现无效字符:', invalidChars.slice(0, 10).join(','));
+    // 尝试移除无效字符
+    base64 = base64.replace(/[^A-Za-z0-9+/=]/g, '');
+    console.log('📊 [normalizeBase64] 移除无效字符后长度:', base64.length);
+  }
+  
+  // 验证长度合理性（至少1KB的图像）
+  if (base64.length < 1000) {
+    console.error('❌ [normalizeBase64] base64太短，可能不是有效图像:', base64.length, 'bytes');
+  }
+  
+  return base64;
 }
 
 /**
@@ -463,23 +526,47 @@ async function decodeWithZXing(base64Image: string, preprocessed: boolean = fals
     const canvas = document.createElement('canvas');
     canvas.width = img.width;
     canvas.height = img.height;
-    const ctx = canvas.getContext('2d');
+    const ctx = canvas.getContext('2d', { willReadFrequently: true });
     if (!ctx) {
       console.error('❌ [ZXing] Canvas context获取失败');
       return null;
     }
+    
+    // 清空canvas并绘制图像
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
     ctx.drawImage(img, 0, 0);
     console.log(`🖼️ [ZXing] 已绘制到canvas: ${canvas.width}x${canvas.height}`);
+    
+    // 验证图像数据
+    try {
+      const imageData = ctx.getImageData(0, 0, Math.min(10, canvas.width), Math.min(10, canvas.height));
+      console.log(`✅ [ZXing] ImageData采样成功: ${imageData.data.length} bytes, 前10个像素:`, Array.from(imageData.data.slice(0, 40)));
+      
+      // 检查是否全是透明或全黑
+      const allZero = imageData.data.every(v => v === 0);
+      const allMax = imageData.data.every((v, i) => i % 4 === 3 || v === 255);
+      if (allZero) {
+        console.error('❌ [ZXing] Canvas数据全为0，图像可能未正确绘制');
+      } else if (allMax) {
+        console.warn('⚠️ [ZXing] Canvas数据全为255，图像可能过曝');
+      }
+    } catch (e) {
+      console.error('❌ [ZXing] 无法读取ImageData:', e);
+    }
 
     // 尝试从canvas解码
     let result;
     try {
+      console.log('🔍 [ZXing] 尝试 decodeFromCanvas...');
       result = await reader.decodeFromCanvas(canvas);
+      console.log('✅ [ZXing] decodeFromCanvas成功');
     } catch (canvasError) {
-      console.warn(`⚠️ [ZXing] decodeFromCanvas失败，尝试decodeFromImageElement:`, canvasError);
-      // 备用方案
+      console.warn(`⚠️ [ZXing] decodeFromCanvas失败:`, canvasError);
+      // 备用方案：尝试从VideoFrame或ImageElement
       try {
+        console.log('🔍 [ZXing] 尝试 decodeFromImageElement...');
         result = await reader.decodeFromImageElement(img);
+        console.log('✅ [ZXing] decodeFromImageElement成功');
       } catch (imgError) {
         console.error(`❌ [ZXing] decodeFromImageElement也失败:`, imgError);
         throw canvasError; // 抛出原始错误
