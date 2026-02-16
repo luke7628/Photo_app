@@ -464,12 +464,22 @@ const CameraScreen: React.FC<CameraScreenProps> = ({
             </div>
 
             <button 
-              onClick={() => setFlash(f => f === 'off' ? 'on' : 'off')}
+              onClick={() => setFlash(f => {
+                if (f === 'off') return 'auto';
+                if (f === 'auto') return 'on';
+                return 'off';
+              })}
               style={rotationStyle}
-              className={`size-10 flex items-center justify-center rounded-2xl border transition-all backdrop-blur-xl ${flash === 'on' ? 'bg-primary border-primary text-black shadow-[0_0_15px_rgba(0,122,255,0.4)]' : 'bg-black/40 border-white/10 text-white'}`}
+              className={`size-10 flex items-center justify-center rounded-2xl border transition-all backdrop-blur-xl ${
+                flash === 'on' 
+                  ? 'bg-primary border-primary text-black shadow-[0_0_15px_rgba(0,122,255,0.4)]' 
+                  : flash === 'auto'
+                  ? 'bg-yellow-500 border-yellow-500 text-black shadow-[0_0_15px_rgba(234,179,8,0.4)]'
+                  : 'bg-black/40 border-white/10 text-white'
+              }`}
             >
               <span className="material-symbols-outlined text-lg font-bold">
-                {flash === 'on' ? 'flash_on' : 'flash_off'}
+                {flash === 'on' ? 'flash_on' : flash === 'auto' ? 'flash_auto' : 'flash_off'}
               </span>
             </button>
           </header>
