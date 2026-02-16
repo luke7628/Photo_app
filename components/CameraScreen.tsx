@@ -81,14 +81,29 @@ const CameraScreen: React.FC<CameraScreenProps> = ({
         
         // 尝试多个constraints配置，优先使用后置摄像头
         const constraintsList: MediaStreamConstraints[] = [
-          // 强制后置摄像头，必须满足
+          // 最佳配置：后置摄像头 + 自动对焦 + 优化分辨率
           {
             video: {
-              facingMode: { exact: 'environment' }
-            },
+              facingMode: { exact: 'environment' },
+              width: { ideal: 1920, max: 3840 },
+              height: { ideal: 1080, max: 2160 },
+              focusMode: { ideal: 'continuous' }, // 持续自动对焦
+              exposureMode: { ideal: 'continuous' }, // 自动曝光
+              whiteBalanceMode: { ideal: 'continuous' }, // 自动白平衡
+            } as any,
             audio: false
           },
-          // 后置摄像头，宽松分辨率
+          // 备选1：宽松的后置摄像头 + 基础对焦
+          {
+            video: {
+              facingMode: { ideal: 'environment' },
+              width: { ideal: 1920 },
+              height: { ideal: 1080 },
+              focusMode: { ideal: 'continuous' },
+            } as any,
+            audio: false
+          },
+          // 备选2：后置摄像头，标准分辨率
           {
             video: {
               facingMode: { ideal: 'environment' },
@@ -97,14 +112,14 @@ const CameraScreen: React.FC<CameraScreenProps> = ({
             },
             audio: false
           },
-          // 后置摄像头，不指定分辨率
+          // 备选3：后置摄像头，不指定分辨率
           {
             video: {
               facingMode: { ideal: 'environment' }
             },
             audio: false
           },
-          // 任何摄像头，宽松分辨率
+          // 备选4：任何摄像头，宽松分辨率
           {
             video: {
               width: { ideal: 1280 },

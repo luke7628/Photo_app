@@ -82,6 +82,99 @@ function normalizeBase64(base64Image: string): string {
 }
 
 /**
+ * ROI (Region of Interest) 裁剪：只处理图像中心区域
+ * 移动设备优化：减少处理区域，提升速度和准确度
+ * @param base64Image - Base64 编码的图像
+ * @param centerRatio - 中心区域比例 (0.5 = 50%, 0.7 = 70%)
+ * @returns 裁剪后的 Base64 图像
+ */
+async function cropToROI(base64Image: string, centerRatio: number = 0.7): Promise<string> {
+  if (!base64Image) return base64Image;
+
+  try {
+    const img = await loadImageFromBase64(base64Image);
+    const canvas = document.createElement('canvas');
+
+    // 计算ROI区域
+    const roiWidth = Math.floor(img.width * centerRatio);
+    const roiHeight = Math.floor(img.height * centerRatio);
+    const roiX = Math.floor((img.width - roiWidth) / 2);
+    const roiY = Math.floor((img.height - roiHeight) / 2);
+
+    canvas.width = roiWidth;
+    canvas.height = roiHeight;
+
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return base64Image;
+
+    // 绘制ROI区域到canvas
+    ctx.drawImage(img, roiX, roiY, roiWidth, roiHeight, 0, 0, roiWidth, roiHeight);
+
+    const croppedBase64 = canvas.toDataURL('image/jpeg', 0.95).split(',')[1];
+    console.log(`✂️ [cropToROI] 已裁剪到中心区域: ${roiWidth}x${roiHeight} (${(centerRatio * 100).toFixed(0)}%)`);
+    return croppedBase64;
+  } catch (error) {
+    console.warn('⚠️ [cropToROI] ROI裁剪失败，使用原图:', error);
+    return base64Image;
+  }
+}
+
+/**
+ * 智能分辨率调整：移动设备优化
+ * 自动将超大图像缩小到合适尺寸，提升处理速度
+ * @param base64Image - Base64 编码的图像
+ * @param maxDimension - 最大边长 (默认 1600px)
+ * @returns 调整后的 Base64 图像
+ */
+async function optimizeResolution(base64Image: string, maxDimension: number = 1600): Promise<string> {
+  if (!base64Image) return base64Image;
+
+  try {
+    const img = await loadImageFromBase64(base64Image);
+    
+    // 如果图像已经足够小，不需要调整
+    if (img.width <= maxDimension && img.height <= maxDimension) {
+      return base64Image;
+    }
+
+    const canvas = document.createElement('canvas');
+    let newWidth = img.width;
+    let newHeight = img.height;
+
+    // 按比例缩小
+    if (img.width > img.height) {
+      if (img.width > maxDimension) {
+        newWidth = maxDimension;
+        newHeight = Math.floor((img.height * maxDimension) / img.width);
+      }
+    } else {
+      if (img.height > maxDimension) {
+        newHeight = maxDimension;
+        newWidth = Math.floor((img.width * maxDimension) / img.height);
+      }
+    }
+
+    canvas.width = newWidth;
+    canvas.height = newHeight;
+
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return base64Image;
+
+    // 使用高质量缩放
+    ctx.imageSmoothingEnabled = true;
+    ctx.imageSmoothingQuality = 'high';
+    ctx.drawImage(img, 0, 0, newWidth, newHeight);
+
+    const optimizedBase64 = canvas.toDataURL('image/jpeg', 0.92).split(',')[1];
+    console.log(`📐 [optimizeResolution] 分辨率优化: ${img.width}x${img.height} → ${newWidth}x${newHeight}`);
+    return optimizedBase64;
+  } catch (error) {
+    console.warn('⚠️ [optimizeResolution] 分辨率优化失败，使用原图:', error);
+    return base64Image;
+  }
+}
+
+/**
  * 图像预处理：增强条码识别效果
  * 简化方案：对比度增强 + 亮度调整（避免复杂的锐化操作）
  * @param base64Image - Base64 编码的图像
@@ -361,14 +454,18 @@ export async function readBarcode(base64Image: string): Promise<BarcodeResult[]>
       return results;
     }
 
-    console.log('🔍 [readBarcode] 开始识别（相机拍摄 → 预处理 → 多引擎识别）');
+    console.log('🔍 [readBarcode] 开始识别（移动优化：分辨率调整 → ROI裁剪 → 多引擎识别）');
 
-    // 第一阶段：尝试识别原图
-    console.log('📍 [readBarcode] 第一阶段：识别原始图像');
+    // 预优化阶段：分辨率调整（移动设备优化）
+    console.log('📐 [readBarcode] 预优化：调整分辨率...');
+    let optimizedBase64 = await optimizeResolution(normalizedBase64, 1600);
+
+    // 第一阶段：尝试识别原图（全图）
+    console.log('📍 [readBarcode] 第一阶段：识别原始图像（全图）');
 
     // 1a. 尝试 BarcodeDetector
-    console.log('  ├─ 尝试 BarcodeDetector API...');
-    let detectorResults = await decodeWithBarcodeDetector(normalizedBase64, false);
+    console.log('  ├─ 尝试 BarcodeDetector API (全图)...');
+    let detectorResults = await decodeWithBarcodeDetector(optimizedBase64, false);
     detectorResults.forEach(r => addUniqueResult(results, r));
 
     if (results.length > 0) {
@@ -377,8 +474,8 @@ export async function readBarcode(base64Image: string): Promise<BarcodeResult[]>
     }
 
     // 1b. 尝试 ZXing（更多格式支持）
-    console.log('  ├─ 尝试 ZXing...');
-    let zxingResult = await decodeWithZXing(normalizedBase64, false);
+    console.log('  ├─ 尝试 ZXing (全图)...');
+    let zxingResult = await decodeWithZXing(optimizedBase64, false);
     if (zxingResult) {
       addUniqueResult(results, {
         type: 'barcode',
@@ -389,24 +486,53 @@ export async function readBarcode(base64Image: string): Promise<BarcodeResult[]>
       return results;
     }
 
-    console.log('⏳ [readBarcode] 原图识别失败，尝试预处理...');
+    console.log('⏳ [readBarcode] 全图识别失败，尝试 ROI 裁剪...');
 
-    // 第二阶段：应用预处理并重试
-    console.log('📍 [readBarcode] 第二阶段：预处理并识别');
-    const preprocessedBase64 = await preprocessImageForDetection(normalizedBase64);
+    // 第二阶段：ROI裁剪（中心70%区域）
+    console.log('📍 [readBarcode] 第二阶段：ROI 裁剪（中心区域）');
+    const roiBase64 = await cropToROI(optimizedBase64, 0.7);
 
-    // 2a. 预处理后尝试 BarcodeDetector
-    console.log('  ├─ 尝试预处理图像 + BarcodeDetector API...');
+    // 2a. ROI + BarcodeDetector
+    console.log('  ├─ 尝试 ROI + BarcodeDetector API...');
+    detectorResults = await decodeWithBarcodeDetector(roiBase64, false);
+    detectorResults.forEach(r => addUniqueResult(results, r));
+
+    if (results.length > 0) {
+      console.log('✅ [readBarcode] ROI+BarcodeDetector 成功！');
+      return results;
+    }
+
+    // 2b. ROI + ZXing
+    console.log('  ├─ 尝试 ROI + ZXing...');
+    zxingResult = await decodeWithZXing(roiBase64, false);
+    if (zxingResult) {
+      addUniqueResult(results, {
+        type: 'barcode',
+        value: zxingResult.text,
+        format: zxingResult.format
+      });
+      console.log('✅ [readBarcode] ROI+ZXing 成功！');
+      return results;
+    }
+
+    console.log('⏳ [readBarcode] ROI 识别失败，应用预处理...');
+
+    // 第三阶段：ROI + 预处理
+    console.log('📍 [readBarcode] 第三阶段：ROI + 预处理（对比度/亮度增强）');
+    const preprocessedBase64 = await preprocessImageForDetection(roiBase64);
+
+    // 3a. 预处理后尝试 BarcodeDetector
+    console.log('  ├─ 尝试 ROI+预处理 + BarcodeDetector API...');
     detectorResults = await decodeWithBarcodeDetector(preprocessedBase64, true);
     detectorResults.forEach(r => addUniqueResult(results, r));
 
     if (results.length > 0) {
-      console.log('✅ [readBarcode] 预处理+BarcodeDetector 成功！');
+      console.log('✅ [readBarcode] ROI+预处理+BarcodeDetector 成功！');
       return results;
     }
 
-    // 2b. 预处理后尝试 ZXing
-    console.log('  └─ 尝试预处理图像 + ZXing...');
+    // 3b. 预处理后尝试 ZXing
+    console.log('  └─ 尝试 ROI+预处理 + ZXing...');
     zxingResult = await decodeWithZXing(preprocessedBase64, true);
     if (zxingResult) {
       addUniqueResult(results, {
@@ -414,11 +540,38 @@ export async function readBarcode(base64Image: string): Promise<BarcodeResult[]>
         value: zxingResult.text,
         format: zxingResult.format
       });
-      console.log('✅ [readBarcode] 预处理+ZXing 成功！');
+      console.log('✅ [readBarcode] ROI+预处理+ZXing 成功！');
       return results;
     }
 
-    // 第三阶段：所有方法都失败，分析原因并提供建议
+    // 第四阶段：全图预处理（最后尝试）
+    console.log('📍 [readBarcode] 第四阶段：全图预处理（最后尝试）');
+    const fullPreprocessedBase64 = await preprocessImageForDetection(optimizedBase64);
+
+    // 4a. 全图预处理 + BarcodeDetector
+    console.log('  ├─ 尝试 全图预处理 + BarcodeDetector...');
+    detectorResults = await decodeWithBarcodeDetector(fullPreprocessedBase64, true);
+    detectorResults.forEach(r => addUniqueResult(results, r));
+
+    if (results.length > 0) {
+      console.log('✅ [readBarcode] 全图预处理+BarcodeDetector 成功！');
+      return results;
+    }
+
+    // 4b. 全图预处理 + ZXing
+    console.log('  └─ 尝试 全图预处理 + ZXing...');
+    zxingResult = await decodeWithZXing(fullPreprocessedBase64, true);
+    if (zxingResult) {
+      addUniqueResult(results, {
+        type: 'barcode',
+        value: zxingResult.text,
+        format: zxingResult.format
+      });
+      console.log('✅ [readBarcode] 全图预处理+ZXing 成功！');
+      return results;
+    }
+
+    // 所有阶段都失败，分析原因并提供建议
     console.warn('❌ [readBarcode] 所有识别方法均失败，正在分析原因...');
 
     try {
