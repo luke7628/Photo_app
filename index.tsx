@@ -1,4 +1,8 @@
 
+// Polyfill for buffer (required by Quagga2)
+import { Buffer } from 'buffer';
+window.Buffer = Buffer;
+
 import React from 'react';
 import ReactDOM from 'react-dom/client';
 import './styles/theme.css';
