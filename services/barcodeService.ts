@@ -1079,7 +1079,7 @@ export async function readBarcode(base64Image: string): Promise<BarcodeResult[]>
     }
 
     console.log(`✅ [readBarcode] 第一阶段完成，已找到 ${results.length} 个条码`);
-    （仅在全图失败时执行） ==========
+    // 仅在全图失败时执行
     if (results.length === 0) {
       const scanRegions = [
         { name: '顶部25%', y: 0, h: 0.25 },
@@ -1143,11 +1143,9 @@ export async function readBarcode(base64Image: string): Promise<BarcodeResult[]>
         console.error(`    └─ ❌ ${region.name} 异常:`, e);
       }
     }
-
-      }
     }
 
-    console.log(`✅ [readBarcode] 扫描
+    console.log(`✅ [readBarcode] 扫描完成，共 ${results.length} 个条码`);
     if (results.length > 0) {
       console.log(`🎉 [readBarcode] 识别成功！共找到 ${results.length} 个条码:`);
       results.forEach((r, idx) => {
