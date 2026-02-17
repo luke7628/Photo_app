@@ -156,6 +156,16 @@ const GalleryScreen: React.FC<GalleryScreenProps> = ({
                     </div>
                     <button 
                       onClick={() => {
+                        onManualSync();
+                        setShowUserMenu(false);
+                      }}
+                      className="w-full px-4 py-3 text-left flex items-center gap-2 text-blue-600 hover:bg-blue-50 transition-colors border-b border-gray-50"
+                    >
+                      <span className="material-symbols-outlined text-base">cloud_upload</span>
+                      <span className="text-sm font-medium">Sync Now</span>
+                    </button>
+                    <button 
+                      onClick={() => {
                         onLogout();
                         setShowUserMenu(false);
                       }}

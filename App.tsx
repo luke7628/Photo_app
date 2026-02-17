@@ -139,13 +139,21 @@ const App: React.FC = () => {
           console.log('✅ [exchangeAuthCode] Setting user state:', userInfo);
           setUser(userInfo as any);
           storageService.saveUser(userInfo as any);
-          setSettings(prev => ({ ...prev, cloudProvider: 'onedrive' }));
-          console.log('✅ [exchangeAuthCode] User successfully logged in');
+          // 🎯 自动启用云同步
+          setSettings(prev => {
+            const newSettings = { ...prev, cloudProvider: 'onedrive', autoUpload: true };
+            storageService.saveSettings(newSettings);
+            return newSettings;
+          });
+          displayToast(`✅ 已登陆 ${userInfo.email}，自动同步已启用`);
+          console.log('✅ [exchangeAuthCode] User successfully logged in, auto-upload enabled');
         } else {
           console.warn('⚠️ [exchangeAuthCode] Failed to get user info');
+          displayToast('⚠️ 登陆成功但无法获取用户信息');
         }
       } else {
         console.error('❌ [exchangeAuthCode] Token exchange failed or no access token');
+        displayToast('❌ 登陆失败，请重试');
       }
     } catch (error) {
       console.error('❌ [exchangeAuthCode] Error:', error);
@@ -321,12 +329,14 @@ const App: React.FC = () => {
   useEffect(() => { storageService.saveProjects(projects); }, [projects]);
   useEffect(() => { storageService.saveSettings(settings); }, [settings]);
 
-  // Real Sync Cycle to OneDrive
+  // Real Sync Cycle to OneDrive with improved error handling
   const performSyncCycle = useCallback(async () => {
     // 需要：自动上传开启、用户已登录、有访问令牌
     const hasMicrosoftToken = oneDriveService.accessToken;
     
-    if (!settings.autoUpload || settings.cloudProvider !== 'onedrive' || !user || !hasMicrosoftToken) return;
+    if (!settings.autoUpload || settings.cloudProvider !== 'onedrive' || !user || !hasMicrosoftToken) {
+      return;
+    }
     
     // 查找有未同步照片且当前未同步的打印机
     const targetPrinter = printers.find(p => {
@@ -337,6 +347,7 @@ const App: React.FC = () => {
     if (!targetPrinter) return;
     
     // 在 UI 中标记为正在同步
+    console.log(`📤 [Sync] Starting sync for printer: ${targetPrinter.serialNumber}`);
     setPrinters(prev => prev.map(p => p.id === targetPrinter.id ? { ...p, isSyncing: true } : p));
     if (selectedPrinter?.id === targetPrinter.id) {
       setSelectedPrinter(prev => prev ? { ...prev, isSyncing: true } : null);
@@ -348,32 +359,43 @@ const App: React.FC = () => {
       // ==================== OneDrive 同步流程 ====================
       // 1. 确保根文件夹"Dematic/FieldPhotos"存在
       const drivePath = settings.drivePath || '/Dematic/FieldPhotos/';
+      console.log(`📂 [Sync] Checking root folder: ${drivePath}`);
+      
       let rootFolderId = await oneDriveService.findFolder(drivePath);
       
       if (!rootFolderId) {
+        console.log(`📂 [Sync] Root folder not found, creating...`);
         rootFolderId = await oneDriveService.ensureFolder(drivePath);
       }
       
       if (!rootFolderId) throw new Error("Could not create/find root folder in OneDrive");
+      console.log(`✅ [Sync] Root folder ready: ${rootFolderId}`);
 
       // 2. 确保项目文件夹存在
       const project = projects.find(p => p.id === targetPrinter.projectId);
       const projectName = project ? project.name : 'Unassigned Project';
       const projectPath = `${settings.drivePath}${projectName}`;
+      console.log(`📂 [Sync] Checking project folder: ${projectPath}`);
+      
       let projectFolderId = await oneDriveService.findFolder(projectPath);
       
       if (!projectFolderId) {
+        console.log(`📂 [Sync] Project folder not found, creating...`);
         projectFolderId = await oneDriveService.ensureFolder(projectPath);
       }
       
       if (!projectFolderId) throw new Error("Could not create/find project folder");
+      console.log(`✅ [Sync] Project folder ready: ${projectFolderId}`);
 
       // 3. 如果启用了按序列号分文件夹
       if (settings.useSubfoldersBySN) {
         const snPath = `${projectPath}/${targetPrinter.serialNumber}`;
+        console.log(`📂 [Sync] Checking SN subfolder: ${snPath}`);
+        
         targetFolderId = await oneDriveService.findFolder(snPath);
         
         if (!targetFolderId) {
+          console.log(`📂 [Sync] SN subfolder not found, creating...`);
           targetFolderId = await oneDriveService.ensureFolder(snPath);
         }
       } else {
@@ -381,28 +403,34 @@ const App: React.FC = () => {
       }
 
       if (!targetFolderId) throw new Error("Could not determine target folder");
+      console.log(`✅ [Sync] Target folder ready: ${targetFolderId}`);
 
       // 4. 上传照片
       const photos = targetPrinter.photos || [];
       const updatedPhotos = [...photos];
       let hasChanges = false;
+      let uploadedCount = 0;
 
       for (let i = 0; i < updatedPhotos.length; i++) {
         const photo = updatedPhotos[i];
         if (photo.url && !photo.isSynced) {
           try {
+            console.log(`📸 [Sync] Uploading ${i + 1}/${photos.filter(p => !p.isSynced).length}: ${photo.filename}`);
             await oneDriveService.uploadImage(photo.url, photo.filename, targetFolderId);
             updatedPhotos[i] = { ...photo, isSynced: true };
             hasChanges = true;
-          } catch (uploadError) {
-             console.error(`Failed to upload ${photo.filename}`, uploadError);
-             // 继续上传下一张照片
+            uploadedCount++;
+            console.log(`✅ [Sync] Uploaded: ${photo.filename}`);
+          } catch (uploadError: any) {
+            console.error(`❌ [Sync] Failed to upload ${photo.filename}:`, uploadError?.message || uploadError);
+            // 继续上传下一张照片
           }
         }
       }
 
       // 5. 更新状态
       if (hasChanges) {
+        console.log(`📤 [Sync] Completed: uploaded ${uploadedCount} photos`);
         setPrinters(currentPrinters => {
           return currentPrinters.map(p => {
             if (p.id === targetPrinter.id) {
@@ -421,19 +449,21 @@ const App: React.FC = () => {
             return p;
           });
         });
+        displayToast(`✅ 已同步 ${uploadedCount} 张照片到云空间`);
       } else {
         // No changes but we need to clear the syncing flag
         setPrinters(prev => prev.map(p => p.id === targetPrinter.id ? { ...p, isSyncing: false } : p));
         if (selectedPrinter?.id === targetPrinter.id) setSelectedPrinter(prev => prev ? { ...prev, isSyncing: false } : null);
       }
 
-    } catch (error) {
-      console.error("Sync Cycle Error:", error);
+    } catch (error: any) {
+      console.error("❌ [Sync] Cycle Error:", error?.message || error);
+      displayToast(`❌ 同步失败: ${error?.message || '未知错误'}`);
       // Reset syncing flag on error
       setPrinters(prev => prev.map(p => p.id === targetPrinter.id ? { ...p, isSyncing: false } : p));
       if (selectedPrinter?.id === targetPrinter.id) setSelectedPrinter(prev => prev ? { ...prev, isSyncing: false } : null);
     }
-  }, [settings.autoUpload, user, printers, projects, selectedPrinter, settings.useSubfoldersBySN]);
+  }, [settings.autoUpload, user, printers, projects, selectedPrinter, settings.useSubfoldersBySN, settings.cloudProvider, settings.drivePath]);
 
   useEffect(() => {
     let interval: number;

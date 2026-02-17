@@ -11,7 +11,6 @@
   },
   "dependencies": {
     "@ericblade/quagga2": "^1.12.1",
-    "@zxing/library": "^0.21.3",
     "buffer": "^6.0.3",
     "jsqr": "^1.4.0",
     "react": "^19.2.4",
