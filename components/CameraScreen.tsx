@@ -66,6 +66,7 @@ const CameraScreen: React.FC<CameraScreenProps> = ({
   useEffect(() => {
     let timeoutId: number;
     let cleanupListeners: Array<() => void> = [];
+    let isMounted = true; // Bug Fix: 追踪挂载状态
     
     const startCamera = async () => {
       try {
@@ -267,6 +268,8 @@ const CameraScreen: React.FC<CameraScreenProps> = ({
           message: err.message,
           stack: err.stack
         });
+        // Bug Fix: 确保即使出错也清理之前注册的监听器
+        cleanupListeners.forEach(cleanup => cleanup());
       }
     };
 
@@ -274,6 +277,7 @@ const CameraScreen: React.FC<CameraScreenProps> = ({
 
     // 清理函数
     return () => {
+      isMounted = false; // Bug Fix: 标记组件卸载
       if (timeoutId) clearTimeout(timeoutId);
       cleanupListeners.forEach(cleanup => cleanup());
       if (streamRef.current) {

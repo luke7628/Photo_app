@@ -244,6 +244,11 @@ const App: React.FC = () => {
       return;
     }
     
+    // Bug Fix: 清理旧的监听器防止堆积
+    if ((window as any).__authMessageHandler) {
+      window.removeEventListener('message', (window as any).__authMessageHandler);
+    }
+
     // 监听来自回调页面的消息
     const handleAuthMessage = async (event: MessageEvent) => {
       console.log('📨 [handleAuthMessage] Received message:', event.data);
@@ -260,9 +265,12 @@ const App: React.FC = () => {
 
         if (authWindow) authWindow.close();
         window.removeEventListener('message', handleAuthMessage);
+        delete (window as any).__authMessageHandler;
       }
     };
 
+    // Bug Fix: 存储引用以便后续清理
+    (window as any).__authMessageHandler = handleAuthMessage;
     window.addEventListener('message', handleAuthMessage);
     console.log('📡 [handleLogin] Message listener registered, waiting for callback...');
   }, [exchangeAuthCode]);
@@ -275,6 +283,11 @@ const App: React.FC = () => {
     microsoftAuthService.logout();
     oneDriveService.setToken("");
     setSettings(prev => ({ ...prev, cloudProvider: 'none' }));
+    // Bug Fix: 清理消息监听器防止内存泄漏
+    if ((window as any).__authMessageHandler) {
+      window.removeEventListener('message', (window as any).__authMessageHandler);
+      delete (window as any).__authMessageHandler;
+    }
   }, []);
 
   const updatePrinter = useCallback((printerId: string, updates: Partial<Printer>) => {
@@ -287,9 +300,11 @@ const App: React.FC = () => {
     if (selectedPrinter?.id === printerId) {
       setSelectedPrinter(prev => prev ? { ...prev, ...updates } : null);
     }
-  }, [selectedPrinter]);
+  }, []); // Bug Fix: 移除selectedPrinter依赖，避免不必要的重新创建
 
   useEffect(() => {
+    let mounted = true; // Bug Fix: 追踪组件挂载状态
+    
     const initAppData = async () => {
       const savedProjects = storageService.loadProjects();
       const savedPrinters = await storageService.loadPrinters(); // Async IDB
@@ -298,6 +313,9 @@ const App: React.FC = () => {
       const normalizedSettings = savedSettings?.cloudProvider === 'drive'
         ? { ...savedSettings, cloudProvider: 'onedrive' }
         : savedSettings;
+      
+      // Bug Fix: 检查组件是否仍在挂载
+      if (!mounted) return;
       
       // 合并MOCK数据，确保测试项目存在
       let finalProjects = savedProjects || [];
@@ -320,16 +338,26 @@ const App: React.FC = () => {
       if (finalProjects.length === 0) finalProjects = MOCK_PROJECTS;
       if (finalPrinters.length === 0) finalPrinters = MOCK_PRINTERS;
       
+      // Bug Fix: 再次检查mounted
+      if (!mounted) return;
       setProjects(finalProjects);
       setPrinters(finalPrinters);
       if (savedUser) setUser(savedUser);
       if (normalizedSettings) setSettings(normalizedSettings);
 
-      const timer = setTimeout(() => setCurrentScreen(AppScreen.PROJECT_LIST), 2500);
+      const timer = setTimeout(() => {
+        if (mounted) setCurrentScreen(AppScreen.PROJECT_LIST);
+      }, 2500);
+      
       return () => { clearTimeout(timer); };
     };
 
     initAppData();
+    
+    // Bug Fix: 正确的cleanup函数
+    return () => {
+      mounted = false;
+    };
   }, []);
 
   // Persist Printers to IndexedDB whenever state changes
@@ -345,6 +373,9 @@ const App: React.FC = () => {
 
   // Real Sync Cycle to OneDrive with improved token handling
   const performSyncCycle = useCallback(async () => {
+    // Bug Fix: 添加mounted标志防止组件卸载后调用setState
+    let isMounted = true;
+    
     // 需要：自动上传开启、用户已登录、有访问令牌
     const hasMicrosoftToken = oneDriveService.accessToken;
     
@@ -477,33 +508,39 @@ const App: React.FC = () => {
       // 5. 更新状态
       if (hasChanges) {
         console.log(`📤 [Sync] Completed: uploaded ${uploadedCount} photos`);
-        setPrinters(currentPrinters => {
-          return currentPrinters.map(p => {
-            if (p.id === targetPrinter.id) {
-              const newSyncedCount = updatedPhotos.filter(ph => ph.isSynced).length;
-              const updatedPrinter = {
-                ...p,
-                photos: updatedPhotos,
-                syncedCount: newSyncedCount,
-                isSyncing: false,
-                lastSync: new Date().toISOString()
-              };
-              // 如果当前选中的打印机是被同步的那个，更新它
-              if (selectedPrinter?.id === p.id) setSelectedPrinter(updatedPrinter);
-              return updatedPrinter;
-            }
-            return p;
+        if (isMounted) { // Bug Fix: 检查mounted状态
+          setPrinters(currentPrinters => {
+            return currentPrinters.map(p => {
+              if (p.id === targetPrinter.id) {
+                const newSyncedCount = updatedPhotos.filter(ph => ph.isSynced).length;
+                const updatedPrinter = {
+                  ...p,
+                  photos: updatedPhotos,
+                  syncedCount: newSyncedCount,
+                  isSyncing: false,
+                  lastSync: new Date().toISOString()
+                };
+                // 如果当前选中的打印机是被同步的那个，更新它
+                if (selectedPrinter?.id === p.id) setSelectedPrinter(updatedPrinter);
+                return updatedPrinter;
+              }
+              return p;
+            });
           });
-        });
-        displayToast(`✅ 已同步 ${uploadedCount} 张照片到云空间`);
+          displayToast(`✅ 已同步 ${uploadedCount} 张照片到云空间`);
+        }
       } else {
-        // No changes but we need to clear the syncing flag
-        setPrinters(prev => prev.map(p => p.id === targetPrinter.id ? { ...p, isSyncing: false } : p));
-        if (selectedPrinter?.id === targetPrinter.id) setSelectedPrinter(prev => prev ? { ...prev, isSyncing: false } : null);
+        if (isMounted) { // Bug Fix: 检查mounted状态
+          // No changes but we need to clear the syncing flag
+          setPrinters(prev => prev.map(p => p.id === targetPrinter.id ? { ...p, isSyncing: false } : p));
+          if (selectedPrinter?.id === targetPrinter.id) setSelectedPrinter(prev => prev ? { ...prev, isSyncing: false } : null);
+        }
       }
 
     } catch (error: any) {
       console.error("❌ [Sync] Cycle Error:", error?.message || error);
+      
+      if (!isMounted) return; // Bug Fix: 检查mounted状态
       
       // 如果是登陆过期，提示用户重新登陆
       if (error?.message?.includes('Token') || error?.message?.includes('401')) {
@@ -517,6 +554,9 @@ const App: React.FC = () => {
       setPrinters(prev => prev.map(p => p.id === targetPrinter.id ? { ...p, isSyncing: false } : p));
       if (selectedPrinter?.id === targetPrinter.id) setSelectedPrinter(prev => prev ? { ...prev, isSyncing: false } : null);
     }
+    
+    // Bug Fix: 标记异步操作完成
+    isMounted = false;
   }, [settings.autoUpload, user, printers, projects, selectedPrinter, settings.useSubfoldersBySN, settings.cloudProvider, settings.drivePath, displayToast]);
 
   useEffect(() => {
@@ -533,9 +573,14 @@ const App: React.FC = () => {
 
   const analyzeWithBarcode = async (base64Image: string): Promise<{ serialNumber: string; partNumber: string }> => {
     return new Promise<{ serialNumber: string; partNumber: string }>((resolve, reject) => {
+      let isResolved = false; // Bug Fix: 防止多次调用resolve/reject
+      
       const timeout = setTimeout(() => {
         console.warn('⏱️ [analyzeWithBarcode] Timeout after 30 seconds');
-        reject(new Error('Barcode recognition timeout'));
+        if (!isResolved) {
+          isResolved = true;
+          reject(new Error('Barcode recognition timeout'));
+        }
       }, 30000);
 
       (async () => {
@@ -695,7 +740,10 @@ const App: React.FC = () => {
       
       console.log('📊 [analyzeWithBarcode] 最终返回:', { serialNumber, partNumber });
       clearTimeout(timeout);
-      resolve({ serialNumber, partNumber });
+      if (!isResolved) { // Bug Fix: 确保只resolve一次
+        isResolved = true;
+        resolve({ serialNumber, partNumber });
+      }
         } catch (error) {
           console.error('❌ [analyzeWithBarcode] 条形码识别失败');
           console.error('Error object:', error);
@@ -703,7 +751,10 @@ const App: React.FC = () => {
           console.error('Error stack:', (error as any)?.stack);
           console.error('Error name:', (error as any)?.name);
           clearTimeout(timeout);
-          reject(error);
+          if (!isResolved) { // Bug Fix: 确保只reject一次
+            isResolved = true;
+            reject(error);
+          }
         }
       })();
     });
