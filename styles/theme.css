@@ -91,7 +91,9 @@ html, body, #root {
 
 body {
   font-family: var(--font-family);
-  background-color: transparent;
+  background-color: #f4f6fb;
+  background-image: radial-gradient(1200px 600px at 10% -10%, rgba(122, 162, 255, 0.22), transparent 60%),
+                    radial-gradient(900px 500px at 95% 0%, rgba(90, 200, 250, 0.16), transparent 65%);
   color: var(--color-gray-900);
   line-height: 1.5;
   margin: 0;
@@ -186,11 +188,18 @@ input, textarea {
 
 /* Apple-style transitions */
 @media (prefers-reduced-motion: no-preference) {
-  * {
+  button,
+  a,
+  input,
+  textarea,
+  select,
+  [role="button"] {
     transition: background-color var(--transition-fast), 
                 border-color var(--transition-fast),
                 color var(--transition-fast),
-                opacity var(--transition-fast);
+                opacity var(--transition-fast),
+                transform var(--transition-fast),
+                box-shadow var(--transition-fast);
   }
   
   button:active {
@@ -413,6 +422,90 @@ input, textarea {
 
 .screen-enter {
   animation: fadeIn 300ms ease-out;
+}
+
+.screen-container {
+  position: relative;
+  height: 100%;
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  background: linear-gradient(180deg, #f7f9fd 0%, #f1f4fb 100%);
+}
+
+.screen-header {
+  position: relative;
+  padding-top: calc(env(safe-area-inset-top) + 6px);
+  background: color-mix(in oklab, white 88%, transparent);
+  backdrop-filter: saturate(170%) blur(18px);
+  -webkit-backdrop-filter: saturate(170%) blur(18px);
+  border-bottom: 1px solid rgba(15, 23, 42, 0.08);
+}
+
+.screen-content {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior-y: contain;
+  -webkit-overflow-scrolling: touch;
+  padding-bottom: calc(env(safe-area-inset-bottom) + 110px);
+}
+
+.no-scrollbar::-webkit-scrollbar,
+.custom-scrollbar::-webkit-scrollbar {
+  width: 0;
+  height: 0;
+}
+
+.no-scrollbar,
+.custom-scrollbar {
+  scrollbar-width: none;
+}
+
+.floating-button {
+  position: fixed;
+  right: max(20px, calc(env(safe-area-inset-right) + 12px));
+  bottom: max(24px, calc(env(safe-area-inset-bottom) + 16px));
+}
+
+.floating-button.landscape {
+  bottom: max(16px, calc(env(safe-area-inset-bottom) + 8px));
+}
+
+button,
+input,
+textarea,
+select {
+  touch-action: manipulation;
+}
+
+button:focus-visible,
+input:focus-visible,
+textarea:focus-visible,
+select:focus-visible {
+  outline: 2px solid rgba(0, 122, 255, 0.35);
+  outline-offset: 2px;
+}
+
+.ios-card {
+  border-radius: 20px;
+  border: 1px solid rgba(15, 23, 42, 0.06);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.94), rgba(255, 255, 255, 0.88));
+  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.85) inset, 0 8px 24px rgba(15, 23, 42, 0.08);
+}
+
+.ios-card-pressable {
+  transition: transform 180ms cubic-bezier(0.2, 0.9, 0.2, 1), box-shadow 180ms ease, border-color 180ms ease;
+}
+
+.ios-card-pressable:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 14px 30px rgba(15, 23, 42, 0.11);
+  border-color: rgba(0, 122, 255, 0.3);
+}
+
+.ios-card-pressable:active {
+  transform: translateY(0) scale(0.985);
 }
 
 /* Line clamp utility */

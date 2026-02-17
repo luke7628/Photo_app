@@ -1,5 +1,5 @@
 
-import React, { useState, useMemo, memo, useEffect } from 'react';
+import React, { useState, useMemo, memo, useEffect, useRef } from 'react';
 import { Printer, MicrosoftUser, Project } from '../types';
 import { useDeviceOrientation } from '../src/hooks/useDeviceOrientation';
 import { getRotationOnlyStyle, getResponsiveSize, getResponsiveValue } from '../src/services/styleService';
@@ -40,13 +40,13 @@ const PrinterItem = memo(({
       onClick={() => onSelect(printer)}
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
-      className={`w-full text-left group flex items-center bg-white rounded-2xl border border-gray-200 shadow-sm hover:shadow-lg hover:border-blue-300 active:scale-95 transition-all duration-200 animate-slideUpFast cursor-pointer ${isLandscape ? 'p-2 gap-3' : 'p-3 gap-3.5'}`}
+      className={`w-full text-left group flex items-center ios-card ios-card-pressable rounded-2xl animate-slideUpFast cursor-pointer ${isLandscape ? 'p-2 gap-3' : 'p-3 gap-3.5'}`}
       style={{
         animationDelay: `${index * 30}ms`
       }}
     >
       
-      <div className={`rounded-xl bg-gradient-to-br from-blue-50 to-indigo-50 flex items-center justify-center overflow-hidden shrink-0 border border-gray-200 shadow-sm transition-all duration-200 group-hover:scale-110 group-active:scale-100 ${isHovered ? 'shadow-md' : ''} ${isLandscape ? 'size-10' : 'size-14'}`}>
+      <div className={`rounded-xl bg-gradient-to-br from-blue-50 to-indigo-50 flex items-center justify-center overflow-hidden shrink-0 border border-gray-200 shadow-sm transition-all duration-200 group-hover:scale-105 group-active:scale-100 ${isHovered ? 'shadow-md' : ''} ${isLandscape ? 'size-10' : 'size-14'}`}>
         <img src={printer.imageUrl} className="size-full object-cover" alt={printer.serialNumber} />
       </div>
       <div className="flex-1 min-w-0">
@@ -81,6 +81,7 @@ const GalleryScreen: React.FC<GalleryScreenProps> = ({
   const [searchTerm, setSearchTerm] = useState('');
   const [showUserMenu, setShowUserMenu] = useState(false);
   const [uiRotation, setUiRotation] = useState(0);
+  const userMenuRef = useRef<HTMLDivElement>(null);
 
   // 使用共享 Hook 监听设备方向（消除重复代码）
   const { rotation: uiRotationHook, isLandscape } = useDeviceOrientation();
@@ -89,6 +90,30 @@ const GalleryScreen: React.FC<GalleryScreenProps> = ({
   useEffect(() => {
     setUiRotation(uiRotationHook);
   }, [uiRotationHook]);
+
+  useEffect(() => {
+    const handleOutsideClick = (event: MouseEvent) => {
+      if (!userMenuRef.current) return;
+      if (!userMenuRef.current.contains(event.target as Node)) {
+        setShowUserMenu(false);
+      }
+    };
+
+    const handleEscape = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        setShowUserMenu(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handleOutsideClick);
+    document.addEventListener('keydown', handleEscape);
+
+    return () => {
+      document.removeEventListener('mousedown', handleOutsideClick);
+      document.removeEventListener('keydown', handleEscape);
+    };
+  }, []);
+
   const filteredPrinters = useMemo(() => {
     let result = printers;
     if (searchTerm.trim()) {
@@ -110,7 +135,7 @@ const GalleryScreen: React.FC<GalleryScreenProps> = ({
   return (
     <div className="screen-container transition-all duration-300">
       {/* Header with safe-area top padding */}
-      <header className={`screen-header px-4 bg-white z-30 transition-all flex-shrink-0 ${isLandscape ? 'pb-2' : 'pb-4'}`}>
+      <header className={`screen-header px-4 z-30 transition-all flex-shrink-0 ${isLandscape ? 'pb-2' : 'pb-4'}`}>
         {/* Top row: Back button + Title + User + Settings */}
         <div className={`flex items-center gap-3 transition-all ${isLandscape ? 'mb-2 pt-2' : 'mb-3 pt-4'}`}>
           <button 
@@ -127,11 +152,11 @@ const GalleryScreen: React.FC<GalleryScreenProps> = ({
           
           <div className="flex items-center gap-2.5 flex-shrink-0">
             {user ? (
-              <div className="relative">
+              <div className="relative" ref={userMenuRef}>
                 <button 
                   onClick={() => setShowUserMenu(!showUserMenu)} 
                   style={rotationStyle} 
-                  className={`${isLandscape ? 'size-9' : 'size-11'} rounded-full border-2 border-blue-400 bg-blue-500 flex items-center justify-center text-white font-bold overflow-hidden active:scale-90 transition-all hover:border-blue-500`}
+                  className={`${isLandscape ? 'size-9' : 'size-11'} rounded-full border-2 border-blue-300 bg-gradient-to-b from-blue-500 to-blue-600 flex items-center justify-center text-white font-bold overflow-hidden active:scale-90 transition-all shadow-md hover:shadow-lg hover:border-blue-400`}
                 >
                   {user.photoUrl ? (
                     <img 
@@ -149,7 +174,7 @@ const GalleryScreen: React.FC<GalleryScreenProps> = ({
                   </span>
                 </button>
                 {showUserMenu && (
-                  <div className="absolute top-12 right-0 w-48 bg-white shadow-2xl rounded-xl border border-gray-100 overflow-hidden z-50 animate-in fade-in zoom-in-95 duration-200">
+                  <div className="absolute top-12 right-0 w-52 bg-white/95 backdrop-blur-md shadow-2xl rounded-2xl border border-gray-200 overflow-hidden z-50 animate-in fade-in zoom-in-95 duration-200">
                     <div className="px-4 py-3 border-b border-gray-50">
                       <p className="text-xs font-semibold text-gray-900 truncate">{user.name}</p>
                       <p className="text-xs text-gray-500 truncate mt-0.5">{user.email}</p>
@@ -181,7 +206,7 @@ const GalleryScreen: React.FC<GalleryScreenProps> = ({
               <button 
                 onClick={onLogin} 
                 style={rotationStyle} 
-                className="h-9 px-4 bg-blue-500 text-white rounded-lg flex items-center gap-2 text-xs font-semibold hover:bg-blue-600 transition-colors active:scale-95"
+                className="h-9 px-4 bg-blue-500 text-white rounded-xl flex items-center gap-2 text-xs font-semibold hover:bg-blue-600 transition-colors active:scale-95 shadow-sm"
               >
                 <span className="material-symbols-outlined text-sm">cloud</span>
                 <span>Microsoft</span>
@@ -190,7 +215,7 @@ const GalleryScreen: React.FC<GalleryScreenProps> = ({
             <button 
               onClick={onOpenSettings} 
               style={rotationStyle} 
-              className={`${isLandscape ? 'size-9' : 'size-11'} flex items-center justify-center bg-gray-100 rounded-xl text-gray-700 hover:bg-gray-200 transition-colors`}
+              className={`${isLandscape ? 'size-9' : 'size-11'} flex items-center justify-center bg-white/80 border border-gray-200 rounded-xl text-gray-700 hover:bg-white transition-all shadow-sm`}
             >
               <span className={`material-symbols-outlined ${isLandscape ? 'text-base' : 'text-xl'}`}>settings</span>
             </button>
@@ -207,7 +232,7 @@ const GalleryScreen: React.FC<GalleryScreenProps> = ({
         {/* Search bar (portrait only) */}
         {!isLandscape && (
           <div className="mb-3">
-            <div className="w-full flex items-center rounded-xl bg-gray-100 border border-transparent gap-3 h-11 px-4">
+            <div className="w-full flex items-center rounded-2xl bg-white/85 backdrop-blur-sm border border-gray-200 gap-3 h-11 px-4 shadow-sm">
               <span className="material-symbols-outlined text-gray-400 text-lg">search</span>
               <input
                 type="text"
@@ -219,7 +244,7 @@ const GalleryScreen: React.FC<GalleryScreenProps> = ({
               {searchTerm && (
                 <button
                   onClick={() => setSearchTerm('')}
-                  className="flex-shrink-0 size-5 rounded-full hover:bg-gray-300 flex items-center justify-center transition-colors"
+                  className="flex-shrink-0 size-5 rounded-full hover:bg-gray-200 flex items-center justify-center transition-colors"
                 >
                   <span className="material-symbols-outlined text-xs text-gray-500">close</span>
                 </button>
@@ -231,7 +256,7 @@ const GalleryScreen: React.FC<GalleryScreenProps> = ({
         {/* Search bar (landscape mode) */}
         {isLandscape && (
           <div className="mb-2 flex items-center gap-3">
-            <div className="flex-1 flex items-center rounded-xl bg-gray-100 border border-transparent gap-3 h-9 px-3">
+            <div className="flex-1 flex items-center rounded-xl bg-white/85 backdrop-blur-sm border border-gray-200 gap-3 h-9 px-3 shadow-sm">
               <span className="material-symbols-outlined text-gray-400 text-base">search</span>
               <input
                 type="text"
@@ -243,7 +268,7 @@ const GalleryScreen: React.FC<GalleryScreenProps> = ({
               {searchTerm && (
                 <button
                   onClick={() => setSearchTerm('')}
-                  className="flex-shrink-0 size-4 rounded-full hover:bg-gray-300 flex items-center justify-center transition-colors"
+                  className="flex-shrink-0 size-4 rounded-full hover:bg-gray-200 flex items-center justify-center transition-colors"
                 >
                   <span className="material-symbols-outlined text-[10px] text-gray-500">close</span>
                 </button>
@@ -278,7 +303,7 @@ const GalleryScreen: React.FC<GalleryScreenProps> = ({
         <button 
           onClick={onAdd}
           style={rotationStyle}
-          className={`bg-blue-500 hover:bg-blue-600 text-white rounded-full flex items-center shadow-lg hover:shadow-xl transition-all active:scale-95 ${isLandscape ? 'px-6 py-3 gap-2' : 'px-10 py-5 gap-3'}`}
+          className={`bg-gradient-to-b from-blue-500 to-blue-600 hover:from-blue-500 hover:to-blue-700 text-white rounded-full flex items-center shadow-lg hover:shadow-xl transition-all active:scale-95 ${isLandscape ? 'px-6 py-3 gap-2' : 'px-10 py-5 gap-3'}`}
         >
           <span className={`material-symbols-outlined font-semibold ${isLandscape ? 'text-base' : 'text-2xl'}`}>photo_camera</span>
           <span className={`font-semibold tracking-tight ${isLandscape ? 'text-xs' : 'text-base'}`}>Capture</span>

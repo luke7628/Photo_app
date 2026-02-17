@@ -1,5 +1,5 @@
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { Project, MicrosoftUser, Printer } from '../types';
 import { getProjectThumbnail, getProjectStats } from '../services/projectUtils';
 import { UserAvatar } from './UserAvatar';
@@ -26,6 +26,32 @@ const ProjectListScreen: React.FC<ProjectListScreenProps> = ({
   const [siteName, setSiteName] = useState('');
   const [batch, setBatch] = useState('');
   const [auditorName, setAuditorName] = useState('');
+  const menuContainerRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (!menuContainerRef.current) return;
+      if (!menuContainerRef.current.contains(event.target as Node)) {
+        setActiveMenuId(null);
+      }
+    };
+
+    const handleEscape = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        setActiveMenuId(null);
+        setShowCreateModal(false);
+        setDeleteConfirmId(null);
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    document.addEventListener('keydown', handleEscape);
+
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+      document.removeEventListener('keydown', handleEscape);
+    };
+  }, []);
   
   // 计算项目缩略图和统计信息
   const projectsWithMeta = useMemo(() => {
@@ -39,7 +65,7 @@ const ProjectListScreen: React.FC<ProjectListScreenProps> = ({
   return (
     <div className="screen-container">
       {/* Top Header with safe-area padding */}
-      <header className="screen-header px-2 sm:px-6 bg-white border-b border-gray-200 shrink-0 flex items-center justify-between py-3 sm:py-5">
+      <header className="screen-header px-3 sm:px-6 shrink-0 flex items-center justify-between py-3 sm:py-5">
         <div className="flex items-center gap-2 sm:gap-3 flex-1 min-w-0 pr-2">
           <div className="flex-shrink-0 w-9 h-9 sm:w-12 sm:h-12 flex items-center justify-center rounded-xl sm:rounded-2xl bg-blue-50 border border-blue-100">
             <span className="material-symbols-outlined text-lg sm:text-2xl text-blue-500">folder_open</span>
@@ -53,7 +79,7 @@ const ProjectListScreen: React.FC<ProjectListScreenProps> = ({
           ) : (
             <button 
               onClick={onLogin}
-              className="h-8 sm:h-10 px-1.5 sm:px-3 bg-blue-500 hover:bg-blue-600 text-white rounded-lg flex items-center gap-0.5 sm:gap-1.5 text-[10px] sm:text-xs font-semibold transition-colors active:scale-95 flex-shrink-0"
+              className="h-9 sm:h-10 px-2 sm:px-3 bg-blue-500 hover:bg-blue-600 text-white rounded-xl flex items-center gap-0.5 sm:gap-1.5 text-[10px] sm:text-xs font-semibold transition-colors active:scale-95 flex-shrink-0 shadow-sm"
             >
                <span className="material-symbols-outlined text-sm sm:text-base flex-shrink-0">cloud</span>
                <span className="hidden xs:inline">Microsoft</span>
@@ -61,7 +87,7 @@ const ProjectListScreen: React.FC<ProjectListScreenProps> = ({
           )}
           <button 
             onClick={onOpenSettings}
-            className="w-8 h-8 sm:w-10 sm:h-10 flex items-center justify-center rounded-lg bg-gray-100 hover:bg-gray-200 text-gray-600 transition-colors active:scale-90 flex-shrink-0"
+            className="w-9 h-9 sm:w-10 sm:h-10 flex items-center justify-center rounded-xl bg-white/80 border border-gray-200 hover:bg-white text-gray-700 transition-all active:scale-90 flex-shrink-0 shadow-sm"
             title="Settings"
           >
             <span className="material-symbols-outlined text-lg sm:text-xl">settings</span>
@@ -70,15 +96,13 @@ const ProjectListScreen: React.FC<ProjectListScreenProps> = ({
       </header>
 
       {/* Projects Grid */}
-      <main 
-        className="screen-content px-2 sm:px-6 pt-3 sm:pt-6 custom-scrollbar"
-      >
+      <main className="screen-content px-3 sm:px-6 pt-3 sm:pt-6 custom-scrollbar" ref={menuContainerRef}>
         <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-2 sm:gap-4">
           
           {/* Create New Project Card */}
           <button 
             onClick={() => setShowCreateModal(true)}
-            className="aspect-square flex flex-col items-center justify-center gap-2 sm:gap-3 bg-blue-50 border-2 border-dashed border-blue-300 rounded-lg sm:rounded-xl hover:bg-blue-100 active:scale-95 transition-all group"
+            className="aspect-square flex flex-col items-center justify-center gap-2 sm:gap-3 bg-gradient-to-br from-blue-50 to-indigo-50 border-2 border-dashed border-blue-300 rounded-xl sm:rounded-2xl hover:from-blue-100 hover:to-indigo-100 active:scale-95 transition-all group shadow-sm"
           >
             <span className="material-symbols-outlined text-3xl sm:text-5xl text-blue-400 group-hover:text-blue-500 transition-colors">add</span>
             <span className="text-xs sm:text-base font-bold text-blue-600 text-center px-2 leading-tight">
@@ -91,7 +115,7 @@ const ProjectListScreen: React.FC<ProjectListScreenProps> = ({
             <div key={project.id} className="relative group">
               <button 
                 onClick={() => onSelectProject(project.id)}
-                className="w-full aspect-square bg-white rounded-lg sm:rounded-xl shadow-sm border border-gray-200 hover:shadow-xl hover:border-blue-300 active:scale-95 transition-all duration-200 overflow-hidden flex flex-col text-left group cursor-pointer"
+                className="w-full aspect-square ios-card ios-card-pressable rounded-xl sm:rounded-2xl overflow-hidden flex flex-col text-left group cursor-pointer"
               >
                 {/* Thumbnail area */}
                 <div className="relative flex-1 w-full overflow-hidden">
@@ -112,7 +136,7 @@ const ProjectListScreen: React.FC<ProjectListScreenProps> = ({
                 </div>
                 
                 {/* Info area */}
-                <div className="relative px-2 sm:px-3 py-1.5 sm:py-2.5 bg-white">
+                <div className="relative px-2 sm:px-3 py-1.5 sm:py-2.5 bg-white/95 backdrop-blur-sm">
                   <h3 className="text-[10px] sm:text-sm font-bold text-gray-900 truncate">{project.name}</h3>
                   <div className="flex items-center justify-between mt-0.5 sm:mt-1">
                     <p className="text-[8px] sm:text-xs font-medium text-gray-500">
@@ -134,7 +158,7 @@ const ProjectListScreen: React.FC<ProjectListScreenProps> = ({
                   e.stopPropagation(); 
                   setActiveMenuId(activeMenuId === project.id ? null : project.id); 
                 }}
-                className="absolute top-1 sm:top-2 right-1 sm:right-2 w-6 h-6 sm:w-7 sm:h-7 flex items-center justify-center rounded-lg text-white backdrop-blur-sm transition-colors active:scale-90"
+                className="absolute top-1 sm:top-2 right-1 sm:right-2 w-7 h-7 sm:w-8 sm:h-8 flex items-center justify-center rounded-xl text-white backdrop-blur-md transition-colors active:scale-90"
                 style={{backgroundColor: 'rgba(120, 120, 128, 0.4)'}}
                 title="More options"
               >
@@ -142,7 +166,7 @@ const ProjectListScreen: React.FC<ProjectListScreenProps> = ({
               </button>
 
               {activeMenuId === project.id && (
-                <div className="absolute top-7 sm:top-10 right-0 w-24 sm:w-32 bg-white shadow-lg rounded-lg border border-gray-200 overflow-hidden z-20 animate-fadeIn">
+                <div className="absolute top-8 sm:top-11 right-0 w-28 sm:w-32 bg-white/95 backdrop-blur-md shadow-xl rounded-xl border border-gray-200/90 overflow-hidden z-20 animate-fadeIn">
                   <button 
                     onClick={() => { setDeleteConfirmId(project.id); setActiveMenuId(null); }} 
                     className="w-full px-2 sm:px-3 py-1 sm:py-2 text-[10px] sm:text-xs font-semibold text-red-600 hover:bg-red-50 flex items-center gap-1 sm:gap-2 transition-colors"
@@ -167,8 +191,8 @@ const ProjectListScreen: React.FC<ProjectListScreenProps> = ({
 
       {/* Create Modal */}
       {showCreateModal && (
-        <div className="fixed inset-0 z-[100] bg-black/40 backdrop-blur-sm flex items-start pt-8 p-2 sm:p-4">
-           <div className="w-full max-w-sm bg-white rounded-lg sm:rounded-2xl p-4 sm:p-8 shadow-xl animate-slideUp">
+          <div className="fixed inset-0 z-[100] bg-black/45 backdrop-blur-sm flex items-start pt-8 p-2 sm:p-4">
+            <div className="w-full max-w-sm ios-card rounded-2xl p-4 sm:p-8 shadow-2xl animate-slideUp">
               <h2 className="text-lg sm:text-2xl font-bold text-gray-900 mb-1 sm:mb-2">New Project</h2>
               <p className="text-xs sm:text-sm text-gray-500 mb-3 sm:mb-6">Enter project details</p>
               
@@ -180,7 +204,7 @@ const ProjectListScreen: React.FC<ProjectListScreenProps> = ({
                     value={siteName}
                     onChange={(e) => setSiteName(e.target.value)}
                     placeholder="e.g., Ardc/Modc/"
-                    className="w-full h-10 sm:h-12 px-3 sm:px-4 bg-gray-100 rounded-lg border border-transparent focus:border-blue-500 focus:outline-none text-sm font-medium placeholder-gray-500"
+                    className="w-full h-10 sm:h-12 px-3 sm:px-4 bg-white rounded-xl border border-gray-200 focus:border-blue-400 focus:outline-none text-sm font-medium placeholder-gray-400 shadow-inner"
                     onKeyDown={(e) => {
                       if (e.key === 'Enter') {
                         (document.querySelector('input[placeholder="e.g., 2026P1"]') as HTMLInputElement)?.focus();
@@ -195,7 +219,7 @@ const ProjectListScreen: React.FC<ProjectListScreenProps> = ({
                     value={batch}
                     onChange={(e) => setBatch(e.target.value)}
                     placeholder="e.g., 2026P1"
-                    className="w-full h-10 sm:h-12 px-3 sm:px-4 bg-gray-100 rounded-lg border border-transparent focus:border-blue-500 focus:outline-none text-sm font-medium placeholder-gray-500"
+                    className="w-full h-10 sm:h-12 px-3 sm:px-4 bg-white rounded-xl border border-gray-200 focus:border-blue-400 focus:outline-none text-sm font-medium placeholder-gray-400 shadow-inner"
                     onKeyDown={(e) => {
                       if (e.key === 'Enter') {
                         (document.querySelector('input[placeholder="e.g., John Doe"]') as HTMLInputElement)?.focus();
@@ -210,7 +234,7 @@ const ProjectListScreen: React.FC<ProjectListScreenProps> = ({
                     value={auditorName}
                     onChange={(e) => setAuditorName(e.target.value)}
                     placeholder="e.g., John Doe"
-                    className="w-full h-10 sm:h-12 px-3 sm:px-4 bg-gray-100 rounded-lg border border-transparent focus:border-blue-500 focus:outline-none text-sm font-medium placeholder-gray-500"
+                    className="w-full h-10 sm:h-12 px-3 sm:px-4 bg-white rounded-xl border border-gray-200 focus:border-blue-400 focus:outline-none text-sm font-medium placeholder-gray-400 shadow-inner"
                     onKeyDown={(e) => {
                       if (e.key === 'Enter') {
                         const projectName = `${siteName}_${batch}_${auditorName}`.trim();
@@ -262,8 +286,8 @@ const ProjectListScreen: React.FC<ProjectListScreenProps> = ({
 
       {/* Delete Confirmation Modal */}
       {deleteConfirmId && (
-        <div className="fixed inset-0 z-[100] bg-black/40 backdrop-blur-sm flex items-center justify-center p-2 sm:p-4">
-           <div className="w-full max-w-sm bg-white rounded-lg sm:rounded-2xl p-4 sm:p-8 shadow-xl animate-slideUp">
+          <div className="fixed inset-0 z-[100] bg-black/45 backdrop-blur-sm flex items-center justify-center p-2 sm:p-4">
+            <div className="w-full max-w-sm ios-card rounded-2xl p-4 sm:p-8 shadow-2xl animate-slideUp">
               <div className="flex items-center gap-2 sm:gap-3 mb-3 sm:mb-4">
                 <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-full bg-red-100 flex items-center justify-center flex-shrink-0">
                   <span className="material-symbols-outlined text-red-600 text-base sm:text-lg">warning</span>
