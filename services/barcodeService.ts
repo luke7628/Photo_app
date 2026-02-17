@@ -331,6 +331,43 @@ async function optimizeResolution(base64Image: string, maxDimension: number = 16
 }
 
 /**
+ * 放大较小图像，确保条码条纹有足够像素
+ * 仅当图像较小才放大，避免不必要的质量损失
+ */
+async function upscaleIfNeeded(base64Image: string, minDimension: number = 1400): Promise<string> {
+  if (!base64Image) return base64Image;
+
+  try {
+    const img = await loadImageFromBase64(base64Image);
+    const maxSide = Math.max(img.width, img.height);
+    if (maxSide >= minDimension) {
+      return base64Image;
+    }
+
+    const scale = minDimension / maxSide;
+    const newWidth = Math.round(img.width * scale);
+    const newHeight = Math.round(img.height * scale);
+
+    const canvas = document.createElement('canvas');
+    canvas.width = newWidth;
+    canvas.height = newHeight;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return base64Image;
+
+    ctx.imageSmoothingEnabled = true;
+    ctx.imageSmoothingQuality = 'high';
+    ctx.drawImage(img, 0, 0, newWidth, newHeight);
+
+    const upscaledBase64 = canvas.toDataURL('image/jpeg', 0.92).split(',')[1];
+    console.log(`📐 [upscaleIfNeeded] 放大: ${img.width}x${img.height} → ${newWidth}x${newHeight}`);
+    return upscaledBase64;
+  } catch (error) {
+    console.warn('⚠️ [upscaleIfNeeded] 放大失败，使用原图:', error);
+    return base64Image;
+  }
+}
+
+/**
  * 高级图像预处理管道 - 多阶段优化
  * 
  * 处理流程：
@@ -681,7 +718,11 @@ function estimateSharpness(imageData: ImageData): number {
  * - 工业条码识别率高（Code128, Code39等）
  * - 内置图像预处理和旋转检测
  */
-async function decodeWithQuagga(base64Image: string, preprocessed: boolean = false): Promise<{ text: string; format?: string } | null> {
+async function decodeWithQuagga(
+  base64Image: string,
+  preprocessed: boolean = false,
+  options: { halfSample?: boolean } = {}
+): Promise<{ text: string; format?: string } | null> {
   if (!base64Image) return null;
 
   try {
@@ -698,6 +739,7 @@ async function decodeWithQuagga(base64Image: string, preprocessed: boolean = fal
       }, timeoutDuration);
 
       try {
+        const halfSample = options.halfSample ?? true;
         Quagga.decodeSingle({
           src: img.src,
           numOfWorkers: 0,
@@ -709,7 +751,7 @@ async function decodeWithQuagga(base64Image: string, preprocessed: boolean = fal
             }
           },
           locator: {
-            halfSample: true
+            halfSample
           },
           decoder: {
             readers: [
@@ -731,7 +773,7 @@ async function decodeWithQuagga(base64Image: string, preprocessed: boolean = fal
             console.log(`✅ Quagga ${preprocessed ? '(preprocessed)' : '(raw)'} 识别成功: ${text.substring(0, 50)} (${format})`);
             resolve({ text, format });
           } else {
-            console.log(`ℹ️ [Quagga] ${preprocessed ? '(预处理)' : '(原图)'} 未找到条码`);
+            console.log(`ℹ️ [Quagga] ${preprocessed ? '(预处理)' : '(原图)'} 未找到条码 (halfSample=${halfSample})`);
             resolve(null);
           }
         });
@@ -902,48 +944,83 @@ export async function readBarcode(base64Image: string): Promise<BarcodeResult[]>
       return results;
     }
 
-    console.log('🔍 [readBarcode] 基础识别流程：Quagga → ZXing');
-    
-    // 优化分辨率：全图2400px
-    const optimizedBase64 = await optimizeResolution(normalizedBase64, 2400);
-    console.log(`📐 [readBarcode] 图像优化完成`);
+    console.log('🔍 [readBarcode] 1D识别流程：原图 → 优化图');
 
-    // 1. Quagga 快速扫描
-    console.log('  ├─ 🐲 Quagga...');
-    try {
-      const quaggaResult = await decodeWithQuagga(optimizedBase64, false);
-      if (quaggaResult) {
-        addUniqueResult(results, {
-          type: 'barcode',
-          value: quaggaResult.text,
-          format: quaggaResult.format,
-          region: 'full',
-          regionIndex: 0
-        });
-        console.log(`  │  └─ ✅ 识别成功: ${quaggaResult.text.substring(0, 40)}`);
-        return results;
+    const tryAddResult = (text: string, format?: string) => {
+      addUniqueResult(results, {
+        type: 'barcode',
+        value: text,
+        format,
+        region: 'full',
+        regionIndex: 0
+      });
+    };
+
+    const tryDecode = async (label: string, base64: string) => {
+      console.log(`  ├─ 🐲 Quagga ${label} (halfSample=true)...`);
+      const quaggaFast = await decodeWithQuagga(base64, false, { halfSample: true });
+      if (quaggaFast) {
+        tryAddResult(quaggaFast.text, quaggaFast.format);
+        console.log(`  │  └─ ✅ 识别成功: ${quaggaFast.text.substring(0, 40)}`);
+        return true;
       }
+
+      console.log(`  ├─ 🐲 Quagga ${label} (halfSample=false)...`);
+      const quaggaFull = await decodeWithQuagga(base64, false, { halfSample: false });
+      if (quaggaFull) {
+        tryAddResult(quaggaFull.text, quaggaFull.format);
+        console.log(`  │  └─ ✅ 识别成功: ${quaggaFull.text.substring(0, 40)}`);
+        return true;
+      }
+
+      console.log(`  └─ ZXing ${label}...`);
+      const zxingResult = await decodeWithZXing(base64, false);
+      if (zxingResult) {
+        tryAddResult(zxingResult.text, zxingResult.format);
+        console.log(`     └─ ✅ 识别成功: ${zxingResult.text.substring(0, 40)}`);
+        return true;
+      }
+
+      return false;
+    };
+
+    // 1) 原图优先（避免压缩损失）
+    try {
+      const rawOk = await tryDecode('(原图)', normalizedBase64);
+      if (rawOk) return results;
     } catch (e) {
-      console.error('  │  └─ ❌ 异常:', e);
+      console.error('  │  └─ ❌ 原图异常:', e);
     }
 
-    // 2. ZXing 备用
-    console.log('  └─ ZXing...');
+    // 2) 优化图作为兜底
     try {
-      const zxingResult = await decodeWithZXing(optimizedBase64, false);
-      if (zxingResult) {
-        addUniqueResult(results, {
-          type: 'barcode',
-          value: zxingResult.text,
-          format: zxingResult.format,
-          region: 'full',
-          regionIndex: 0
-        });
-        console.log(`     └─ ✅ 识别成功: ${zxingResult.text.substring(0, 40)}`);
-        return results;
-      }
+      const optimizedBase64 = await optimizeResolution(normalizedBase64, 2400);
+      console.log(`📐 [readBarcode] 图像优化完成`);
+      const optimizedOk = await tryDecode('(优化图)', optimizedBase64);
+      if (optimizedOk) return results;
     } catch (e) {
-      console.error('     └─ ❌ 异常:', e);
+      console.error('  │  └─ ❌ 优化图异常:', e);
+    }
+
+    // 3) 多区域扫描（针对标签位置不固定）
+    const scanRegions = [
+      { name: 'top-band', x: 0, y: 0.08, w: 1, h: 0.26 },
+      { name: 'mid-band', x: 0, y: 0.34, w: 1, h: 0.30 },
+      { name: 'bottom-band', x: 0, y: 0.62, w: 1, h: 0.30 },
+      { name: 'left-half', x: 0, y: 0.18, w: 0.55, h: 0.64 },
+      { name: 'right-half', x: 0.45, y: 0.18, w: 0.55, h: 0.64 }
+    ];
+
+    for (let i = 0; i < scanRegions.length; i++) {
+      const region = scanRegions[i];
+      try {
+        const cropped = await cropToRegion(normalizedBase64, region.x, region.y, region.w, region.h);
+        const boosted = await upscaleIfNeeded(cropped, 1400);
+        const regionOk = await tryDecode(`(区域:${region.name})`, boosted);
+        if (regionOk) return results;
+      } catch (e) {
+        console.error(`  │  └─ ❌ 区域${region.name}异常:`, e);
+      }
     }
 
     console.warn('❌ [readBarcode] 无法识别条码');
