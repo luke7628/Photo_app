@@ -3,6 +3,7 @@ import React, { useRef, useState, useEffect, useCallback, useMemo } from 'react'
 import { PHOTO_LABELS } from '../types';
 import { useDeviceOrientation } from '../src/hooks/useDeviceOrientation';
 import { getRotationStyle } from '../src/services/styleService';
+import { useEdgeSwipeBack } from '../src/hooks/useEdgeSwipeBack';
 
 interface CameraScreenProps {
   sessionIndex: number;
@@ -31,6 +32,7 @@ const CameraScreen: React.FC<CameraScreenProps> = ({
   const [cameraError, setCameraError] = useState<string | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const [retryCount, setRetryCount] = useState(0);
+  const edgeBackGesture = useEdgeSwipeBack({ onBack: onClose, enabled: true });
 
   // 使用共享 Hook 监听设备方向（消除重复代码）
   const { rotation: uiRotationHook } = useDeviceOrientation();
@@ -370,8 +372,9 @@ const CameraScreen: React.FC<CameraScreenProps> = ({
   );
 
   return (
-    <div className="screen-container dark fixed inset-0 z-50 touch-none">
+    <div className="screen-container dark fixed inset-0 z-50 touch-none" {...edgeBackGesture.bind} style={edgeBackGesture.style}>
       <div className="relative flex-1 bg-black overflow-hidden flex items-center justify-center">
+        <div className="absolute left-0 top-0 bottom-0 w-6 z-30 pointer-events-none bg-gradient-to-r from-white/10 to-transparent"></div>
         {/* 摄像头错误提示 */}
         {cameraError && (
           <div className="absolute inset-0 z-40 flex items-center justify-center bg-black/85 backdrop-blur-md">

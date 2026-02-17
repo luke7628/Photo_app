@@ -30,6 +30,8 @@ const ImagePreviewScreen: React.FC<ImagePreviewScreenProps> = ({
   const lastDistRef = useRef<number | null>(null);
   const touchStartRef = useRef<{ x: number, y: number, time: number } | null>(null);
   const isDraggingRef = useRef(false);
+  const edgeSwipeRef = useRef({ active: false, startX: 0, startY: 0, startTime: 0 });
+  const [edgeOffsetX, setEdgeOffsetX] = useState(0);
   
   const fileInputRef = useRef<HTMLInputElement>(null);
   const imageRef = useRef<HTMLImageElement>(null);
@@ -76,6 +78,16 @@ const ImagePreviewScreen: React.FC<ImagePreviewScreenProps> = ({
   const onTouchStart = (e: React.TouchEvent) => {
     const touch = e.touches[0];
     const displayRect = getImageDisplayRect();
+
+    if (!isCropping && scale === 1 && e.touches.length === 1 && touch.clientX <= 28) {
+      edgeSwipeRef.current = {
+        active: true,
+        startX: touch.clientX,
+        startY: touch.clientY,
+        startTime: Date.now(),
+      };
+      return;
+    }
     
     if (isCropping && displayRect) {
       const touchX = ((touch.clientX - displayRect.left) / displayRect.w) * 100;
@@ -113,6 +125,23 @@ const ImagePreviewScreen: React.FC<ImagePreviewScreenProps> = ({
   const onTouchMove = (e: React.TouchEvent) => {
     const touch = e.touches[0];
     const displayRect = getImageDisplayRect();
+
+    if (edgeSwipeRef.current.active && e.touches.length === 1) {
+      const deltaX = touch.clientX - edgeSwipeRef.current.startX;
+      const deltaY = Math.abs(touch.clientY - edgeSwipeRef.current.startY);
+
+      if (deltaY > 42 && deltaY > Math.abs(deltaX)) {
+        edgeSwipeRef.current.active = false;
+        setEdgeOffsetX(0);
+        return;
+      }
+
+      if (deltaX > 0) {
+        setEdgeOffsetX(Math.min(180, deltaX));
+        e.preventDefault();
+      }
+      return;
+    }
 
     if (isCropping && activeHandle && displayRect) {
       const touchX = ((touch.clientX - displayRect.left) / displayRect.w) * 100;
@@ -167,6 +196,19 @@ const ImagePreviewScreen: React.FC<ImagePreviewScreenProps> = ({
   };
 
   const onTouchEnd = (e: React.TouchEvent) => {
+    if (edgeSwipeRef.current.active) {
+      const elapsed = Math.max(16, Date.now() - edgeSwipeRef.current.startTime);
+      const velocity = edgeOffsetX / elapsed;
+
+      if (edgeOffsetX > 90 || velocity > 0.6) {
+        onBack();
+      }
+
+      edgeSwipeRef.current.active = false;
+      setEdgeOffsetX(0);
+      return;
+    }
+
     setActiveHandle(null);
     if (e.touches.length === 0 && touchStartRef.current && lastTouchRef.current) {
       const deltaX = lastTouchRef.current.x - touchStartRef.current.x;
@@ -213,7 +255,12 @@ const ImagePreviewScreen: React.FC<ImagePreviewScreenProps> = ({
 
   return (
     <div className="screen-container dark absolute inset-0 z-[100] touch-none"
-      onTouchStart={onTouchStart} onTouchMove={onTouchMove} onTouchEnd={onTouchEnd}>
+      onTouchStart={onTouchStart} onTouchMove={onTouchMove} onTouchEnd={onTouchEnd}
+      style={{
+        transform: `translateX(${edgeOffsetX}px) scale(${1 - Math.min(edgeOffsetX / 3500, 0.015)})`,
+        transition: edgeSwipeRef.current.active ? 'none' : 'transform 280ms cubic-bezier(0.2, 0.9, 0.2, 1)',
+      }}>
+      <div className="absolute left-0 top-0 bottom-0 w-6 z-30 pointer-events-none bg-gradient-to-r from-white/10 to-transparent"></div>
       <input type="file" ref={fileInputRef} className="hidden" accept="image/*" onChange={(e) => {
         const file = e.target.files?.[0];
         if (file) {
