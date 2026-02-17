@@ -910,8 +910,9 @@ export async function readBarcode(base64Image: string): Promise<BarcodeResult[]>
     console.log(`🔧 [readBarcode] 库: Quagga ✅ + ZXing ✅ + 超视界引擎 ✅`);
     console.log(`⏱️ [readBarcode] 超时策略: Quagga原图5s/预处理3s, 多区域扫描2个关键区域 + 高级倾斜修正`);
 
-    // ========== 前置阶段：超视界高级识别引擎 ==========
-    // 这个高级引擎会自动处理倾斜、多角度、质量增强等
+    // ========== 前置阶段：超视界高级识别引擎 (临时禁用) ==========
+    // 高级引擎有兼容性问题，先用基础流程
+    /*
     console.log('📍 [readBarcode] 前置阶段：启动超视界高级识别引擎');
     try {
       // 构建解码函数列表
@@ -956,6 +957,7 @@ export async function readBarcode(base64Image: string): Promise<BarcodeResult[]>
       console.warn('⚠️ [readBarcode] 超视界引擎异常:', error);
       console.log('  → 切换到标准流程');
     }
+    */
 
     // ========== 第一阶段：全图快速扫描 ==========
     console.log('📍 [readBarcode] 第一阶段：全图快速扫描（Quagga优先）');
