@@ -40,6 +40,8 @@ const ImagePreviewScreen: React.FC<ImagePreviewScreenProps> = ({
   const [pageOffsetX, setPageOffsetX] = useState(0);
   const [isPageAnimating, setIsPageAnimating] = useState(false);
   const [isTransformAnimating, setIsTransformAnimating] = useState(false);
+  const [dismissOffsetY, setDismissOffsetY] = useState(0);
+  const [isDismissAnimating, setIsDismissAnimating] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
 
   const gestureIntentRef = useRef<GestureIntent>('none');
@@ -52,6 +54,7 @@ const ImagePreviewScreen: React.FC<ImagePreviewScreenProps> = ({
   const imageRef = useRef<HTMLImageElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const settleTimerRef = useRef<number | null>(null);
+  const dismissTimerRef = useRef<number | null>(null);
 
   const currentPhoto: PhotoSetItem = photos[currentIndex] || { url: '', label: 'Unknown', filename: '', isSynced: false };
 
@@ -59,7 +62,9 @@ const ImagePreviewScreen: React.FC<ImagePreviewScreenProps> = ({
     setScale(1);
     setPosition({ x: 0, y: 0 });
     setPageOffsetX(0);
+    setDismissOffsetY(0);
     setIsPageAnimating(false);
+    setIsDismissAnimating(false);
     setIsTransformAnimating(false);
   }, []);
 
@@ -70,9 +75,29 @@ const ImagePreviewScreen: React.FC<ImagePreviewScreenProps> = ({
     }
   }, []);
 
+  const clearDismissTimer = useCallback(() => {
+    if (dismissTimerRef.current) {
+      window.clearTimeout(dismissTimerRef.current);
+      dismissTimerRef.current = null;
+    }
+  }, []);
+
+  const animateDismissReset = useCallback(() => {
+    clearDismissTimer();
+    setIsDismissAnimating(true);
+    setDismissOffsetY(0);
+    dismissTimerRef.current = window.setTimeout(() => {
+      setIsDismissAnimating(false);
+      dismissTimerRef.current = null;
+    }, 280);
+  }, [clearDismissTimer]);
+
   useEffect(() => {
-    return () => clearSettleTimer();
-  }, [clearSettleTimer]);
+    return () => {
+      clearSettleTimer();
+      clearDismissTimer();
+    };
+  }, [clearDismissTimer, clearSettleTimer]);
 
   useEffect(() => {
     resetViewTransform();
@@ -133,6 +158,15 @@ const ImagePreviewScreen: React.FC<ImagePreviewScreenProps> = ({
     if (value < min) return min + (value - min) * 0.28;
     if (value > max) return max + (value - max) * 0.28;
     return value;
+  };
+
+  const applyPageElastic = (deltaX: number, overPull: boolean) => {
+    if (!overPull) {
+      return deltaX * 0.96;
+    }
+    const abs = Math.abs(deltaX);
+    const elastic = 120 * (1 - Math.exp(-abs / 140));
+    return Math.sign(deltaX) * elastic;
   };
 
   const settleTransform = useCallback(
@@ -231,7 +265,9 @@ const ImagePreviewScreen: React.FC<ImagePreviewScreenProps> = ({
   const onTouchStart = (event: React.TouchEvent) => {
     if (isProcessing) return;
     clearSettleTimer();
+    clearDismissTimer();
     setIsTransformAnimating(false);
+    setIsDismissAnimating(false);
 
     const touch = event.touches[0];
     const displayRect = getImageDisplayRect();
@@ -378,8 +414,22 @@ const ImagePreviewScreen: React.FC<ImagePreviewScreenProps> = ({
       const atFirst = currentIndex === 0;
       const atLast = currentIndex === photos.length - 1;
       const overPull = (atFirst && deltaX > 0) || (atLast && deltaX < 0);
-      const damping = overPull ? 0.35 : 1;
-      setPageOffsetX(deltaX * damping);
+      setPageOffsetX(applyPageElastic(deltaX, overPull));
+      setDismissOffsetY(0);
+      lastTouchRef.current = { x: touch.clientX, y: touch.clientY };
+      event.preventDefault();
+      return;
+    }
+
+    if (
+      gestureIntentRef.current === 'page' &&
+      axisLockRef.current === 'vertical' &&
+      !isCropping &&
+      scale <= 1.02
+    ) {
+      const downPull = Math.max(0, deltaY);
+      const elasticY = downPull <= 140 ? downPull * 0.72 : 100 + (downPull - 140) * 0.32;
+      setDismissOffsetY(elasticY);
       lastTouchRef.current = { x: touch.clientX, y: touch.clientY };
       event.preventDefault();
       return;
@@ -404,16 +454,30 @@ const ImagePreviewScreen: React.FC<ImagePreviewScreenProps> = ({
   const onTouchEnd = () => {
     if (gestureIntentRef.current === 'page' && touchStartRef.current && lastTouchRef.current) {
       const deltaX = lastTouchRef.current.x - touchStartRef.current.x;
+      const deltaY = lastTouchRef.current.y - touchStartRef.current.y;
       const elapsed = Date.now() - touchStartRef.current.time;
       const velocity = Math.abs(deltaX) / Math.max(elapsed, 1);
+      const velocityY = Math.max(0, deltaY) / Math.max(elapsed, 1);
       const shouldChange = axisLockRef.current !== 'vertical' && (Math.abs(deltaX) > 60 || velocity > 0.55) && elapsed < 520;
 
-      setIsPageAnimating(true);
-      if (shouldChange) {
-        if (deltaX > 0) handlePrev();
-        else handleNext();
+      if (axisLockRef.current === 'vertical' && deltaY > 0 && scale <= 1.02 && !isCropping) {
+        const shouldDismiss = dismissOffsetY > 110 || velocityY > 0.75;
+        if (shouldDismiss) {
+          onBack();
+          return;
+        } else {
+          animateDismissReset();
+        }
+        setPageOffsetX(0);
+      } else {
+        setIsPageAnimating(true);
+        if (shouldChange) {
+          if (deltaX > 0) handlePrev();
+          else handleNext();
+        }
+        setPageOffsetX(0);
+        setDismissOffsetY(0);
       }
-      setPageOffsetX(0);
     }
 
     if (gestureIntentRef.current === 'pan' || gestureIntentRef.current === 'pinch') {
@@ -460,10 +524,10 @@ const ImagePreviewScreen: React.FC<ImagePreviewScreenProps> = ({
         </button>
 
         <div className="flex flex-col items-center gap-0.5">
-          <p className="text-white text-[10px] font-black uppercase tracking-[0.2em] opacity-70">
+          <p className="text-white text-xs font-black uppercase tracking-[0.2em] opacity-80">
             {isCropping ? 'Crop Mode' : `${currentIndex + 1} / ${photos.length}`}
           </p>
-          <h2 className="text-white text-sm font-black tracking-tight uppercase drop-shadow-lg">{currentPhoto.label}</h2>
+          <h2 className="text-white text-base font-black tracking-tight uppercase drop-shadow-lg">{currentPhoto.label}</h2>
         </div>
 
         <button
@@ -489,7 +553,7 @@ const ImagePreviewScreen: React.FC<ImagePreviewScreenProps> = ({
               <div
                 className="absolute inset-0 flex items-center justify-center pointer-events-none"
                 style={{
-                  transform: `translateX(calc(-100% + ${pageOffsetX}px))`,
+                  transform: `translate3d(calc(-100% + ${pageOffsetX}px), ${dismissOffsetY}px, 0)`,
                   opacity: clamp(0.2 + Math.min(Math.abs(pageOffsetX) / 220, 0.65), 0.2, 0.85),
                   transition: isPageAnimating ? 'transform 260ms cubic-bezier(0.2, 0.9, 0.2, 1), opacity 220ms ease' : undefined,
                 }}
@@ -508,7 +572,7 @@ const ImagePreviewScreen: React.FC<ImagePreviewScreenProps> = ({
               <div
                 className="absolute inset-0 flex items-center justify-center pointer-events-none"
                 style={{
-                  transform: `translateX(calc(100% + ${pageOffsetX}px))`,
+                  transform: `translate3d(calc(100% + ${pageOffsetX}px), ${dismissOffsetY}px, 0)`,
                   opacity: clamp(0.2 + Math.min(Math.abs(pageOffsetX) / 220, 0.65), 0.2, 0.85),
                   transition: isPageAnimating ? 'transform 260ms cubic-bezier(0.2, 0.9, 0.2, 1), opacity 220ms ease' : undefined,
                 }}
@@ -528,12 +592,15 @@ const ImagePreviewScreen: React.FC<ImagePreviewScreenProps> = ({
         <div
           className="relative w-full h-full flex items-center justify-center"
           style={{
-            transform: `translate(${position.x + pageOffsetX}px, ${position.y}px) scale(${scale})`,
+            transform: `translate3d(${position.x + pageOffsetX}px, ${position.y + dismissOffsetY}px, 0) scale(${scale})`,
             transition: isPageAnimating
               ? 'transform 260ms cubic-bezier(0.2, 0.9, 0.2, 1)'
+              : isDismissAnimating
+                ? 'transform 280ms cubic-bezier(0.2, 0.9, 0.2, 1)'
               : isTransformAnimating
                 ? 'transform 280ms cubic-bezier(0.2, 0.9, 0.2, 1)'
                 : undefined,
+            willChange: 'transform',
           }}
         >
           <img
@@ -585,14 +652,23 @@ const ImagePreviewScreen: React.FC<ImagePreviewScreenProps> = ({
 
       <footer className="pad-bottom-safe absolute bottom-0 inset-x-0 pt-8 px-6 bg-gradient-to-t from-black/95 via-black/60 to-transparent z-20 backdrop-blur-sm transition-all duration-300">
         {!isCropping && (
-          <div className="flex justify-center mb-3">
-            <div className="flex items-center gap-2 px-3 py-1.5 bg-black/45 backdrop-blur-md rounded-full border border-white/10">
-              {photos.map((_, idx) => (
+          <div className="mb-3 -mx-1 px-1 overflow-x-auto">
+            <div className="flex items-center gap-2 w-max min-w-full justify-center">
+              {photos.map((photo, idx) => (
                 <button
                   key={idx}
                   onClick={() => setCurrentIndex(idx)}
-                  className={`transition-all duration-300 ${idx === currentIndex ? 'bg-white w-2.5 h-2 rounded-full' : 'bg-white/40 hover:bg-white/60 w-2 h-2 rounded-full'}`}
-                />
+                  className={`relative shrink-0 w-14 h-14 rounded-xl overflow-hidden border transition-all duration-200 ${idx === currentIndex ? 'border-white/95 ring-2 ring-white/40 scale-105' : 'border-white/25 opacity-80 hover:opacity-100'}`}
+                  aria-label={`Go to photo ${idx + 1}`}
+                >
+                  <img
+                    src={photo.url}
+                    alt={photo.label}
+                    className="w-full h-full object-cover"
+                    draggable={false}
+                  />
+                  <div className={`absolute inset-0 ${idx === currentIndex ? 'bg-transparent' : 'bg-black/25'}`}></div>
+                </button>
               ))}
             </div>
           </div>
@@ -607,9 +683,15 @@ const ImagePreviewScreen: React.FC<ImagePreviewScreenProps> = ({
                 Cancel
               </button>
               <button
+                onClick={() => setCropBox({ x: 0, y: 0, w: 100, h: 100 })}
+                className="flex-1 h-12 bg-white/10 hover:bg-white/20 backdrop-blur-lg border border-white/20 text-white rounded-2xl font-black text-xs uppercase tracking-widest active:scale-95 transition-all duration-200 shadow-lg"
+              >
+                Reset
+              </button>
+              <button
                 onClick={performCrop}
                 disabled={isProcessing}
-                className="flex-[2] h-12 bg-blue-500 hover:bg-blue-600 active:bg-blue-700 text-white rounded-2xl flex items-center justify-center gap-2 font-black text-xs uppercase tracking-widest shadow-lg shadow-blue-500/30 active:scale-95 transition-all duration-200 disabled:opacity-50"
+                className="flex-[1.4] h-12 bg-blue-500 hover:bg-blue-600 active:bg-blue-700 text-white rounded-2xl flex items-center justify-center gap-2 font-black text-xs uppercase tracking-widest shadow-lg shadow-blue-500/30 active:scale-95 transition-all duration-200 disabled:opacity-50"
               >
                 Apply Crop <span className="material-symbols-outlined font-black">check_circle</span>
               </button>
@@ -624,6 +706,7 @@ const ImagePreviewScreen: React.FC<ImagePreviewScreenProps> = ({
               </button>
               <button
                 onClick={() => {
+                  resetViewTransform();
                   setCropBox({ x: 0, y: 0, w: 100, h: 100 });
                   setIsCropping(true);
                 }}
