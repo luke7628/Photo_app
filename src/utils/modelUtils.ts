@@ -73,11 +73,18 @@ export function isValidPartNumber(partNumber?: string): boolean {
 /**
  * 验证打印机数据完整性
  * 
+ * 所需字段：
+ * - serialNumber 必填（序列号）
+ * - partNumber 可选（部件号）
+ * - model 自动推断
+ * 
  * @param data 打印机数据对象
- * @returns 数据是否完整有效
+ * @returns 数据是否有效（至少需要序列号）
  * 
  * @example
+ * isPrinterDataValid({ serialNumber: 'SN123', model: 'ZT411' }) // true (partNumber 可选)
  * isPrinterDataValid({ serialNumber: 'SN123', partNumber: 'PN123', model: 'ZT411' }) // true
+ * isPrinterDataValid({}) // false
  */
 export interface PrinterData {
   serialNumber?: string;
@@ -87,5 +94,6 @@ export interface PrinterData {
 
 export function isPrinterDataValid(data?: PrinterData): boolean {
   if (!data) return false;
-  return isValidSerialNumber(data.serialNumber) && isValidPartNumber(data.partNumber);
+  // 只要序列号有效即可，partNumber 可选
+  return isValidSerialNumber(data.serialNumber);
 }

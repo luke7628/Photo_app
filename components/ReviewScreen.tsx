@@ -75,12 +75,10 @@ const ReviewScreen: React.FC<ReviewScreenProps> = ({ imageUrl, data, isAnalyzing
       setModalError(true);
       return;
     }
-    if (!editPartNumber || !editPartNumber.trim()) {
-      setModalError(true);
-      return;
-    }
-    const normalizedPart = editPartNumber.toUpperCase();
-    onUpdateData({ serialNumber: editSerial.toUpperCase(), model: inferModelFromPartNumber(normalizedPart), partNumber: normalizedPart });
+    // partNumber is now optional - user can leave it empty
+    const normalizedPart = editPartNumber.trim().toUpperCase();
+    const model = normalizedPart ? inferModelFromPartNumber(normalizedPart) : 'ZT411'; // default to ZT411 if no part number
+    onUpdateData({ serialNumber: editSerial.toUpperCase(), model, partNumber: normalizedPart || '' });
     setShowEditModal(false);
   };
 
@@ -405,7 +403,7 @@ const ReviewScreen: React.FC<ReviewScreenProps> = ({ imageUrl, data, isAnalyzing
                 </div>
                 
                 <div>
-                  <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest block mb-2">Part Number</label>
+                  <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest block mb-2">Part Number <span className="text-gray-300">(optional)</span></label>
                   <input 
                     value={editPartNumber}
                     onChange={(e) => {
@@ -413,11 +411,7 @@ const ReviewScreen: React.FC<ReviewScreenProps> = ({ imageUrl, data, isAnalyzing
                       setModalError(false);
                     }}
                     placeholder="e.g. ZT41142-T010000Z"
-                    className={`w-full h-12 px-4 bg-gray-100 rounded-lg border-2 text-base font-black uppercase tracking-widest placeholder:text-gray-400 focus:outline-none transition-all ${
-                      modalError && editSerial && editSerial.trim() && (!editPartNumber || !editPartNumber.trim())
-                        ? 'border-red-400 bg-red-50 text-red-500 animate-pulse'
-                        : 'border-transparent focus:border-primary/50 text-gray-800'
-                    }`}
+                    className="w-full h-12 px-4 bg-gray-100 rounded-lg border-2 border-transparent text-base font-black uppercase tracking-widest placeholder:text-gray-400 focus:outline-none focus:border-primary/50 text-gray-800 transition-all"
                   />
                 </div>
               </div>
@@ -425,12 +419,6 @@ const ReviewScreen: React.FC<ReviewScreenProps> = ({ imageUrl, data, isAnalyzing
               {modalError && (!editSerial || !editSerial.trim()) && (
                 <div className="mb-3 px-3 py-2 bg-red-50 border border-red-200 rounded-lg">
                   <p className="text-xs font-bold text-red-600 text-center">Please enter Serial Number</p>
-                </div>
-              )}
-              
-              {modalError && editSerial && editSerial.trim() && (!editPartNumber || !editPartNumber.trim()) && (
-                <div className="mb-3 px-3 py-2 bg-red-50 border border-red-200 rounded-lg">
-                  <p className="text-xs font-bold text-red-600 text-center">Please enter Part Number</p>
                 </div>
               )}
 
