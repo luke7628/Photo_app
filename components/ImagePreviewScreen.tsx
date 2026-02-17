@@ -458,7 +458,12 @@ const ImagePreviewScreen: React.FC<ImagePreviewScreenProps> = ({
       const elapsed = Date.now() - touchStartRef.current.time;
       const velocity = Math.abs(deltaX) / Math.max(elapsed, 1);
       const velocityY = Math.max(0, deltaY) / Math.max(elapsed, 1);
-      const shouldChange = axisLockRef.current !== 'vertical' && (Math.abs(deltaX) > 60 || velocity > 0.55) && elapsed < 520;
+      const containerWidth = containerRef.current?.clientWidth || 1;
+      const normalizedTravel = Math.abs(pageOffsetX) / containerWidth;
+      const shouldChangeByDistance = normalizedTravel >= 0.5;
+      const shouldChangeByFlick = Math.abs(deltaX) > 44 && velocity > 0.35;
+      const shouldChange =
+        axisLockRef.current !== 'vertical' && (shouldChangeByDistance || shouldChangeByFlick);
 
       if (axisLockRef.current === 'vertical' && deltaY > 0 && scale <= 1.02 && !isCropping) {
         const shouldDismiss = dismissOffsetY > 110 || velocityY > 0.75;
@@ -652,7 +657,10 @@ const ImagePreviewScreen: React.FC<ImagePreviewScreenProps> = ({
 
       <footer className="pad-bottom-safe absolute bottom-0 inset-x-0 pt-8 px-6 bg-gradient-to-t from-black/95 via-black/60 to-transparent z-20 backdrop-blur-sm transition-all duration-300">
         {!isCropping && (
-          <div className="mb-3 -mx-1 px-1 overflow-x-auto">
+          <div
+            className="mb-3 -mx-1 px-1 overflow-x-auto overflow-y-hidden overscroll-x-contain overscroll-y-none touch-pan-x"
+            style={{ touchAction: 'pan-x' }}
+          >
             <div className="flex items-center gap-2 w-max min-w-full justify-center">
               {photos.map((photo, idx) => (
                 <button
