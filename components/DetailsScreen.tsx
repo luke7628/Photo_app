@@ -1,7 +1,6 @@
 
 import React, { useState } from 'react';
 import { Printer, PHOTO_LABELS, PhotoSetItem, MicrosoftUser, ViewMode } from '../types';
-import { UserAvatar } from './UserAvatar';
 import { useSwipeToDismiss } from '../src/hooks/useSwipeToDismiss';
 
 interface DetailsScreenProps {
@@ -16,8 +15,8 @@ interface DetailsScreenProps {
   onUpdatePrinter?: (printerId: string, updates: Partial<Printer>) => void; // 更新printer信息
   isSyncing?: boolean;
   user: MicrosoftUser | null;
-  onLogin: () => void;
-  onLogout: () => void;
+  pendingSyncCount: number;
+  onOpenSettings: () => void;
 }
 
 const SyncIndicator: React.FC<{ isSynced?: boolean, size?: 'sm' | 'md' }> = ({ isSynced, size = 'sm' }) => (
@@ -44,8 +43,8 @@ const DetailsScreen: React.FC<DetailsScreenProps> = ({
   onUpdatePrinter,
   isSyncing,
   user,
-  onLogin,
-  onLogout
+  pendingSyncCount,
+  onOpenSettings
 }) => {
   const [showEditModal, setShowEditModal] = useState(false);
   const [editSerial, setEditSerial] = useState('');
@@ -230,29 +229,35 @@ const DetailsScreen: React.FC<DetailsScreenProps> = ({
           </div>
 
           <div className="flex items-center gap-1.5">
-            {user ? (
-              <>
-                <UserAvatar user={user} onLogout={onLogout} variant="desktop" />
-                <button 
-                  onClick={onManualSync}
-                  className={`ios-pressable size-10 flex items-center justify-center rounded-xl transition-all border border-gray-200 shadow-sm ${isSyncing ? 'text-primary bg-white ios-live' : 'bg-white/80 text-gray-400 hover:text-sage hover:bg-white'}`}
-                >
-                  <span className={`material-symbols-outlined text-[20px] ${isSyncing ? 'animate-[spin_3s_linear_infinite]' : ''}`}>
-                    sync
-                  </span>
-                </button>
-              </>
-            ) : (
+            {user && (
               <button 
-                onClick={onLogin}
-                className="ios-pressable h-8 sm:h-10 px-1.5 sm:px-3 bg-blue-500 hover:bg-blue-600 text-white rounded-xl flex items-center gap-0.5 sm:gap-1.5 text-[10px] sm:text-xs font-semibold transition-colors active:scale-95 flex-shrink-0 shadow-sm"
+                onClick={onManualSync}
+                className={`ios-pressable size-10 flex items-center justify-center rounded-xl transition-all border border-gray-200 shadow-sm ${isSyncing ? 'text-primary bg-white ios-live' : 'bg-white/80 text-gray-400 hover:text-sage hover:bg-white'}`}
+                title="Sync now"
               >
-                <span className="material-symbols-outlined text-sm sm:text-base flex-shrink-0">cloud</span>
-                <span className="hidden xs:inline">Microsoft</span>
+                <span className={`material-symbols-outlined text-[20px] ${isSyncing ? 'animate-[spin_3s_linear_infinite]' : ''}`}>
+                  sync
+                </span>
               </button>
             )}
+            <button
+              onClick={onOpenSettings}
+              className="ios-pressable size-10 flex items-center justify-center rounded-xl bg-white/80 border border-gray-200 text-gray-700 hover:bg-white transition-all shadow-sm"
+              title="Settings"
+            >
+              <span className="material-symbols-outlined text-[20px]">settings</span>
+            </button>
           </div>
         </div>
+
+        {!user && (
+          <div className="mb-2 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2.5">
+            <p className="text-[11px] font-semibold text-amber-800">
+              Offline editing is available. Sign in from Settings before final sync.
+              {pendingSyncCount > 0 ? ` ${pendingSyncCount} photos pending.` : ''}
+            </p>
+          </div>
+        )}
 
         {/* Prominent Info Card */}
         <div className="ios-card rounded-2xl p-3 relative bg-gradient-to-br from-blue-50 to-indigo-50">

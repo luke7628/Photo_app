@@ -1,14 +1,13 @@
 
-import React, { useState, useMemo, memo, useEffect, useRef } from 'react';
+import React, { useState, useMemo, memo, useEffect } from 'react';
 import { Printer, MicrosoftUser, Project } from '../types';
 import { useDeviceOrientation } from '../src/hooks/useDeviceOrientation';
 import { getRotationOnlyStyle, getResponsiveSize, getResponsiveValue } from '../src/services/styleService';
 
 interface GalleryScreenProps {
   user: MicrosoftUser | null;
+  pendingSyncCount: number;
   activeProject?: Project;
-  onLogin: () => void;
-  onLogout: () => void;
   printers: Printer[];
   onSearch: () => void;
   onAdd: () => void;
@@ -76,12 +75,10 @@ const PrinterItem = memo(({
 });
 
 const GalleryScreen: React.FC<GalleryScreenProps> = ({ 
-  user, activeProject, onLogin, onLogout, printers, onSearch, onAdd, onSelectPrinter, onPreviewImage, onOpenSettings, onManualSync, onBackToProjects
+  user, pendingSyncCount, activeProject, printers, onSearch, onAdd, onSelectPrinter, onPreviewImage, onOpenSettings, onManualSync, onBackToProjects
 }) => {
   const [searchTerm, setSearchTerm] = useState('');
-  const [showUserMenu, setShowUserMenu] = useState(false);
   const [uiRotation, setUiRotation] = useState(0);
-  const userMenuRef = useRef<HTMLDivElement>(null);
 
   // 使用共享 Hook 监听设备方向（消除重复代码）
   const { rotation: uiRotationHook, isLandscape } = useDeviceOrientation();
@@ -90,29 +87,6 @@ const GalleryScreen: React.FC<GalleryScreenProps> = ({
   useEffect(() => {
     setUiRotation(uiRotationHook);
   }, [uiRotationHook]);
-
-  useEffect(() => {
-    const handleOutsideClick = (event: MouseEvent) => {
-      if (!userMenuRef.current) return;
-      if (!userMenuRef.current.contains(event.target as Node)) {
-        setShowUserMenu(false);
-      }
-    };
-
-    const handleEscape = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') {
-        setShowUserMenu(false);
-      }
-    };
-
-    document.addEventListener('mousedown', handleOutsideClick);
-    document.addEventListener('keydown', handleEscape);
-
-    return () => {
-      document.removeEventListener('mousedown', handleOutsideClick);
-      document.removeEventListener('keydown', handleEscape);
-    };
-  }, []);
 
   const filteredPrinters = useMemo(() => {
     let result = printers;
@@ -151,65 +125,14 @@ const GalleryScreen: React.FC<GalleryScreenProps> = ({
           </h1>
           
           <div className="flex items-center gap-2.5 flex-shrink-0">
-            {user ? (
-              <div className="relative" ref={userMenuRef}>
-                <button 
-                  onClick={() => setShowUserMenu(!showUserMenu)} 
-                  style={rotationStyle} 
-                  className={`ios-pressable ${isLandscape ? 'size-9' : 'size-11'} rounded-full border-2 border-blue-300 bg-gradient-to-b from-blue-500 to-blue-600 flex items-center justify-center text-white font-bold overflow-hidden active:scale-90 transition-all shadow-md hover:shadow-lg hover:border-blue-400`}
-                >
-                  {user.photoUrl ? (
-                    <img 
-                      src={user.photoUrl} 
-                      className="size-full rounded-full object-cover" 
-                      alt={user.name}
-                      onError={(e) => {
-                        // Hide broken image, show initials instead
-                        e.currentTarget.style.display = 'none';
-                      }}
-                    />
-                  ) : null}
-                  <span className={`${user.photoUrl ? 'absolute inset-0 flex items-center justify-center' : ''} text-sm`}>
-                    {user.name.charAt(0).toUpperCase()}
-                  </span>
-                </button>
-                {showUserMenu && (
-                  <div className="absolute top-12 right-0 w-52 bg-white/95 backdrop-blur-md shadow-2xl rounded-2xl border border-gray-200 overflow-hidden z-50 ios-modal-sheet">
-                    <div className="px-4 py-3 border-b border-gray-50">
-                      <p className="text-xs font-semibold text-gray-900 truncate">{user.name}</p>
-                      <p className="text-xs text-gray-500 truncate mt-0.5">{user.email}</p>
-                    </div>
-                    <button 
-                      onClick={() => {
-                        onManualSync();
-                        setShowUserMenu(false);
-                      }}
-                      className="w-full px-4 py-3 text-left flex items-center gap-2 text-blue-600 hover:bg-blue-50 transition-colors border-b border-gray-50"
-                    >
-                      <span className="material-symbols-outlined text-base">cloud_upload</span>
-                      <span className="text-sm font-medium">Sync Now</span>
-                    </button>
-                    <button 
-                      onClick={() => {
-                        onLogout();
-                        setShowUserMenu(false);
-                      }}
-                      className="w-full px-4 py-3 text-left flex items-center gap-2 text-red-600 hover:bg-red-50 transition-colors"
-                    >
-                      <span className="material-symbols-outlined text-base">logout</span>
-                      <span className="text-sm font-medium">Sign Out</span>
-                    </button>
-                  </div>
-                )}
-              </div>
-            ) : (
-              <button 
-                onClick={onLogin} 
-                style={rotationStyle} 
-                className="ios-pressable h-9 px-4 bg-blue-500 text-white rounded-xl flex items-center gap-2 text-xs font-semibold hover:bg-blue-600 transition-colors active:scale-95 shadow-sm"
+            {user && (
+              <button
+                onClick={onManualSync}
+                style={rotationStyle}
+                className={`ios-pressable ${isLandscape ? 'size-9' : 'size-11'} flex items-center justify-center rounded-xl border border-emerald-200 bg-emerald-50 text-emerald-700 transition-all shadow-sm`}
+                title="Sync now"
               >
-                <span className="material-symbols-outlined text-sm">cloud</span>
-                <span>Microsoft</span>
+                <span className="material-symbols-outlined text-[18px]">cloud_sync</span>
               </button>
             )}
             <button 
@@ -274,6 +197,15 @@ const GalleryScreen: React.FC<GalleryScreenProps> = ({
                 </button>
               )}
             </div>
+          </div>
+        )}
+
+        {!user && (
+          <div className="mb-2 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2.5">
+            <p className="text-[11px] font-semibold text-amber-800">
+              Offline capture is enabled. Sign in from Settings before final sync.
+              {pendingSyncCount > 0 ? ` ${pendingSyncCount} photos pending.` : ''}
+            </p>
           </div>
         )}
 

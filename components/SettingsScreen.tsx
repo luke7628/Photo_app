@@ -7,10 +7,13 @@ interface SettingsScreenProps {
   onUpdate: (settings: UserPreferences) => void;
   activeProject?: Project;
   user: MicrosoftUser | null;
+  pendingSyncCount: number;
+  onLogin: () => void;
+  onLogout: () => void;
   onBack: () => void;
 }
 
-const SettingsScreen: React.FC<SettingsScreenProps> = ({ settings, onUpdate, activeProject, user, onBack }) => {
+const SettingsScreen: React.FC<SettingsScreenProps> = ({ settings, onUpdate, activeProject, user, pendingSyncCount, onLogin, onLogout, onBack }) => {
   const [isReloading, setIsReloading] = useState(false);
   const [reloadProgress, setReloadProgress] = useState(0);
   const [showRebootOverlay, setShowRebootOverlay] = useState(false);
@@ -167,6 +170,53 @@ const SettingsScreen: React.FC<SettingsScreenProps> = ({ settings, onUpdate, act
       <main 
         className="screen-content px-4 sm:px-6 py-4 sm:py-6 no-scrollbar space-y-4 sm:space-y-6"
       >
+        <section>
+          <h2 className="text-xs sm:text-sm font-bold text-gray-600 mb-3 flex items-center gap-2 px-1">
+            <span className="material-symbols-outlined text-base text-gray-400">person</span>
+            Account & Sync
+          </h2>
+          <div className="ios-card rounded-2xl p-4 sm:p-5 space-y-4">
+            <div className="flex items-start justify-between gap-4">
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-semibold text-gray-900">
+                  {user ? 'Signed in to Microsoft' : 'Not signed in'}
+                </p>
+                <p className="text-xs text-gray-500 mt-0.5 break-all">
+                  {user ? user.email : 'Capture and edit works offline. Sign in before final sync.'}
+                </p>
+              </div>
+              {user ? (
+                <button
+                  onClick={onLogout}
+                  className="ios-pressable px-3 py-2 rounded-lg text-xs font-bold text-red-600 bg-red-50 hover:bg-red-100 transition-colors"
+                >
+                  Sign Out
+                </button>
+              ) : (
+                <button
+                  onClick={onLogin}
+                  className="ios-pressable px-3 py-2 rounded-lg text-xs font-bold text-white bg-blue-500 hover:bg-blue-600 transition-colors"
+                >
+                  Sign In
+                </button>
+              )}
+            </div>
+
+            <div className={`rounded-xl px-3 py-2.5 border ${pendingSyncCount > 0 ? 'bg-amber-50 border-amber-200' : 'bg-green-50 border-green-200'}`}>
+              <p className={`text-xs font-semibold ${pendingSyncCount > 0 ? 'text-amber-700' : 'text-green-700'}`}>
+                {pendingSyncCount > 0
+                  ? `${pendingSyncCount} photos pending sync`
+                  : 'All photos are synced'}
+              </p>
+              {!user && pendingSyncCount > 0 && (
+                <p className="text-[11px] text-amber-700/90 mt-1">
+                  Offline work is saved locally. Sign in to push pending photos to OneDrive.
+                </p>
+              )}
+            </div>
+          </div>
+        </section>
+
         {/* Camera Section */}
         <section>
           <h2 className="text-xs sm:text-sm font-bold text-gray-600 mb-3 flex items-center gap-2 px-1">

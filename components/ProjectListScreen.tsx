@@ -2,7 +2,6 @@
 import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { Project, MicrosoftUser, Printer } from '../types';
 import { getProjectThumbnail, getProjectStats } from '../services/projectUtils';
-import { UserAvatar } from './UserAvatar';
 import { useSwipeToDismiss } from '../src/hooks/useSwipeToDismiss';
 
 interface ProjectListScreenProps {
@@ -14,12 +13,11 @@ interface ProjectListScreenProps {
   onDeleteProject: (id: string) => void;
   onOpenSettings: () => void;
   user: MicrosoftUser | null;
-  onLogin: () => void;
-  onLogout: () => void;
+  pendingSyncCount: number;
 }
 
 const ProjectListScreen: React.FC<ProjectListScreenProps> = ({ 
-  projects, printers, onSelectProject, onCreateProject, onRenameProject, onDeleteProject, onOpenSettings, user, onLogin, onLogout
+  projects, printers, onSelectProject, onCreateProject, onRenameProject, onDeleteProject, onOpenSettings, user, pendingSyncCount
 }) => {
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [activeMenuId, setActiveMenuId] = useState<string | null>(null);
@@ -77,17 +75,11 @@ const ProjectListScreen: React.FC<ProjectListScreenProps> = ({
         </div>
 
         <div className="flex items-center gap-0.5 sm:gap-3 flex-shrink-0 relative">
-          {user ? (
-            <UserAvatar user={user} onLogout={onLogout} variant="desktop" />
-          ) : (
-            <button 
-              onClick={onLogin}
-              className="ios-pressable h-9 sm:h-10 px-2 sm:px-3 bg-blue-500 hover:bg-blue-600 text-white rounded-xl flex items-center gap-0.5 sm:gap-1.5 text-[10px] sm:text-xs font-semibold transition-colors active:scale-95 flex-shrink-0 shadow-sm"
-            >
-               <span className="material-symbols-outlined text-sm sm:text-base flex-shrink-0">cloud</span>
-               <span className="hidden xs:inline">Microsoft</span>
-            </button>
-          )}
+          <div className={`px-2.5 h-9 sm:h-10 rounded-xl border flex items-center gap-1.5 text-[10px] sm:text-xs font-semibold ${user ? 'bg-emerald-50 border-emerald-200 text-emerald-700' : 'bg-amber-50 border-amber-200 text-amber-700'}`}>
+            <span className="material-symbols-outlined text-sm">cloud_sync</span>
+            <span>{user ? 'Signed In' : 'Offline'}</span>
+            {pendingSyncCount > 0 && <span className="font-black">· {pendingSyncCount}</span>}
+          </div>
           <button 
             onClick={onOpenSettings}
             className="ios-pressable w-9 h-9 sm:w-10 sm:h-10 flex items-center justify-center rounded-xl bg-white/80 border border-gray-200 hover:bg-white text-gray-700 transition-all active:scale-90 flex-shrink-0 shadow-sm"
