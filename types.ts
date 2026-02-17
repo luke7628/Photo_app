@@ -6,6 +6,7 @@ export interface PhotoSetItem {
   isSynced?: boolean;
   driveFileId?: string; // 云盘文件ID，用于扩展
   localPath?: string; // 本地路径，用于扩展
+  rotation?: number; // 拍摄时的设备旋转角度 (0, 90, -90, 180)
 }
 
 export interface UserPreferences {

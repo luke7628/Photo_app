@@ -1,8 +1,9 @@
 import { BrowserMultiFormatReader, BarcodeFormat, DecodeHintType } from '@zxing/library';
 import Quagga from '@ericblade/quagga2';
+import { AdvancedBarcodeEngine } from './advancedBarcodeService';
 
 /**
- * 混合库条码识别服务 - 专业级离线高效方案
+ * 混合库条码识别服务 - 专业级离线高效方案 + 超视界引擎
  * 
  * 识别策略（三层次、专业级优化）：
  * 
@@ -689,11 +690,12 @@ async function decodeWithQuagga(base64Image: string, preprocessed: boolean = fal
     console.log(`🔍 [Quagga] 开始解码 ${preprocessed ? '(预处理)' : '(原图)'}...`);
 
     return new Promise((resolve) => {
-      // 添加超时保护
+      // 添加超时保护：原图5秒，预处理3秒
+      const timeoutDuration = preprocessed ? 3000 : 5000;
       const timeout = setTimeout(() => {
-        console.warn(`⏱️ [Quagga] 解码超时（${preprocessed ? '预处理' : '原图'}）`);
+        console.warn(`⏱️ [Quagga] 解码超时（${preprocessed ? '预处理' : '原图'}，${timeoutDuration}ms）`);
         resolve(null);
-      }, 2000);
+      }, timeoutDuration);
 
       try {
         Quagga.decodeSingle({
@@ -937,7 +939,7 @@ export async function readBarcode(base64Image: string): Promise<BarcodeResult[]>
       return results;
     }
 
-    console.log('🔍 [readBarcode] 混合库策略开始（Quagga优先 + ZXing备用 + 高级预处理）');
+    console.log('🔍 [readBarcode] 混合库策略开始（Quagga优先 + ZXing备用 + 高级预处理 + 超视界引擎）');
     console.log(`📊 [readBarcode] 原始图像大小: ${normalizedBase64.length} bytes`);
     
     // 智能压缩：全图2400px，区域3000px
@@ -945,7 +947,55 @@ export async function readBarcode(base64Image: string): Promise<BarcodeResult[]>
     const highResBase64 = await optimizeResolution(normalizedBase64, 3000);
     
     console.log(`📐 [readBarcode] 图像优化: 原始 → 全图2400px + 区域3000px`);
-    console.log(`🔧 [readBarcode] 库: Quagga ✅ + ZXing ✅`);
+    console.log(`🔧 [readBarcode] 库: Quagga ✅ + ZXing ✅ + 超视界引擎 ✅`);
+    console.log(`⏱️ [readBarcode] 超时策略: Quagga原图5s/预处理3s, 多区域扫描2个关键区域 + 高级倾斜修正`);
+
+    // ========== 前置阶段：超视界高级识别引擎 ==========
+    // 这个高级引擎会自动处理倾斜、多角度、质量增强等
+    console.log('📍 [readBarcode] 前置阶段：启动超视界高级识别引擎');
+    try {
+      // 构建解码函数列表
+      const advancedDecoders = [
+        {
+          name: 'Quagga',
+          fn: (img: string) => decodeWithQuagga(img, false)
+        },
+        {
+          name: 'ZXing',
+          fn: (img: string) => decodeWithZXing(img, false)
+        }
+      ];
+
+      // 调用高级引擎（启用倾斜修正、多角度、质量增强）
+      const advancedResult = await AdvancedBarcodeEngine.decodeBarCodeAdvanced(
+        optimizedBase64,
+        advancedDecoders,
+        {
+          trySkewCorrection: true,        // 自动倾斜修正
+          tryMultipleAngles: true,        // 多角度扫描
+          enhanceQuality: true,           // 自适应质量增强
+          useParallelDecoding: true,      // 并行解码加速
+          maxAttempts: 4
+        }
+      );
+
+      if (advancedResult) {
+        addUniqueResult(results, {
+          type: 'barcode',
+          value: advancedResult.text || advancedResult,
+          format: advancedResult.format || 'DETECTED',
+          region: '超视界引擎',
+          regionIndex: -1
+        });
+        console.log(`✅ [readBarcode] 超视界引擎成功! 值: ${(advancedResult.text || advancedResult).substring(0, 50)}`);
+        return results;  // 成功立即返回，无需继续其他阶段
+      } else {
+        console.log(`⚠️ [readBarcode] 超视界引擎未识别，继续使用标准流程...`);
+      }
+    } catch (error) {
+      console.warn('⚠️ [readBarcode] 超视界引擎异常:', error);
+      console.log('  → 切换到标准流程');
+    }
 
     // ========== 第一阶段：全图快速扫描 ==========
     console.log('📍 [readBarcode] 第一阶段：全图快速扫描（Quagga优先）');
@@ -1029,18 +1079,16 @@ export async function readBarcode(base64Image: string): Promise<BarcodeResult[]>
     }
 
     console.log(`✅ [readBarcode] 第一阶段完成，已找到 ${results.length} 个条码`);
-    
-    // ========== 第二阶段：多区域扫描 ==========
-    const scanRegions = [
-      { name: '顶部20%', y: 0, h: 0.2 },
-      { name: '上部20-40%', y: 0.2, h: 0.2 },
-      { name: '中上40-60%', y: 0.4, h: 0.2 },
-      { name: '中下60-80%', y: 0.6, h: 0.2 },
-      { name: '底部80-100%', y: 0.8, h: 0.2 },
-    ];
-    
-    console.log(`📍 [readBarcode] 第二阶段：横向多区域扫描 (${scanRegions.length}个区域，混合库策略)`);
-    
+    （仅在全图失败时执行） ==========
+    if (results.length === 0) {
+      const scanRegions = [
+        { name: '顶部25%', y: 0, h: 0.25 },
+        { name: '下部25%', y: 0.75, h: 0.25 },
+      ];
+      
+      console.log(`📍 [readBarcode] 第二阶段：关键区域扫描 (${scanRegions.length}个区域，仅在全图失败时)`);
+      
+      
     for (let i = 0; i < scanRegions.length; i++) {
       const region = scanRegions[i];
       const regionIndex = i + 1;
@@ -1096,9 +1144,10 @@ export async function readBarcode(base64Image: string): Promise<BarcodeResult[]>
       }
     }
 
-    console.log(`✅ [readBarcode] 第二阶段完成，共找到 ${results.length} 个条码`);
-    
-    // ========== 结果汇总 ==========
+      }
+    }
+
+    console.log(`✅ [readBarcode] 扫描
     if (results.length > 0) {
       console.log(`🎉 [readBarcode] 识别成功！共找到 ${results.length} 个条码:`);
       results.forEach((r, idx) => {

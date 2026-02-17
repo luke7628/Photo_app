@@ -11,13 +11,14 @@ interface ReviewScreenProps {
   isAnalyzing: boolean;
   sessionIndex: number;
   isSingleRetake?: boolean;
+  photoRotation?: number; // 拍摄时的设备旋转角度
   onRetake: () => void;
   onConfirm: () => void;
   onUpdateData: (data: { serialNumber: string; model: string; partNumber?: string }) => void;
   onBack?: () => void;
 }
 
-const ReviewScreen: React.FC<ReviewScreenProps> = ({ imageUrl, data, isAnalyzing, sessionIndex, isSingleRetake, onRetake, onConfirm, onUpdateData, onBack }) => {
+const ReviewScreen: React.FC<ReviewScreenProps> = ({ imageUrl, data, isAnalyzing, sessionIndex, isSingleRetake, photoRotation, onRetake, onConfirm, onUpdateData, onBack }) => {
   const [crop, setCrop] = useState({ x: 0, y: 0, w: 100, h: 100 });
   const containerRef = useRef<HTMLDivElement>(null);
   const activeHandle = useRef<string | null>(null);
@@ -48,6 +49,16 @@ const ReviewScreen: React.FC<ReviewScreenProps> = ({ imageUrl, data, isAnalyzing
   useEffect(() => {
     setUiRotation(uiRotationHook);
   }, [uiRotationHook]);
+
+  // 应用拍摄时的旋转角度到图像显示
+  useEffect(() => {
+    if (photoRotation !== undefined && photoRotation !== 0) {
+      setImageRotation(photoRotation);
+      console.log(`📸 [ReviewScreen] 应用拍摄时的旋转角度: ${photoRotation}°`);
+    } else {
+      setImageRotation(0);
+    }
+  }, [photoRotation]);
 
   const hasValidData = !isAnalyzing && isPrinterDataValid(data);
 

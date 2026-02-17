@@ -72,7 +72,7 @@ const DetailsScreen: React.FC<DetailsScreenProps> = ({
                 <div className={`size-10 rounded-lg overflow-hidden shrink-0 border relative flex items-center justify-center ${photo.url ? 'border-gray-100 shadow-sm' : 'border-dashed border-gray-200 bg-gray-50 text-gray-400'}`}>
                   {photo.url ? (
                     <>
-                      <img src={photo.url} className="size-full object-cover" alt={photo.label} />
+                      <img src={photo.url} className="size-full object-cover" alt={photo.label} style={photo.rotation ? { transform: `rotate(${photo.rotation}deg)` } : undefined} />
                       <div className={`absolute top-0.5 left-0.5 size-3.5 rounded-full border border-white flex items-center justify-center ${photo.isSynced ? 'bg-green-500' : 'bg-red-500'}`}>
                         <span className="material-symbols-outlined text-[9px] text-white font-black">{photo.isSynced ? 'check' : 'close'}</span>
                       </div>
@@ -104,7 +104,7 @@ const DetailsScreen: React.FC<DetailsScreenProps> = ({
                 <div className={`relative aspect-video rounded-xl overflow-hidden flex items-center justify-center border-2 transition-all ${photo.url ? 'bg-slate-100 border-white shadow-md' : 'bg-gray-50 border-dashed border-gray-200'}`}>
                   {photo.url ? (
                     <>
-                      <img src={photo.url} className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105" alt={photo.label} />
+                      <img src={photo.url} className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105" alt={photo.label} style={photo.rotation ? { transform: `rotate(${photo.rotation}deg)` } : undefined} />
                       <SyncIndicator isSynced={photo.isSynced} size="md" />
                       <div className="absolute top-2 right-2 bg-background-dark/80 backdrop-blur-md px-2 py-1 rounded-full border border-white/10">
                         <p className="text-[9px] font-black text-primary uppercase tracking-widest leading-none">{index + 1} / 12</p>
@@ -150,7 +150,7 @@ const DetailsScreen: React.FC<DetailsScreenProps> = ({
                 <div className={`relative aspect-square rounded-lg overflow-hidden flex items-center justify-center border transition-all duration-200 group-hover:shadow-lg group-hover:scale-105 ${photo.url ? 'bg-gray-100 border-gray-200 shadow-sm' : 'bg-blue-50 border-2 border-dashed border-blue-300 hover:bg-blue-100'}`}>
                   {photo.url ? (
                     <>
-                      <img src={photo.url} className="w-full h-full object-cover" alt={photo.label} />
+                      <img src={photo.url} className="w-full h-full object-cover" alt={photo.label} style={photo.rotation ? { transform: `rotate(${photo.rotation}deg)` } : undefined} />
                       <div className={`absolute top-1.5 left-1.5 flex items-center justify-center rounded-full size-5 border-2 border-white shadow-md ${
                         photo.isSynced 
                         ? 'bg-green-500' 

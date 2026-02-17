@@ -347,6 +347,8 @@ const CameraScreen: React.FC<CameraScreenProps> = ({
 
       // 延迟后回调
       setTimeout(() => {
+        // 保存拍摄时的旋转角度到sessionStorage（用于后续的图像方向处理）
+        sessionStorage.setItem('lastCaptureRotation', uiRotation.toString());
         onCapture(fullBase64);
         setIsCapturing(false);
       }, 150);

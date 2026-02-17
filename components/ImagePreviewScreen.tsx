@@ -247,7 +247,7 @@ const ImagePreviewScreen: React.FC<ImagePreviewScreenProps> = ({
       <div ref={containerRef} className="flex-1 relative bg-black flex items-center justify-center overflow-hidden group">
         <div className="relative w-full h-full flex items-center justify-center transition-transform duration-300 ease-out"
           style={{ transform: `translate(${position.x}px, ${position.y}px) scale(${scale})` }}>
-          <img ref={imageRef} src={currentPhoto.url} className="max-w-full max-h-full object-contain select-none" alt={currentPhoto.label} draggable={false} />
+          <img ref={imageRef} src={currentPhoto.url} className="max-w-full max-h-full object-contain select-none" alt={currentPhoto.label} draggable={false} style={currentPhoto.rotation ? { transform: `rotate(${currentPhoto.rotation}deg)` } : undefined} />
         </div>
 
         {/* 页面指示器 - 仿iOS风格 */}
