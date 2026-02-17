@@ -829,55 +829,15 @@ async function decodeWithZXing(base64Image: string, preprocessed: boolean = fals
     const reader = getReader();
     console.log(`🔍 [ZXing] 开始解码 ${preprocessed ? '(预处理)' : '(原图)'}...`);
 
-    // iOS兼容：使用canvas而不是直接从img元素解码
-    const canvas = document.createElement('canvas');
-    canvas.width = img.width;
-    canvas.height = img.height;
-    const ctx = canvas.getContext('2d', { willReadFrequently: true });
-    if (!ctx) {
-      console.error('❌ [ZXing] Canvas context获取失败');
-      return null;
-    }
-    
-    // 清空canvas并绘制图像
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
-    ctx.drawImage(img, 0, 0);
-    console.log(`🖼️ [ZXing] 已绘制到canvas: ${canvas.width}x${canvas.height}`);
-    
-    // 验证图像数据
-    try {
-      const imageData = ctx.getImageData(0, 0, Math.min(10, canvas.width), Math.min(10, canvas.height));
-      console.log(`✅ [ZXing] ImageData采样成功: ${imageData.data.length} bytes, 前10个像素:`, Array.from(imageData.data.slice(0, 40)));
-      
-      // 检查是否全是透明或全黑
-      const allZero = imageData.data.every(v => v === 0);
-      const allMax = imageData.data.every((v, i) => i % 4 === 3 || v === 255);
-      if (allZero) {
-        console.error('❌ [ZXing] Canvas数据全为0，图像可能未正确绘制');
-      } else if (allMax) {
-        console.warn('⚠️ [ZXing] Canvas数据全为255，图像可能过曝');
-      }
-    } catch (e) {
-      console.error('❌ [ZXing] 无法读取ImageData:', e);
-    }
-
-    // 尝试从canvas解码
+    // 直接从ImageElement解码（ZXing的标准方式）
     let result;
     try {
-      console.log('🔍 [ZXing] 尝试 decodeFromCanvas...');
-      result = await reader.decodeFromCanvas(canvas);
-      console.log('✅ [ZXing] decodeFromCanvas成功');
-    } catch (canvasError) {
-      console.warn(`⚠️ [ZXing] decodeFromCanvas失败:`, canvasError);
-      // 备用方案：尝试从VideoFrame或ImageElement
-      try {
-        console.log('🔍 [ZXing] 尝试 decodeFromImageElement...');
-        result = await reader.decodeFromImageElement(img);
-        console.log('✅ [ZXing] decodeFromImageElement成功');
-      } catch (imgError) {
-        console.error(`❌ [ZXing] decodeFromImageElement也失败:`, imgError);
-        throw canvasError; // 抛出原始错误
-      }
+      console.log('🔍 [ZXing] 开始解码（使用ImageElement）...');
+      result = await reader.decodeFromImageElement(img);
+      console.log('✅ [ZXing] 解码成功');
+    } catch (decodeError) {
+      console.error(`❌ [ZXing] 解码失败:`, decodeError);
+      return null;
     }
     
     if (!result) {
