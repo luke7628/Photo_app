@@ -181,7 +181,7 @@ const ReviewScreen: React.FC<ReviewScreenProps> = ({ imageUrl, data, isAnalyzing
   );
 
   return (
-    <div className="screen-container select-none touch-none" 
+    <div className="screen-container ios-page-enter select-none touch-none" 
          onMouseMove={handleTouchMove} 
          onMouseUp={handleTouchEnd}
          onTouchMove={handleTouchMove} 
@@ -193,7 +193,7 @@ const ReviewScreen: React.FC<ReviewScreenProps> = ({ imageUrl, data, isAnalyzing
            {onBack && (
              <button
                onClick={handleBackAttempt}
-               className="size-7 rounded-lg bg-white/85 border border-gray-200 hover:bg-white flex items-center justify-center active:scale-95 transition-all shadow-sm"
+               className="ios-pressable size-7 rounded-lg bg-white/85 border border-gray-200 hover:bg-white flex items-center justify-center active:scale-95 transition-all shadow-sm"
                style={rotationStyle}
              >
                <span className="material-symbols-outlined text-[16px] text-gray-700">arrow_back</span>
@@ -265,7 +265,7 @@ const ReviewScreen: React.FC<ReviewScreenProps> = ({ imageUrl, data, isAnalyzing
         <div className="w-full max-w-sm flex justify-end mb-1">
           <button
             onClick={() => setImageRotation(prev => (prev - 90) % 360)}
-            className="size-8 flex items-center justify-center bg-gradient-to-b from-blue-500 to-blue-600 hover:to-blue-700 text-white rounded-lg shadow-md active:scale-95 transition-all"
+            className="ios-pressable size-8 flex items-center justify-center bg-gradient-to-b from-blue-500 to-blue-600 hover:to-blue-700 text-white rounded-lg shadow-md active:scale-95 transition-all"
             title="Rotate counter-clockwise 90°"
           >
             <span className="material-symbols-outlined text-[18px]">rotate_left</span>
@@ -375,8 +375,8 @@ const ReviewScreen: React.FC<ReviewScreenProps> = ({ imageUrl, data, isAnalyzing
 
       {/* Manual Entry Modal */}
       {showEditModal && (
-          <div className="fixed inset-0 z-[100] bg-black/45 backdrop-blur-md flex items-center justify-center p-6 animate-in fade-in">
-            <div className="w-full max-w-[320px] ios-card rounded-[1.5rem] p-6 shadow-2xl animate-in zoom-in-95 duration-200">
+            <div className="fixed inset-0 z-[100] bg-black/45 backdrop-blur-md flex items-center justify-center p-6 ios-modal-backdrop">
+              <div className="w-full max-w-[320px] ios-card rounded-[1.5rem] p-6 shadow-2xl ios-modal-sheet">
               <div className="mb-6">
                 <h3 className="text-lg font-black text-[#1a2332] uppercase tracking-tight leading-none">Manual Entry</h3>
                 <p className="text-[10px] font-bold text-gray-400 mt-1 uppercase tracking-[0.1em]">Correct Identification</p>
@@ -445,8 +445,8 @@ const ReviewScreen: React.FC<ReviewScreenProps> = ({ imageUrl, data, isAnalyzing
 
       {/* Discard Confirmation Dialog */}
       {showDiscardConfirm && (
-        <div className="fixed inset-0 z-[100] bg-black/50 backdrop-blur-md flex items-center justify-center p-6 animate-in fade-in">
-          <div className="w-full max-w-[320px] ios-card rounded-[1.5rem] p-6 shadow-2xl animate-in zoom-in-95 duration-200">
+        <div className="fixed inset-0 z-[100] bg-black/50 backdrop-blur-md flex items-center justify-center p-6 ios-modal-backdrop">
+          <div className="w-full max-w-[320px] ios-card rounded-[1.5rem] p-6 shadow-2xl ios-modal-sheet">
             <div className="flex flex-col items-center gap-4 mb-6">
               <div className="size-16 rounded-full bg-red-100 flex items-center justify-center">
                 <span className="material-symbols-outlined text-4xl text-red-500">warning</span>

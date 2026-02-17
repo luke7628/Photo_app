@@ -101,9 +101,9 @@ const SettingsScreen: React.FC<SettingsScreenProps> = ({ settings, onUpdate, act
   const displayPath = `${cloudServiceName}${settings.drivePath}${projectName}/${settings.useSubfoldersBySN ? 'SN_123456/' : ''}`;
 
   return (
-    <div className="screen-container">
+    <div className="screen-container ios-page-enter">
       {isReloading && (
-        <div className="fixed inset-0 z-[999] bg-black/50 backdrop-blur-sm flex flex-col items-center justify-center animate-fadeIn">
+        <div className="fixed inset-0 z-[999] bg-black/50 backdrop-blur-sm flex flex-col items-center justify-center ios-modal-backdrop">
           <div className="bg-white rounded-2xl p-8 shadow-2xl w-full mx-4 max-w-sm">
             <div className="flex justify-center mb-6">
               <div className="relative">
@@ -134,7 +134,7 @@ const SettingsScreen: React.FC<SettingsScreenProps> = ({ settings, onUpdate, act
 
       {/* Reboot Overlay */}
       {showRebootOverlay && (
-        <div className="fixed inset-0 z-[1000] bg-black flex flex-col items-center justify-center animate-fadeIn">
+        <div className="fixed inset-0 z-[1000] bg-black flex flex-col items-center justify-center ios-modal-backdrop">
           <div className="relative mb-8">
             <div className="absolute -inset-8 bg-blue-500/20 blur-3xl rounded-full animate-pulse"></div>
             <span className="material-symbols-outlined text-5xl sm:text-6xl text-blue-500 animate-spin">
@@ -151,7 +151,7 @@ const SettingsScreen: React.FC<SettingsScreenProps> = ({ settings, onUpdate, act
         <div className="flex items-center gap-3 sm:gap-4">
           <button 
             onClick={onBack}
-            className="w-10 h-10 sm:w-11 sm:h-11 flex items-center justify-center rounded-xl bg-white/80 border border-gray-200 hover:bg-white text-gray-700 transition-all active:scale-90 shadow-sm"
+            className="ios-pressable w-10 h-10 sm:w-11 sm:h-11 flex items-center justify-center rounded-xl bg-white/80 border border-gray-200 hover:bg-white text-gray-700 transition-all active:scale-90 shadow-sm"
             title="Back"
           >
             <span className="material-symbols-outlined text-xl">arrow_back</span>
@@ -203,7 +203,7 @@ const SettingsScreen: React.FC<SettingsScreenProps> = ({ settings, onUpdate, act
               </div>
               <button 
                 onClick={() => updateField('skipReview', !settings.skipReview)}
-                className={`w-12 h-7 sm:w-14 sm:h-8 flex-shrink-0 rounded-full p-1 transition-all duration-300 ml-4 flex items-center ${
+                className={`ios-pressable w-12 h-7 sm:w-14 sm:h-8 flex-shrink-0 rounded-full p-1 transition-all duration-300 ml-4 flex items-center ${
                   settings.skipReview 
                     ? 'bg-blue-500 shadow-md shadow-blue-200' 
                     : 'bg-gray-300 shadow-sm'
@@ -246,7 +246,7 @@ const SettingsScreen: React.FC<SettingsScreenProps> = ({ settings, onUpdate, act
               </div>
               <button 
                 onClick={() => updateField('autoUpload', !settings.autoUpload)}
-                className={`w-12 h-7 sm:w-14 sm:h-8 flex-shrink-0 rounded-full p-1 transition-colors ml-4 ${settings.autoUpload ? 'bg-blue-500' : 'bg-gray-300'}`}
+                className={`ios-pressable w-12 h-7 sm:w-14 sm:h-8 flex-shrink-0 rounded-full p-1 transition-colors ml-4 ${settings.autoUpload ? 'bg-blue-500' : 'bg-gray-300'}`}
               >
                 <div className={`w-5 h-5 sm:w-6 sm:h-6 bg-white rounded-full shadow-md transition-transform ${settings.autoUpload ? 'translate-x-5 sm:translate-x-6' : ''}`} />
               </button>
@@ -259,7 +259,7 @@ const SettingsScreen: React.FC<SettingsScreenProps> = ({ settings, onUpdate, act
               </div>
               <button 
                 onClick={() => updateField('useSubfoldersBySN', !settings.useSubfoldersBySN)}
-                className={`w-12 h-7 sm:w-14 sm:h-8 flex-shrink-0 rounded-full p-1 transition-all duration-300 ml-4 flex items-center ${
+                className={`ios-pressable w-12 h-7 sm:w-14 sm:h-8 flex-shrink-0 rounded-full p-1 transition-all duration-300 ml-4 flex items-center ${
                   settings.useSubfoldersBySN 
                     ? 'bg-blue-500 shadow-md shadow-blue-200' 
                     : 'bg-gray-300 shadow-sm'
@@ -307,7 +307,7 @@ const SettingsScreen: React.FC<SettingsScreenProps> = ({ settings, onUpdate, act
               <button 
                 onClick={handleReload}
                 disabled={isReloading}
-                className={`flex-shrink-0 ml-4 px-3 sm:px-5 py-2.5 rounded-lg text-white text-xs font-bold transition-all duration-200 active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap ${
+                className={`ios-pressable flex-shrink-0 ml-4 px-3 sm:px-5 py-2.5 rounded-lg text-white text-xs font-bold transition-all duration-200 active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap ${
                   isReloading
                     ? 'bg-blue-500/50'
                     : 'bg-blue-500 hover:bg-blue-600 shadow-lg shadow-blue-500/30 hover:shadow-blue-500/50'

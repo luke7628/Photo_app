@@ -63,7 +63,7 @@ const ProjectListScreen: React.FC<ProjectListScreenProps> = ({
   }, [projects, printers]);
 
   return (
-    <div className="screen-container">
+    <div className="screen-container ios-page-enter">
       {/* Top Header with safe-area padding */}
       <header className="screen-header px-3 sm:px-6 shrink-0 flex items-center justify-between py-3 sm:py-5">
         <div className="flex items-center gap-2 sm:gap-3 flex-1 min-w-0 pr-2">
@@ -79,7 +79,7 @@ const ProjectListScreen: React.FC<ProjectListScreenProps> = ({
           ) : (
             <button 
               onClick={onLogin}
-              className="h-9 sm:h-10 px-2 sm:px-3 bg-blue-500 hover:bg-blue-600 text-white rounded-xl flex items-center gap-0.5 sm:gap-1.5 text-[10px] sm:text-xs font-semibold transition-colors active:scale-95 flex-shrink-0 shadow-sm"
+              className="ios-pressable h-9 sm:h-10 px-2 sm:px-3 bg-blue-500 hover:bg-blue-600 text-white rounded-xl flex items-center gap-0.5 sm:gap-1.5 text-[10px] sm:text-xs font-semibold transition-colors active:scale-95 flex-shrink-0 shadow-sm"
             >
                <span className="material-symbols-outlined text-sm sm:text-base flex-shrink-0">cloud</span>
                <span className="hidden xs:inline">Microsoft</span>
@@ -87,7 +87,7 @@ const ProjectListScreen: React.FC<ProjectListScreenProps> = ({
           )}
           <button 
             onClick={onOpenSettings}
-            className="w-9 h-9 sm:w-10 sm:h-10 flex items-center justify-center rounded-xl bg-white/80 border border-gray-200 hover:bg-white text-gray-700 transition-all active:scale-90 flex-shrink-0 shadow-sm"
+            className="ios-pressable w-9 h-9 sm:w-10 sm:h-10 flex items-center justify-center rounded-xl bg-white/80 border border-gray-200 hover:bg-white text-gray-700 transition-all active:scale-90 flex-shrink-0 shadow-sm"
             title="Settings"
           >
             <span className="material-symbols-outlined text-lg sm:text-xl">settings</span>
@@ -191,8 +191,8 @@ const ProjectListScreen: React.FC<ProjectListScreenProps> = ({
 
       {/* Create Modal */}
       {showCreateModal && (
-          <div className="fixed inset-0 z-[100] bg-black/45 backdrop-blur-sm flex items-start pt-8 p-2 sm:p-4">
-            <div className="w-full max-w-sm ios-card rounded-2xl p-4 sm:p-8 shadow-2xl animate-slideUp">
+            <div className="fixed inset-0 z-[100] bg-black/45 backdrop-blur-sm flex items-start pt-8 p-2 sm:p-4 ios-modal-backdrop">
+              <div className="w-full max-w-sm ios-card rounded-2xl p-4 sm:p-8 shadow-2xl ios-modal-sheet">
               <h2 className="text-lg sm:text-2xl font-bold text-gray-900 mb-1 sm:mb-2">New Project</h2>
               <p className="text-xs sm:text-sm text-gray-500 mb-3 sm:mb-6">Enter project details</p>
               
@@ -286,8 +286,8 @@ const ProjectListScreen: React.FC<ProjectListScreenProps> = ({
 
       {/* Delete Confirmation Modal */}
       {deleteConfirmId && (
-          <div className="fixed inset-0 z-[100] bg-black/45 backdrop-blur-sm flex items-center justify-center p-2 sm:p-4">
-            <div className="w-full max-w-sm ios-card rounded-2xl p-4 sm:p-8 shadow-2xl animate-slideUp">
+            <div className="fixed inset-0 z-[100] bg-black/45 backdrop-blur-sm flex items-center justify-center p-2 sm:p-4 ios-modal-backdrop">
+              <div className="w-full max-w-sm ios-card rounded-2xl p-4 sm:p-8 shadow-2xl ios-modal-sheet">
               <div className="flex items-center gap-2 sm:gap-3 mb-3 sm:mb-4">
                 <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-full bg-red-100 flex items-center justify-center flex-shrink-0">
                   <span className="material-symbols-outlined text-red-600 text-base sm:text-lg">warning</span>

@@ -57,6 +57,15 @@
   --transition-fast: 150ms cubic-bezier(0.4, 0, 0.2, 1);
   --transition-base: 300ms cubic-bezier(0.4, 0, 0.2, 1);
   --transition-slow: 500ms cubic-bezier(0.4, 0, 0.2, 1);
+
+  /* iOS-like motion curves */
+  --ease-ios-standard: cubic-bezier(0.28, 0.11, 0.32, 1);
+  --ease-ios-emphasized: cubic-bezier(0.2, 0.9, 0.2, 1);
+  --ease-ios-snappy: cubic-bezier(0.34, 1.56, 0.64, 1);
+  --duration-micro: 120ms;
+  --duration-short: 220ms;
+  --duration-medium: 340ms;
+  --duration-long: 520ms;
   
   /* Typography */
   --font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue', sans-serif;
@@ -271,7 +280,7 @@ input, textarea {
 /* Haptic feedback visual indicator */
 @media (hover: hover) {
   button:hover {
-    opacity: 0.8;
+    opacity: 0.95;
   }
 }
 
@@ -400,6 +409,48 @@ input, textarea {
   }
 }
 
+@keyframes iosPageIn {
+  0% {
+    opacity: 0;
+    transform: translateY(14px) scale(0.992);
+    filter: blur(2px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+    filter: blur(0);
+  }
+}
+
+@keyframes iosSheetIn {
+  0% {
+    opacity: 0;
+    transform: translateY(28px) scale(0.985);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes iosBackdropIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes iosSoftPulse {
+  0%, 100% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.02);
+  }
+}
+
 .animate-scaleIn {
   animation: scaleIn 800ms cubic-bezier(0.34, 1.56, 0.64, 1);
 }
@@ -422,6 +473,18 @@ input, textarea {
 
 .screen-enter {
   animation: fadeIn 300ms ease-out;
+}
+
+.ios-page-enter {
+  animation: iosPageIn var(--duration-medium) var(--ease-ios-standard);
+}
+
+.ios-modal-backdrop {
+  animation: iosBackdropIn var(--duration-short) ease-out;
+}
+
+.ios-modal-sheet {
+  animation: iosSheetIn var(--duration-medium) var(--ease-ios-snappy);
 }
 
 .screen-container {
@@ -495,7 +558,7 @@ select:focus-visible {
 }
 
 .ios-card-pressable {
-  transition: transform 180ms cubic-bezier(0.2, 0.9, 0.2, 1), box-shadow 180ms ease, border-color 180ms ease;
+  transition: transform var(--duration-short) var(--ease-ios-emphasized), box-shadow var(--duration-short) ease, border-color var(--duration-short) ease;
 }
 
 .ios-card-pressable:hover {
@@ -506,6 +569,46 @@ select:focus-visible {
 
 .ios-card-pressable:active {
   transform: translateY(0) scale(0.985);
+}
+
+.ios-pressable {
+  transition: transform var(--duration-micro) var(--ease-ios-emphasized),
+              filter var(--duration-short) ease,
+              box-shadow var(--duration-short) ease;
+}
+
+.ios-pressable:hover {
+  filter: brightness(1.02);
+}
+
+.ios-pressable:active {
+  transform: scale(0.97);
+}
+
+.ios-fab {
+  transform-origin: center;
+  transition: transform var(--duration-short) var(--ease-ios-snappy), box-shadow var(--duration-short) ease;
+}
+
+.ios-fab:hover {
+  transform: translateY(-1px) scale(1.02);
+}
+
+.ios-fab:active {
+  transform: translateY(0) scale(0.97);
+}
+
+.ios-live {
+  animation: iosSoftPulse 2.4s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ios-page-enter,
+  .ios-modal-backdrop,
+  .ios-modal-sheet,
+  .ios-live {
+    animation: none !important;
+  }
 }
 
 /* Line clamp utility */

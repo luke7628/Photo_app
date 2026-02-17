@@ -210,12 +210,12 @@ const DetailsScreen: React.FC<DetailsScreenProps> = ({
   };
 
   return (
-    <div className="screen-container animate-in fade-in duration-300">
+    <div className="screen-container ios-page-enter animate-in fade-in duration-300">
       <header className="screen-header px-4 pb-3 z-10">
         <div className="flex items-center gap-3 mb-3">
           <button 
             onClick={onBack}
-            className="size-10 flex items-center justify-center rounded-xl bg-white/80 border border-gray-200 text-gray-700 hover:bg-white transition-all active:scale-95 shadow-sm"
+            className="ios-pressable size-10 flex items-center justify-center rounded-xl bg-white/80 border border-gray-200 text-gray-700 hover:bg-white transition-all active:scale-95 shadow-sm"
           >
             <span className="material-symbols-outlined font-bold">arrow_back</span>
           </button>
@@ -233,7 +233,7 @@ const DetailsScreen: React.FC<DetailsScreenProps> = ({
                 <UserAvatar user={user} onLogout={onLogout} variant="desktop" />
                 <button 
                   onClick={onManualSync}
-                  className={`size-10 flex items-center justify-center rounded-xl transition-all border border-gray-200 shadow-sm ${isSyncing ? 'text-primary bg-white' : 'bg-white/80 text-gray-400 hover:text-sage hover:bg-white'}`}
+                  className={`ios-pressable size-10 flex items-center justify-center rounded-xl transition-all border border-gray-200 shadow-sm ${isSyncing ? 'text-primary bg-white ios-live' : 'bg-white/80 text-gray-400 hover:text-sage hover:bg-white'}`}
                 >
                   <span className={`material-symbols-outlined text-[20px] ${isSyncing ? 'animate-[spin_3s_linear_infinite]' : ''}`}>
                     sync
@@ -243,7 +243,7 @@ const DetailsScreen: React.FC<DetailsScreenProps> = ({
             ) : (
               <button 
                 onClick={onLogin}
-                className="h-8 sm:h-10 px-1.5 sm:px-3 bg-blue-500 hover:bg-blue-600 text-white rounded-xl flex items-center gap-0.5 sm:gap-1.5 text-[10px] sm:text-xs font-semibold transition-colors active:scale-95 flex-shrink-0 shadow-sm"
+                className="ios-pressable h-8 sm:h-10 px-1.5 sm:px-3 bg-blue-500 hover:bg-blue-600 text-white rounded-xl flex items-center gap-0.5 sm:gap-1.5 text-[10px] sm:text-xs font-semibold transition-colors active:scale-95 flex-shrink-0 shadow-sm"
               >
                 <span className="material-symbols-outlined text-sm sm:text-base flex-shrink-0">cloud</span>
                 <span className="hidden xs:inline">Microsoft</span>
@@ -327,7 +327,7 @@ const DetailsScreen: React.FC<DetailsScreenProps> = ({
                 const nextIdx = photos.findIndex(p => !p.url);
                 onAddPhoto(nextIdx !== -1 ? nextIdx : 0);
               }}
-              className="bg-gradient-to-b from-blue-500 to-blue-600 hover:scale-105 active:scale-95 text-white px-8 py-4 rounded-full flex items-center gap-3 shadow-xl transition-all pointer-events-auto"
+              className="ios-fab bg-gradient-to-b from-blue-500 to-blue-600 hover:scale-105 active:scale-95 text-white px-8 py-4 rounded-full flex items-center gap-3 shadow-xl transition-all pointer-events-auto"
             >
               <span className="material-symbols-outlined text-xl font-bold">add_a_photo</span>
               <span className="font-black text-xs tracking-widest uppercase">Resume Capture</span>
@@ -355,8 +355,8 @@ const DetailsScreen: React.FC<DetailsScreenProps> = ({
 
       {/* Edit Modal */}
       {showEditModal && (
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-5 animate-in fade-in duration-200">
-          <div className="ios-card rounded-3xl w-full max-w-md p-6 shadow-2xl animate-in zoom-in-95 duration-200">
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-5 ios-modal-backdrop">
+          <div className="ios-card rounded-3xl w-full max-w-md p-6 shadow-2xl ios-modal-sheet">
             <div className="flex items-center justify-between mb-5">
               <h2 className="text-xl font-black text-gray-900 uppercase tracking-tight">Edit Information</h2>
               <button

@@ -133,7 +133,7 @@ const GalleryScreen: React.FC<GalleryScreenProps> = ({
   );
 
   return (
-    <div className="screen-container transition-all duration-300">
+    <div className="screen-container ios-page-enter transition-all duration-300">
       {/* Header with safe-area top padding */}
       <header className={`screen-header px-4 z-30 transition-all flex-shrink-0 ${isLandscape ? 'pb-2' : 'pb-4'}`}>
         {/* Top row: Back button + Title + User + Settings */}
@@ -141,7 +141,7 @@ const GalleryScreen: React.FC<GalleryScreenProps> = ({
           <button 
             onClick={onBackToProjects}
             style={rotationStyle}
-            className={`${isLandscape ? 'size-9' : 'size-11'} flex items-center justify-center rounded-xl bg-gray-100 text-gray-700 active:scale-95 transition-all hover:bg-gray-200 flex-shrink-0`}
+            className={`ios-pressable ${isLandscape ? 'size-9' : 'size-11'} flex items-center justify-center rounded-xl bg-gray-100 text-gray-700 active:scale-95 transition-all hover:bg-gray-200 flex-shrink-0`}
           >
             <span className={`material-symbols-outlined ${isLandscape ? 'text-base' : 'text-xl'}`}>arrow_back_ios_new</span>
           </button>
@@ -156,7 +156,7 @@ const GalleryScreen: React.FC<GalleryScreenProps> = ({
                 <button 
                   onClick={() => setShowUserMenu(!showUserMenu)} 
                   style={rotationStyle} 
-                  className={`${isLandscape ? 'size-9' : 'size-11'} rounded-full border-2 border-blue-300 bg-gradient-to-b from-blue-500 to-blue-600 flex items-center justify-center text-white font-bold overflow-hidden active:scale-90 transition-all shadow-md hover:shadow-lg hover:border-blue-400`}
+                  className={`ios-pressable ${isLandscape ? 'size-9' : 'size-11'} rounded-full border-2 border-blue-300 bg-gradient-to-b from-blue-500 to-blue-600 flex items-center justify-center text-white font-bold overflow-hidden active:scale-90 transition-all shadow-md hover:shadow-lg hover:border-blue-400`}
                 >
                   {user.photoUrl ? (
                     <img 
@@ -174,7 +174,7 @@ const GalleryScreen: React.FC<GalleryScreenProps> = ({
                   </span>
                 </button>
                 {showUserMenu && (
-                  <div className="absolute top-12 right-0 w-52 bg-white/95 backdrop-blur-md shadow-2xl rounded-2xl border border-gray-200 overflow-hidden z-50 animate-in fade-in zoom-in-95 duration-200">
+                  <div className="absolute top-12 right-0 w-52 bg-white/95 backdrop-blur-md shadow-2xl rounded-2xl border border-gray-200 overflow-hidden z-50 ios-modal-sheet">
                     <div className="px-4 py-3 border-b border-gray-50">
                       <p className="text-xs font-semibold text-gray-900 truncate">{user.name}</p>
                       <p className="text-xs text-gray-500 truncate mt-0.5">{user.email}</p>
@@ -206,7 +206,7 @@ const GalleryScreen: React.FC<GalleryScreenProps> = ({
               <button 
                 onClick={onLogin} 
                 style={rotationStyle} 
-                className="h-9 px-4 bg-blue-500 text-white rounded-xl flex items-center gap-2 text-xs font-semibold hover:bg-blue-600 transition-colors active:scale-95 shadow-sm"
+                className="ios-pressable h-9 px-4 bg-blue-500 text-white rounded-xl flex items-center gap-2 text-xs font-semibold hover:bg-blue-600 transition-colors active:scale-95 shadow-sm"
               >
                 <span className="material-symbols-outlined text-sm">cloud</span>
                 <span>Microsoft</span>
@@ -215,7 +215,7 @@ const GalleryScreen: React.FC<GalleryScreenProps> = ({
             <button 
               onClick={onOpenSettings} 
               style={rotationStyle} 
-              className={`${isLandscape ? 'size-9' : 'size-11'} flex items-center justify-center bg-white/80 border border-gray-200 rounded-xl text-gray-700 hover:bg-white transition-all shadow-sm`}
+              className={`ios-pressable ${isLandscape ? 'size-9' : 'size-11'} flex items-center justify-center bg-white/80 border border-gray-200 rounded-xl text-gray-700 hover:bg-white transition-all shadow-sm`}
             >
               <span className={`material-symbols-outlined ${isLandscape ? 'text-base' : 'text-xl'}`}>settings</span>
             </button>
@@ -303,7 +303,7 @@ const GalleryScreen: React.FC<GalleryScreenProps> = ({
         <button 
           onClick={onAdd}
           style={rotationStyle}
-          className={`bg-gradient-to-b from-blue-500 to-blue-600 hover:from-blue-500 hover:to-blue-700 text-white rounded-full flex items-center shadow-lg hover:shadow-xl transition-all active:scale-95 ${isLandscape ? 'px-6 py-3 gap-2' : 'px-10 py-5 gap-3'}`}
+          className={`ios-fab bg-gradient-to-b from-blue-500 to-blue-600 hover:from-blue-500 hover:to-blue-700 text-white rounded-full flex items-center shadow-lg hover:shadow-xl transition-all active:scale-95 ${isLandscape ? 'px-6 py-3 gap-2' : 'px-10 py-5 gap-3'}`}
         >
           <span className={`material-symbols-outlined font-semibold ${isLandscape ? 'text-base' : 'text-2xl'}`}>photo_camera</span>
           <span className={`font-semibold tracking-tight ${isLandscape ? 'text-xs' : 'text-base'}`}>Capture</span>
