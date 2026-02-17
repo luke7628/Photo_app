@@ -34,9 +34,9 @@ jobs:
     - name: Build project
       run: npm run build
       env:
-        VITE_MICROSOFT_CLIENT_ID: ${{ secrets.VITE_MICROSOFT_CLIENT_ID }}
-        VITE_MICROSOFT_TENANT_ID: ${{ secrets.VITE_MICROSOFT_TENANT_ID }}
-        VITE_MICROSOFT_REDIRECT_URI: ${{ secrets.VITE_MICROSOFT_REDIRECT_URI }}
+        VITE_MICROSOFT_CLIENT_ID: ${{ secrets.VITE_MICROSOFT_CLIENT_ID || 'placeholder-client-id' }}
+        VITE_MICROSOFT_TENANT_ID: ${{ secrets.VITE_MICROSOFT_TENANT_ID || 'placeholder-tenant-id' }}
+        VITE_MICROSOFT_REDIRECT_URI: ${{ secrets.VITE_MICROSOFT_REDIRECT_URI || 'http://localhost:3000' }}
         NODE_ENV: production
 
     - name: Check build artifacts
