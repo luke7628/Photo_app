@@ -147,11 +147,11 @@ const SettingsScreen: React.FC<SettingsScreenProps> = ({ settings, onUpdate, act
       )}
 
       {/* Header with safe-area padding */}
-      <header className="screen-header px-4 sm:px-6 py-4 sm:py-5 bg-white border-b border-gray-200 z-10">
+      <header className="screen-header px-4 sm:px-6 py-4 sm:py-5 z-10">
         <div className="flex items-center gap-3 sm:gap-4">
           <button 
             onClick={onBack}
-            className="w-10 h-10 sm:w-11 sm:h-11 flex items-center justify-center rounded-lg bg-gray-100 hover:bg-gray-200 text-gray-700 transition-colors active:scale-90"
+            className="w-10 h-10 sm:w-11 sm:h-11 flex items-center justify-center rounded-xl bg-white/80 border border-gray-200 hover:bg-white text-gray-700 transition-all active:scale-90 shadow-sm"
             title="Back"
           >
             <span className="material-symbols-outlined text-xl">arrow_back</span>
@@ -173,18 +173,18 @@ const SettingsScreen: React.FC<SettingsScreenProps> = ({ settings, onUpdate, act
             <span className="material-symbols-outlined text-base text-gray-400">photo_camera</span>
             Camera
           </h2>
-          <div className="bg-white rounded-lg sm:rounded-xl p-4 sm:p-5 shadow-sm border border-gray-200 hover:shadow-md hover:border-gray-300 transition-all duration-200 space-y-4">
+          <div className="ios-card rounded-2xl p-4 sm:p-5 hover:shadow-md transition-all duration-200 space-y-4">
             <div className="flex items-center justify-between">
               <div className="flex-1">
                 <p className="text-sm font-semibold text-gray-900">Flash Mode</p>
                 <p className="text-xs text-gray-500 mt-0.5">Default flash setting</p>
               </div>
-              <div className="flex bg-gray-100 p-1 rounded-lg ml-4 gap-1">
+              <div className="flex bg-gray-100 p-1 rounded-xl ml-4 gap-1">
                 {(['off', 'auto', 'on'] as const).map(mode => (
                   <button
                     key={mode}
                     onClick={() => updateField('defaultFlash', mode)}
-                    className={`px-2.5 sm:px-3 py-1.5 rounded-md text-xs font-semibold whitespace-nowrap transition-all duration-200 active:scale-95 ${
+                    className={`px-2.5 sm:px-3 py-1.5 rounded-lg text-xs font-semibold whitespace-nowrap transition-all duration-200 active:scale-95 ${
                       settings.defaultFlash === mode 
                         ? 'bg-white text-blue-500 shadow-md shadow-blue-200 border border-blue-100' 
                         : 'text-gray-500 hover:text-gray-700 active:bg-gray-200'
@@ -223,13 +223,13 @@ const SettingsScreen: React.FC<SettingsScreenProps> = ({ settings, onUpdate, act
             <span className="material-symbols-outlined text-base text-gray-400">cloud_sync</span>
             Cloud Storage
           </h2>
-          <div className="bg-white rounded-lg sm:rounded-xl p-4 sm:p-5 shadow-sm border border-gray-200 space-y-4">
+          <div className="ios-card rounded-2xl p-4 sm:p-5 space-y-4">
             <div className="flex items-center justify-between">
               <div className="flex-1">
                 <p className="text-sm font-semibold text-gray-900">Cloud Provider</p>
                 <p className="text-xs text-gray-500 mt-0.5">{user ? 'Auto-set based on login' : 'Login to enable cloud sync'}</p>
               </div>
-              <div className="flex bg-gray-100 p-1 rounded-lg ml-4">
+              <div className="flex bg-gray-100 p-1 rounded-xl ml-4">
                 <div className={`px-2.5 sm:px-3 py-1 rounded-md text-xs font-semibold whitespace-nowrap ${settings.cloudProvider === 'none' ? 'bg-white text-blue-500 shadow-sm' : 'text-gray-500'}`}>
                   None
                 </div>
@@ -274,7 +274,7 @@ const SettingsScreen: React.FC<SettingsScreenProps> = ({ settings, onUpdate, act
             <div className="h-px bg-gray-100 mt-4"></div>
             <div className="space-y-3 pt-2">
               <label className="text-xs font-bold text-gray-600">Storage Path</label>
-              <div className="flex items-center gap-2 bg-gray-50 px-3 py-2.5 rounded-lg border border-gray-200">
+              <div className="flex items-center gap-2 bg-white px-3 py-2.5 rounded-xl border border-gray-200 shadow-inner">
                 <span className="material-symbols-outlined text-sm text-gray-400 flex-shrink-0">folder</span>
                 <input 
                   type="text" 
@@ -285,7 +285,7 @@ const SettingsScreen: React.FC<SettingsScreenProps> = ({ settings, onUpdate, act
                 />
               </div>
               
-              <div className="bg-gray-900 text-gray-300 p-3 rounded-lg border border-gray-700 text-xs font-mono overflow-x-auto">
+              <div className="bg-gray-900 text-gray-300 p-3 rounded-xl border border-gray-700 text-xs font-mono overflow-x-auto">
                 <div className="whitespace-nowrap text-xs">{displayPath}</div>
               </div>
             </div>
@@ -298,7 +298,7 @@ const SettingsScreen: React.FC<SettingsScreenProps> = ({ settings, onUpdate, act
             <span className="material-symbols-outlined text-base text-gray-400">settings_suggest</span>
             System
           </h2>
-          <div className="bg-gradient-to-br from-gray-900 to-gray-800 rounded-lg sm:rounded-xl p-4 sm:p-5 shadow-md border border-gray-700 hover:shadow-lg hover:border-gray-600 transition-all duration-200">
+          <div className="bg-gradient-to-br from-gray-900 to-gray-800 rounded-2xl p-4 sm:p-5 shadow-md border border-gray-700 hover:shadow-lg hover:border-gray-600 transition-all duration-200">
             <div className="flex items-center justify-between group">
               <div className="flex-1 min-w-0">
                 <p className="text-sm font-semibold text-white">Refresh App</p>

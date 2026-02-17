@@ -211,11 +211,11 @@ const DetailsScreen: React.FC<DetailsScreenProps> = ({
 
   return (
     <div className="screen-container animate-in fade-in duration-300">
-      <header className="screen-header px-4 pb-3 bg-white border-b border-gray-100 z-10">
+      <header className="screen-header px-4 pb-3 z-10">
         <div className="flex items-center gap-3 mb-3">
           <button 
             onClick={onBack}
-            className="size-10 flex items-center justify-center rounded-xl bg-gray-50 text-gray-700 hover:bg-primary/10 transition-colors active:scale-95"
+            className="size-10 flex items-center justify-center rounded-xl bg-white/80 border border-gray-200 text-gray-700 hover:bg-white transition-all active:scale-95 shadow-sm"
           >
             <span className="material-symbols-outlined font-bold">arrow_back</span>
           </button>
@@ -233,7 +233,7 @@ const DetailsScreen: React.FC<DetailsScreenProps> = ({
                 <UserAvatar user={user} onLogout={onLogout} variant="desktop" />
                 <button 
                   onClick={onManualSync}
-                  className={`size-10 flex items-center justify-center rounded-xl transition-all ${isSyncing ? 'text-primary bg-background-dark/10' : 'bg-gray-50 text-gray-400 hover:text-sage'}`}
+                  className={`size-10 flex items-center justify-center rounded-xl transition-all border border-gray-200 shadow-sm ${isSyncing ? 'text-primary bg-white' : 'bg-white/80 text-gray-400 hover:text-sage hover:bg-white'}`}
                 >
                   <span className={`material-symbols-outlined text-[20px] ${isSyncing ? 'animate-[spin_3s_linear_infinite]' : ''}`}>
                     sync
@@ -243,7 +243,7 @@ const DetailsScreen: React.FC<DetailsScreenProps> = ({
             ) : (
               <button 
                 onClick={onLogin}
-                className="h-8 sm:h-10 px-1.5 sm:px-3 bg-blue-500 hover:bg-blue-600 text-white rounded-lg flex items-center gap-0.5 sm:gap-1.5 text-[10px] sm:text-xs font-semibold transition-colors active:scale-95 flex-shrink-0"
+                className="h-8 sm:h-10 px-1.5 sm:px-3 bg-blue-500 hover:bg-blue-600 text-white rounded-xl flex items-center gap-0.5 sm:gap-1.5 text-[10px] sm:text-xs font-semibold transition-colors active:scale-95 flex-shrink-0 shadow-sm"
               >
                 <span className="material-symbols-outlined text-sm sm:text-base flex-shrink-0">cloud</span>
                 <span className="hidden xs:inline">Microsoft</span>
@@ -253,10 +253,10 @@ const DetailsScreen: React.FC<DetailsScreenProps> = ({
         </div>
 
         {/* Prominent Info Card */}
-        <div className="bg-gradient-to-br from-blue-50 to-indigo-50 rounded-2xl p-3 border-2 border-blue-200 shadow-sm relative">
+        <div className="ios-card rounded-2xl p-3 relative bg-gradient-to-br from-blue-50 to-indigo-50">
           <button
             onClick={handleOpenEdit}
-            className="absolute top-2 right-2 size-7 rounded-lg bg-white border border-blue-300 flex items-center justify-center hover:bg-blue-50 transition-all active:scale-95"
+            className="absolute top-2 right-2 size-7 rounded-xl bg-white border border-blue-200 flex items-center justify-center hover:bg-blue-50 transition-all active:scale-95 shadow-sm"
             title="Edit Serial Number & Part Number"
           >
             <span className="material-symbols-outlined text-blue-500 text-sm">edit</span>
@@ -282,7 +282,7 @@ const DetailsScreen: React.FC<DetailsScreenProps> = ({
       <main 
         className="screen-content no-scrollbar"
       >
-        <div className="sticky top-0 bg-white z-10 px-5 py-3 border-b border-gray-100">
+        <div className="sticky top-0 bg-white/85 backdrop-blur-md z-10 px-5 py-3 border-b border-gray-100">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
               <div className="size-6 bg-sage/10 rounded-lg flex items-center justify-center">
@@ -291,7 +291,7 @@ const DetailsScreen: React.FC<DetailsScreenProps> = ({
               <h2 className="text-[10px] font-black text-gray-400 uppercase tracking-[0.1em]">Components</h2>
             </div>
             
-            <div className="flex bg-gray-100 p-0.5 rounded-lg border border-gray-200">
+            <div className="flex bg-gray-100 p-0.5 rounded-xl border border-gray-200">
               <button 
                 onClick={() => setViewMode(ViewMode.LIST)}
                 className={`px-2 py-1 rounded-md flex items-center justify-center transition-all ${viewMode === ViewMode.LIST ? 'bg-white text-sage shadow-sm' : 'text-gray-400 hover:text-gray-600'}`}
@@ -327,7 +327,7 @@ const DetailsScreen: React.FC<DetailsScreenProps> = ({
                 const nextIdx = photos.findIndex(p => !p.url);
                 onAddPhoto(nextIdx !== -1 ? nextIdx : 0);
               }}
-              className="bg-primary hover:scale-105 active:scale-95 text-background-dark px-8 py-4 rounded-full flex items-center gap-3 shadow-xl transition-all pointer-events-auto"
+              className="bg-gradient-to-b from-blue-500 to-blue-600 hover:scale-105 active:scale-95 text-white px-8 py-4 rounded-full flex items-center gap-3 shadow-xl transition-all pointer-events-auto"
             >
               <span className="material-symbols-outlined text-xl font-bold">add_a_photo</span>
               <span className="font-black text-xs tracking-widest uppercase">Resume Capture</span>
@@ -356,7 +356,7 @@ const DetailsScreen: React.FC<DetailsScreenProps> = ({
       {/* Edit Modal */}
       {showEditModal && (
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-5 animate-in fade-in duration-200">
-          <div className="bg-white rounded-3xl w-full max-w-md p-6 shadow-2xl animate-in zoom-in-95 duration-200">
+          <div className="ios-card rounded-3xl w-full max-w-md p-6 shadow-2xl animate-in zoom-in-95 duration-200">
             <div className="flex items-center justify-between mb-5">
               <h2 className="text-xl font-black text-gray-900 uppercase tracking-tight">Edit Information</h2>
               <button
@@ -376,7 +376,7 @@ const DetailsScreen: React.FC<DetailsScreenProps> = ({
                   type="text"
                   value={editSerial}
                   onChange={(e) => setEditSerial(e.target.value.toUpperCase())}
-                  className="w-full h-12 px-4 bg-gray-50 border-2 border-gray-200 rounded-xl font-black text-gray-900 uppercase focus:outline-none focus:border-blue-400 transition-colors"
+                  className="w-full h-12 px-4 bg-white border-2 border-gray-200 rounded-xl font-black text-gray-900 uppercase focus:outline-none focus:border-blue-400 transition-colors shadow-inner"
                   placeholder="Enter serial number"
                 />
               </div>
@@ -389,7 +389,7 @@ const DetailsScreen: React.FC<DetailsScreenProps> = ({
                   type="text"
                   value={editPartNumber}
                   onChange={(e) => setEditPartNumber(e.target.value.toUpperCase())}
-                  className="w-full h-12 px-4 bg-gray-50 border-2 border-gray-200 rounded-xl font-black text-gray-900 uppercase focus:outline-none focus:border-blue-400 transition-colors"
+                  className="w-full h-12 px-4 bg-white border-2 border-gray-200 rounded-xl font-black text-gray-900 uppercase focus:outline-none focus:border-blue-400 transition-colors shadow-inner"
                   placeholder="Enter part number"
                 />
               </div>

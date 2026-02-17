@@ -181,19 +181,19 @@ const ReviewScreen: React.FC<ReviewScreenProps> = ({ imageUrl, data, isAnalyzing
   );
 
   return (
-    <div className="screen-container bg-[#f6f8f6] select-none touch-none" 
+    <div className="screen-container select-none touch-none" 
          onMouseMove={handleTouchMove} 
          onMouseUp={handleTouchEnd}
          onTouchMove={handleTouchMove} 
          onTouchEnd={handleTouchEnd}>
       
-      <header className={`pt-4 px-4 bg-white rounded-b-3xl shadow-sm shrink-0 transition-all duration-500 ${isLandscape ? 'pb-1.5' : 'pb-2'}`}>
+      <header className={`screen-header pt-4 px-4 rounded-b-3xl shrink-0 transition-all duration-500 ${isLandscape ? 'pb-1.5' : 'pb-2'}`}>
         <div className={`flex items-center gap-2 transition-all ${isLandscape ? 'pt-1.5 mb-1' : 'pt-2 mb-1.5'}`}>
            {/* 返回按钮 */}
            {onBack && (
              <button
                onClick={handleBackAttempt}
-               className="size-7 rounded-lg bg-gray-100 hover:bg-gray-200 flex items-center justify-center active:scale-95 transition-all"
+               className="size-7 rounded-lg bg-white/85 border border-gray-200 hover:bg-white flex items-center justify-center active:scale-95 transition-all shadow-sm"
                style={rotationStyle}
              >
                <span className="material-symbols-outlined text-[16px] text-gray-700">arrow_back</span>
@@ -214,7 +214,7 @@ const ReviewScreen: React.FC<ReviewScreenProps> = ({ imageUrl, data, isAnalyzing
         </div>
 
         {/* 强化后的序列号显示卡片 - 可点击编辑 - 增加 shaking 错误提示 */}
-        <div className={`bg-background-dark p-0.5 rounded-xl shadow-lg overflow-hidden relative group transition-all duration-300 ${shakeError ? 'ring-4 ring-red-500/50 translate-x-[-2px]' : ''}`}>
+        <div className={`ios-card p-0.5 rounded-xl shadow-lg overflow-hidden relative group transition-all duration-300 ${shakeError ? 'ring-4 ring-red-500/50 translate-x-[-2px]' : ''}`}>
           <button 
             onClick={handleOpenEdit}
             disabled={isAnalyzing}
@@ -260,12 +260,12 @@ const ReviewScreen: React.FC<ReviewScreenProps> = ({ imageUrl, data, isAnalyzing
         </div>
       </header>
 
-      <main className="flex-1 flex flex-col items-center justify-center px-4 py-1 overflow-hidden relative transition-all">
+      <main className="screen-content flex flex-col items-center justify-center px-4 py-1 overflow-hidden relative transition-all">
         {/* 旋转按钮 */}
         <div className="w-full max-w-sm flex justify-end mb-1">
           <button
             onClick={() => setImageRotation(prev => (prev - 90) % 360)}
-            className="size-8 flex items-center justify-center bg-blue-500 hover:bg-blue-600 text-white rounded-lg shadow-md active:scale-95 transition-all"
+            className="size-8 flex items-center justify-center bg-gradient-to-b from-blue-500 to-blue-600 hover:to-blue-700 text-white rounded-lg shadow-md active:scale-95 transition-all"
             title="Rotate counter-clockwise 90°"
           >
             <span className="material-symbols-outlined text-[18px]">rotate_left</span>
@@ -329,12 +329,12 @@ const ReviewScreen: React.FC<ReviewScreenProps> = ({ imageUrl, data, isAnalyzing
         </div>
       </main>
 
-      <footer className={`bg-white rounded-t-3xl shadow-[0_-15_50px_rgba(0,0,0,0.06)] shrink-0 z-20 transition-all duration-500 ${isLandscape ? 'pt-1 px-12 pb-2' : 'pt-2 px-5 pb-2'}`}>
+      <footer className={`bg-white/92 backdrop-blur-md rounded-t-3xl shadow-[0_-15_50px_rgba(0,0,0,0.06)] shrink-0 z-20 transition-all duration-500 border-t border-gray-100 ${isLandscape ? 'pt-1 px-12 pb-2' : 'pt-2 px-5 pb-2'}`}>
         <div className={`flex gap-4 ${isLandscape ? 'justify-center' : ''}`}>
           <button 
             onClick={onRetake}
             style={rotationStyle}
-            className={`bg-slate-50 active:scale-95 rounded-2xl flex items-center justify-center gap-2 transition-all border border-slate-100 shadow-sm ${isLandscape ? 'px-8 h-12' : 'flex-1 h-14'}`}
+            className={`bg-white active:scale-95 rounded-2xl flex items-center justify-center gap-2 transition-all border border-gray-200 shadow-sm hover:bg-gray-50 ${isLandscape ? 'px-8 h-12' : 'flex-1 h-14'}`}
           >
             <span className="material-symbols-outlined text-gray-500 text-lg font-bold">replay</span>
             <span className="font-black text-gray-700 uppercase text-[10px] tracking-widest">Retake</span>
@@ -348,7 +348,7 @@ const ReviewScreen: React.FC<ReviewScreenProps> = ({ imageUrl, data, isAnalyzing
                 ? (isSingleRetake ? '#f59e0b' : '#10b981')
                 : '#e5e7eb'
             }}
-            className={`active:scale-95 rounded-lg sm:rounded-2xl flex items-center justify-center gap-2 transition-all duration-200 shadow-xl disabled:opacity-50 hover:shadow-2xl ${isLandscape ? 'px-12 h-12' : 'flex-[2] h-12'} ${
+            className={`active:scale-95 rounded-xl sm:rounded-2xl flex items-center justify-center gap-2 transition-all duration-200 shadow-xl disabled:opacity-50 hover:shadow-2xl ${isLandscape ? 'px-12 h-12' : 'flex-[2] h-12'} ${
               hasValidData 
               ? 'hover:brightness-110 active:brightness-95' 
               : 'text-gray-400 shadow-none'
@@ -375,8 +375,8 @@ const ReviewScreen: React.FC<ReviewScreenProps> = ({ imageUrl, data, isAnalyzing
 
       {/* Manual Entry Modal */}
       {showEditModal && (
-        <div className="fixed inset-0 z-[100] bg-black/40 backdrop-blur-md flex items-center justify-center p-6 animate-in fade-in">
-           <div className="w-full max-w-[320px] bg-white rounded-[1.5rem] p-6 shadow-2xl animate-in zoom-in-95 duration-200">
+          <div className="fixed inset-0 z-[100] bg-black/45 backdrop-blur-md flex items-center justify-center p-6 animate-in fade-in">
+            <div className="w-full max-w-[320px] ios-card rounded-[1.5rem] p-6 shadow-2xl animate-in zoom-in-95 duration-200">
               <div className="mb-6">
                 <h3 className="text-lg font-black text-[#1a2332] uppercase tracking-tight leading-none">Manual Entry</h3>
                 <p className="text-[10px] font-bold text-gray-400 mt-1 uppercase tracking-[0.1em]">Correct Identification</p>
@@ -393,7 +393,7 @@ const ReviewScreen: React.FC<ReviewScreenProps> = ({ imageUrl, data, isAnalyzing
                       setModalError(false);
                     }}
                     placeholder="N/A"
-                    className={`w-full h-12 px-4 bg-gray-100 rounded-lg border-2 text-base font-black uppercase tracking-widest placeholder:text-gray-400 focus:outline-none transition-all ${
+                    className={`w-full h-12 px-4 bg-white rounded-xl border-2 text-base font-black uppercase tracking-widest placeholder:text-gray-400 focus:outline-none transition-all shadow-inner ${
                       modalError && (!editSerial || !editSerial.trim())
                       ? 'border-red-400 bg-red-50 text-red-500 animate-pulse' 
                       : 'border-transparent focus:border-primary/50 text-gray-800'
@@ -410,7 +410,7 @@ const ReviewScreen: React.FC<ReviewScreenProps> = ({ imageUrl, data, isAnalyzing
                       setModalError(false);
                     }}
                     placeholder="e.g. ZT41142-T010000Z"
-                    className="w-full h-12 px-4 bg-gray-100 rounded-lg border-2 border-transparent text-base font-black uppercase tracking-widest placeholder:text-gray-400 focus:outline-none focus:border-primary/50 text-gray-800 transition-all"
+                    className="w-full h-12 px-4 bg-white rounded-xl border-2 border-transparent text-base font-black uppercase tracking-widest placeholder:text-gray-400 focus:outline-none focus:border-primary/50 text-gray-800 transition-all shadow-inner"
                   />
                 </div>
               </div>
@@ -424,13 +424,13 @@ const ReviewScreen: React.FC<ReviewScreenProps> = ({ imageUrl, data, isAnalyzing
               <div className="flex items-center gap-3">
                 <button 
                   onClick={() => setShowEditModal(false)} 
-                  className="flex-1 h-12 rounded-lg text-gray-400 font-black uppercase text-[10px] tracking-widest hover:bg-gray-50 transition-colors"
+                  className="flex-1 h-12 rounded-xl text-gray-500 font-black uppercase text-[10px] tracking-widest hover:bg-gray-100 transition-colors"
                 >
                   Cancel
                 </button>
                 <button 
                   onClick={handleSaveEdit}
-                  className={`flex-[1.5] h-12 rounded-lg font-black uppercase text-[10px] tracking-widest transition-all ${
+                  className={`flex-[1.5] h-12 rounded-xl font-black uppercase text-[10px] tracking-widest transition-all ${
                     editPartNumber && editPartNumber.trim()
                     ? 'bg-blue-500 text-white shadow-lg shadow-blue-500/20 active:scale-95 hover:brightness-105' 
                     : 'bg-gray-300 text-gray-500 cursor-not-allowed'
@@ -446,7 +446,7 @@ const ReviewScreen: React.FC<ReviewScreenProps> = ({ imageUrl, data, isAnalyzing
       {/* Discard Confirmation Dialog */}
       {showDiscardConfirm && (
         <div className="fixed inset-0 z-[100] bg-black/50 backdrop-blur-md flex items-center justify-center p-6 animate-in fade-in">
-          <div className="w-full max-w-[320px] bg-white rounded-[1.5rem] p-6 shadow-2xl animate-in zoom-in-95 duration-200">
+          <div className="w-full max-w-[320px] ios-card rounded-[1.5rem] p-6 shadow-2xl animate-in zoom-in-95 duration-200">
             <div className="flex flex-col items-center gap-4 mb-6">
               <div className="size-16 rounded-full bg-red-100 flex items-center justify-center">
                 <span className="material-symbols-outlined text-4xl text-red-500">warning</span>
