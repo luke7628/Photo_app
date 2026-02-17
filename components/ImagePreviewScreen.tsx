@@ -53,8 +53,12 @@ const ImagePreviewScreen: React.FC<ImagePreviewScreenProps> = ({
   const fileInputRef = useRef<HTMLInputElement>(null);
   const imageRef = useRef<HTMLImageElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
+  const dotTrackRef = useRef<HTMLDivElement>(null);
   const settleTimerRef = useRef<number | null>(null);
   const dismissTimerRef = useRef<number | null>(null);
+  const pageSwitchTimerRef = useRef<number | null>(null);
+  const pageSettleTimerRef = useRef<number | null>(null);
+  const isDotScrubbingRef = useRef(false);
 
   const currentPhoto: PhotoSetItem = photos[currentIndex] || { url: '', label: 'Unknown', filename: '', isSynced: false };
 
@@ -82,6 +86,17 @@ const ImagePreviewScreen: React.FC<ImagePreviewScreenProps> = ({
     }
   }, []);
 
+  const clearPageTimers = useCallback(() => {
+    if (pageSwitchTimerRef.current) {
+      window.clearTimeout(pageSwitchTimerRef.current);
+      pageSwitchTimerRef.current = null;
+    }
+    if (pageSettleTimerRef.current) {
+      window.clearTimeout(pageSettleTimerRef.current);
+      pageSettleTimerRef.current = null;
+    }
+  }, []);
+
   const animateDismissReset = useCallback(() => {
     clearDismissTimer();
     setIsDismissAnimating(true);
@@ -96,16 +111,19 @@ const ImagePreviewScreen: React.FC<ImagePreviewScreenProps> = ({
     return () => {
       clearSettleTimer();
       clearDismissTimer();
+      clearPageTimers();
     };
-  }, [clearDismissTimer, clearSettleTimer]);
+  }, [clearDismissTimer, clearPageTimers, clearSettleTimer]);
 
   useEffect(() => {
-    resetViewTransform();
+    setScale(1);
+    setPosition({ x: 0, y: 0 });
+    setDismissOffsetY(0);
     setCropBox({ x: 0, y: 0, w: 100, h: 100 });
     setActiveHandle(null);
     gestureIntentRef.current = 'none';
     axisLockRef.current = 'undecided';
-  }, [currentIndex, resetViewTransform]);
+  }, [currentIndex]);
 
   const getImageDisplayRect = () => {
     if (!imageRef.current || !containerRef.current) return null;
@@ -199,13 +217,68 @@ const ImagePreviewScreen: React.FC<ImagePreviewScreenProps> = ({
     [clearSettleTimer, getPanBounds, position, scale]
   );
 
-  const handleNext = useCallback(() => {
-    if (currentIndex < photos.length - 1) setCurrentIndex(prev => prev + 1);
-  }, [currentIndex, photos.length]);
+  const animateToIndex = useCallback(
+    (targetIndex: number) => {
+      const boundedTarget = clamp(targetIndex, 0, photos.length - 1);
+      if (boundedTarget === currentIndex) {
+        setIsPageAnimating(true);
+        setPageOffsetX(0);
+        clearPageTimers();
+        pageSettleTimerRef.current = window.setTimeout(() => {
+          setIsPageAnimating(false);
+          pageSettleTimerRef.current = null;
+        }, 300);
+        return;
+      }
 
-  const handlePrev = useCallback(() => {
-    if (currentIndex > 0) setCurrentIndex(prev => prev - 1);
-  }, [currentIndex]);
+      const width = containerRef.current?.clientWidth || window.innerWidth || 360;
+      const direction = boundedTarget > currentIndex ? -1 : 1;
+      const entryOffset = -direction * Math.min(width * 0.24, 150);
+
+      clearPageTimers();
+      setIsPageAnimating(true);
+      setPageOffsetX(direction * width);
+
+      pageSwitchTimerRef.current = window.setTimeout(() => {
+        setCurrentIndex(boundedTarget);
+        setPageOffsetX(entryOffset);
+        window.requestAnimationFrame(() => {
+          window.requestAnimationFrame(() => {
+            setPageOffsetX(0);
+          });
+        });
+
+        pageSettleTimerRef.current = window.setTimeout(() => {
+          setIsPageAnimating(false);
+          pageSettleTimerRef.current = null;
+        }, 320);
+
+        pageSwitchTimerRef.current = null;
+      }, 180);
+    },
+    [clearPageTimers, currentIndex, photos.length]
+  );
+
+  const scrubToIndex = useCallback(
+    (clientX: number) => {
+      if (!dotTrackRef.current || photos.length <= 1) return;
+      const rect = dotTrackRef.current.getBoundingClientRect();
+      if (rect.width <= 0) return;
+      const ratio = clamp((clientX - rect.left) / rect.width, 0, 1);
+      const nextIndex = Math.round(ratio * (photos.length - 1));
+      if (nextIndex !== currentIndex) {
+        clearPageTimers();
+        setIsPageAnimating(true);
+        const direction = nextIndex > currentIndex ? -1 : 1;
+        setPageOffsetX(direction * 22);
+        setCurrentIndex(nextIndex);
+        window.requestAnimationFrame(() => {
+          setPageOffsetX(0);
+        });
+      }
+    },
+    [clearPageTimers, currentIndex, photos.length]
+  );
 
   const rotateCurrent = async () => {
     if (!currentPhoto.url || isProcessing) return;
@@ -475,12 +548,17 @@ const ImagePreviewScreen: React.FC<ImagePreviewScreenProps> = ({
         }
         setPageOffsetX(0);
       } else {
-        setIsPageAnimating(true);
         if (shouldChange) {
-          if (deltaX > 0) handlePrev();
-          else handleNext();
+          animateToIndex(deltaX > 0 ? currentIndex - 1 : currentIndex + 1);
+        } else {
+          setIsPageAnimating(true);
+          setPageOffsetX(0);
+          clearPageTimers();
+          pageSettleTimerRef.current = window.setTimeout(() => {
+            setIsPageAnimating(false);
+            pageSettleTimerRef.current = null;
+          }, 300);
         }
-        setPageOffsetX(0);
         setDismissOffsetY(0);
       }
     }
@@ -560,7 +638,7 @@ const ImagePreviewScreen: React.FC<ImagePreviewScreenProps> = ({
                 style={{
                   transform: `translate3d(calc(-100% + ${pageOffsetX}px), ${dismissOffsetY}px, 0)`,
                   opacity: clamp(0.2 + Math.min(Math.abs(pageOffsetX) / 220, 0.65), 0.2, 0.85),
-                  transition: isPageAnimating ? 'transform 260ms cubic-bezier(0.2, 0.9, 0.2, 1), opacity 220ms ease' : undefined,
+                  transition: isPageAnimating ? 'transform 340ms cubic-bezier(0.22, 1, 0.36, 1), opacity 260ms ease' : undefined,
                 }}
               >
                 <img
@@ -579,7 +657,7 @@ const ImagePreviewScreen: React.FC<ImagePreviewScreenProps> = ({
                 style={{
                   transform: `translate3d(calc(100% + ${pageOffsetX}px), ${dismissOffsetY}px, 0)`,
                   opacity: clamp(0.2 + Math.min(Math.abs(pageOffsetX) / 220, 0.65), 0.2, 0.85),
-                  transition: isPageAnimating ? 'transform 260ms cubic-bezier(0.2, 0.9, 0.2, 1), opacity 220ms ease' : undefined,
+                  transition: isPageAnimating ? 'transform 340ms cubic-bezier(0.22, 1, 0.36, 1), opacity 260ms ease' : undefined,
                 }}
               >
                 <img
@@ -599,7 +677,7 @@ const ImagePreviewScreen: React.FC<ImagePreviewScreenProps> = ({
           style={{
             transform: `translate3d(${position.x + pageOffsetX}px, ${position.y + dismissOffsetY}px, 0) scale(${scale})`,
             transition: isPageAnimating
-              ? 'transform 260ms cubic-bezier(0.2, 0.9, 0.2, 1)'
+              ? 'transform 340ms cubic-bezier(0.22, 1, 0.36, 1)'
               : isDismissAnimating
                 ? 'transform 280ms cubic-bezier(0.2, 0.9, 0.2, 1)'
               : isTransformAnimating
@@ -658,14 +736,48 @@ const ImagePreviewScreen: React.FC<ImagePreviewScreenProps> = ({
       <footer className="pad-bottom-safe absolute bottom-0 inset-x-0 pt-8 px-6 bg-gradient-to-t from-black/95 via-black/60 to-transparent z-20 backdrop-blur-sm transition-all duration-300">
         {!isCropping && (
           <div
-            className="mb-3 -mx-1 px-1 overflow-x-auto overflow-y-hidden overscroll-x-contain overscroll-y-none touch-pan-x"
+            ref={dotTrackRef}
+            className="mb-2 px-1 py-1 flex items-center justify-center gap-2 touch-pan-x select-none"
+            style={{ touchAction: 'pan-x' }}
+            onPointerDown={(event) => {
+              isDotScrubbingRef.current = true;
+              (event.currentTarget as HTMLDivElement).setPointerCapture(event.pointerId);
+              scrubToIndex(event.clientX);
+            }}
+            onPointerMove={(event) => {
+              if (!isDotScrubbingRef.current) return;
+              scrubToIndex(event.clientX);
+            }}
+            onPointerUp={(event) => {
+              isDotScrubbingRef.current = false;
+              (event.currentTarget as HTMLDivElement).releasePointerCapture(event.pointerId);
+            }}
+            onPointerCancel={(event) => {
+              isDotScrubbingRef.current = false;
+              (event.currentTarget as HTMLDivElement).releasePointerCapture(event.pointerId);
+            }}
+          >
+            {photos.map((_, idx) => (
+              <button
+                key={`dot-${idx}`}
+                onClick={() => animateToIndex(idx)}
+                className={`rounded-full transition-all duration-300 ${idx === currentIndex ? 'w-2.5 h-2.5 bg-white opacity-100' : 'w-1.5 h-1.5 bg-white/45 opacity-70'}`}
+                aria-label={`Go to photo ${idx + 1}`}
+              />
+            ))}
+          </div>
+        )}
+
+        {!isCropping && (
+          <div
+            className="no-scrollbar mb-3 -mx-1 px-1 overflow-x-auto overflow-y-hidden overscroll-x-contain overscroll-y-none touch-pan-x"
             style={{ touchAction: 'pan-x' }}
           >
             <div className="flex items-center gap-2 w-max min-w-full justify-center">
               {photos.map((photo, idx) => (
                 <button
                   key={idx}
-                  onClick={() => setCurrentIndex(idx)}
+                  onClick={() => animateToIndex(idx)}
                   className={`relative shrink-0 w-14 h-14 rounded-xl overflow-hidden border transition-all duration-200 ${idx === currentIndex ? 'border-white/95 ring-2 ring-white/40 scale-105' : 'border-white/25 opacity-80 hover:opacity-100'}`}
                   aria-label={`Go to photo ${idx + 1}`}
                 >
