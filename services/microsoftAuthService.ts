@@ -193,8 +193,10 @@ export const microsoftAuthService = {
 
       if (!res.ok) {
         if (res.status === 401) {
-          // Token 过期，可以尝试刷新
-          console.warn('⚠️ [getUserInfo] Token expired (401), need refresh');
+          // Token 过期，自动尝试刷新
+          console.warn('⚠️ [getUserInfo] Token expired (401), attempting refresh...');
+          // 注意：这里不能自动调用refreshAccessToken，因为需要clientId
+          // 应该在调用者处处理Token刷新
         }
         const errText = await res.text();
         console.error('❌ [getUserInfo] Graph API error:', errText);

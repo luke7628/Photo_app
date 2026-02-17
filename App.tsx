@@ -75,12 +75,13 @@ const App: React.FC = () => {
   const [showToast, setShowToast] = useState<boolean>(false);
 
   // Toast notification helper
-  const displayToast = (message: string, duration = 3000) => {
+  const displayToast = useCallback((message: string, duration = 3000) => {
     console.log('📢 Toast:', message);
     setToastMessage(message);
     setShowToast(true);
-    setTimeout(() => setShowToast(false), duration);
-  };
+    const timer = setTimeout(() => setShowToast(false), duration);
+    return () => clearTimeout(timer);
+  }, []);
 
   // Initialize Microsoft Auth
   useEffect(() => {
@@ -94,7 +95,20 @@ const App: React.FC = () => {
             setUser(userInfo as any);
             storageService.saveUser(userInfo as any);
             oneDriveService.setToken(microsoftAuthService.accessToken!);
-            setSettings(prev => ({ ...prev, cloudProvider: 'onedrive' }));
+            setSettings(prev => ({ ...prev, cloudProvider: 'onedrive', autoUpload: true }));
+          } else {
+            // 用户信息获取失败，可能Token已过期，尝试刷新
+            console.warn('⚠️ [initMicrosoft] User info fetch failed, attempting token refresh...');
+            const refreshed = await microsoftAuthService.refreshAccessToken(MICROSOFT_CLIENT_ID);
+            if (refreshed) {
+              const retryInfo = await microsoftAuthService.getUserInfo();
+              if (retryInfo) {
+                setUser(retryInfo);
+                storageService.saveUser(retryInfo);
+                oneDriveService.setToken(microsoftAuthService.accessToken!);
+                setSettings(prev => ({ ...prev, cloudProvider: 'onedrive', autoUpload: true }));
+              }
+            }
           }
         } catch (e) {
           console.error("Microsoft Init Error:", e);
@@ -329,7 +343,7 @@ const App: React.FC = () => {
   useEffect(() => { storageService.saveProjects(projects); }, [projects]);
   useEffect(() => { storageService.saveSettings(settings); }, [settings]);
 
-  // Real Sync Cycle to OneDrive with improved error handling
+  // Real Sync Cycle to OneDrive with improved token handling
   const performSyncCycle = useCallback(async () => {
     // 需要：自动上传开启、用户已登录、有访问令牌
     const hasMicrosoftToken = oneDriveService.accessToken;
@@ -355,6 +369,33 @@ const App: React.FC = () => {
 
     try {
       let targetFolderId: string | null = null;
+
+      // ==================== Token 有效性检查 ====================
+      // 在同步前检查Token是否过期，如果过期则尝试刷新
+      try {
+        // 通过调用Graph API来检查Token是否有效
+        const testRes = await fetch('https://graph.microsoft.com/v1.0/me', {
+          headers: {
+            'Authorization': `Bearer ${microsoftAuthService.accessToken}`,
+            'Content-Type': 'application/json'
+          }
+        });
+
+        if (testRes.status === 401) {
+          console.warn('⚠️ [Sync] Token expired, attempting refresh...');
+          const refreshSuccess = await microsoftAuthService.refreshAccessToken(MICROSOFT_CLIENT_ID);
+          
+          if (refreshSuccess && microsoftAuthService.accessToken) {
+            console.log('✅ [Sync] Token refreshed successfully');
+            oneDriveService.setToken(microsoftAuthService.accessToken);
+          } else {
+            throw new Error('Token expired and refresh failed. Please login again.');
+          }
+        }
+      } catch (tokenCheckError) {
+        console.error('❌ [Sync] Token check failed:', tokenCheckError);
+        // 继续尝试同步，可能API仍然可用
+      }
 
       // ==================== OneDrive 同步流程 ====================
       // 1. 确保根文件夹"Dematic/FieldPhotos"存在
@@ -422,6 +463,11 @@ const App: React.FC = () => {
             uploadedCount++;
             console.log(`✅ [Sync] Uploaded: ${photo.filename}`);
           } catch (uploadError: any) {
+            // 如果是401错误，说明Token失效
+            if (uploadError?.message?.includes('401')) {
+              console.error(`❌ [Sync] Token expired during upload, aborting sync`);
+              throw new Error('Token expired. Please login again.');
+            }
             console.error(`❌ [Sync] Failed to upload ${photo.filename}:`, uploadError?.message || uploadError);
             // 继续上传下一张照片
           }
@@ -458,12 +504,20 @@ const App: React.FC = () => {
 
     } catch (error: any) {
       console.error("❌ [Sync] Cycle Error:", error?.message || error);
-      displayToast(`❌ 同步失败: ${error?.message || '未知错误'}`);
+      
+      // 如果是登陆过期，提示用户重新登陆
+      if (error?.message?.includes('Token') || error?.message?.includes('401')) {
+        displayToast('❌ 登陆已过期，请重新登陆');
+        handleLogout();
+      } else {
+        displayToast(`❌ 同步失败: ${error?.message || '未知错误'}`);
+      }
+      
       // Reset syncing flag on error
       setPrinters(prev => prev.map(p => p.id === targetPrinter.id ? { ...p, isSyncing: false } : p));
       if (selectedPrinter?.id === targetPrinter.id) setSelectedPrinter(prev => prev ? { ...prev, isSyncing: false } : null);
     }
-  }, [settings.autoUpload, user, printers, projects, selectedPrinter, settings.useSubfoldersBySN, settings.cloudProvider, settings.drivePath]);
+  }, [settings.autoUpload, user, printers, projects, selectedPrinter, settings.useSubfoldersBySN, settings.cloudProvider, settings.drivePath, displayToast]);
 
   useEffect(() => {
     let interval: number;

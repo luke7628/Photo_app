@@ -35,23 +35,38 @@ interface BarcodeResult {
 let preprocessedImageCache: { base64: string; processed: string } | null = null;
 
 /**
- * 加载 Base64 图像
+ * 加载 Base64 图像（带内存清理）
  */
 function loadImageFromBase64(base64Image: string): Promise<HTMLImageElement> {
   return new Promise((resolve, reject) => {
     const img = new Image();
+    let isResolved = false;
+    
     const timeout = setTimeout(() => {
+      isResolved = true;
+      img.onload = null;
+      img.onerror = null;
+      img.src = ''; // 清理src
       reject(new Error('Image load timeout (10s)'));
     }, 10000);
 
     img.onload = () => {
+      if (isResolved) return;
+      isResolved = true;
       clearTimeout(timeout);
+      img.onload = null;
+      img.onerror = null;
       console.log(`✅ [loadImage] ${img.width}x${img.height} pixels loaded`);
       resolve(img);
     };
 
     img.onerror = (error) => {
+      if (isResolved) return;
+      isResolved = true;
       clearTimeout(timeout);
+      img.onload = null;
+      img.onerror = null;
+      img.src = ''; // 清理src
       console.error(`❌ [loadImage] 加载失败:`, error);
       reject(new Error('Failed to load image'));
     };
@@ -83,6 +98,33 @@ function normalizeBase64(base64Image: string): string {
 }
 
 /**
+ * 安全的Canvas操作（自动清理）
+ */
+async function withCanvas<T>(
+  width: number,
+  height: number,
+  operation: (canvas: HTMLCanvasElement, ctx: CanvasRenderingContext2D) => T
+): Promise<T> {
+  const canvas = document.createElement('canvas');
+  canvas.width = width;
+  canvas.height = height;
+  const ctx = canvas.getContext('2d');
+  
+  if (!ctx) {
+    throw new Error('Unable to get canvas context');
+  }
+  
+  try {
+    return operation(canvas, ctx);
+  } finally {
+    // 清理Canvas
+    ctx.clearRect(0, 0, width, height);
+    canvas.width = 0;
+    canvas.height = 0;
+  }
+}
+
+/**
  * 智能分辨率调整
  */
 async function optimizeResolution(base64Image: string, maxDimension: number = 1200): Promise<string> {
@@ -95,7 +137,6 @@ async function optimizeResolution(base64Image: string, maxDimension: number = 12
       return base64Image;
     }
 
-    const canvas = document.createElement('canvas');
     let newWidth = img.width;
     let newHeight = img.height;
 
@@ -111,19 +152,13 @@ async function optimizeResolution(base64Image: string, maxDimension: number = 12
       }
     }
 
-    canvas.width = newWidth;
-    canvas.height = newHeight;
-
-    const ctx = canvas.getContext('2d');
-    if (!ctx) return base64Image;
-
-    ctx.imageSmoothingEnabled = true;
-    ctx.imageSmoothingQuality = 'high';
-    ctx.drawImage(img, 0, 0, newWidth, newHeight);
-
-    const optimized = canvas.toDataURL('image/jpeg', 0.90).split(',')[1];
-    console.log(`📐 [optimize] ${img.width}x${img.height} → ${newWidth}x${newHeight}`);
-    return optimized;
+    return await withCanvas(newWidth, newHeight, (canvas, ctx) => {
+      ctx.imageSmoothingEnabled = true;
+      ctx.imageSmoothingQuality = 'high';
+      ctx.drawImage(img, 0, 0, newWidth, newHeight);
+      console.log(`📐 [optimize] ${img.width}x${img.height} → ${newWidth}x${newHeight}`);
+      return canvas.toDataURL('image/jpeg', 0.90).split(',')[1];
+    });
   } catch (error) {
     console.warn('⚠️ [optimizeResolution] 失败，使用原图');
     return base64Image;
@@ -138,25 +173,17 @@ async function rotateBase64(base64Image: string, angle: 90 | 180 | 270): Promise
 
   try {
     const img = await loadImageFromBase64(base64Image);
-    const canvas = document.createElement('canvas');
-    const ctx = canvas.getContext('2d');
-    if (!ctx) return base64Image;
+    const width = angle === 180 ? img.width : img.height;
+    const height = angle === 180 ? img.height : img.width;
 
-    if (angle === 180) {
-      canvas.width = img.width;
-      canvas.height = img.height;
-    } else {
-      canvas.width = img.height;
-      canvas.height = img.width;
-    }
-
-    ctx.save();
-    ctx.translate(canvas.width / 2, canvas.height / 2);
-    ctx.rotate((angle * Math.PI) / 180);
-    ctx.drawImage(img, -img.width / 2, -img.height / 2);
-    ctx.restore();
-
-    return canvas.toDataURL('image/jpeg', 0.90).split(',')[1];
+    return await withCanvas(width, height, (canvas, ctx) => {
+      ctx.save();
+      ctx.translate(canvas.width / 2, canvas.height / 2);
+      ctx.rotate((angle * Math.PI) / 180);
+      ctx.drawImage(img, -img.width / 2, -img.height / 2);
+      ctx.restore();
+      return canvas.toDataURL('image/jpeg', 0.90).split(',')[1];
+    });
   } catch (error) {
     console.warn(`⚠️ [rotate] ${angle}° 失败`);
     return base64Image;
@@ -171,66 +198,63 @@ async function otsuBinarize(base64Image: string): Promise<string> {
 
   try {
     const img = await loadImageFromBase64(base64Image);
-    const canvas = document.createElement('canvas');
-    canvas.width = img.width;
-    canvas.height = img.height;
-    const ctx = canvas.getContext('2d');
-    if (!ctx) return base64Image;
 
-    ctx.drawImage(img, 0, 0);
-    const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-    const data = imageData.data;
+    return await withCanvas(img.width, img.height, (canvas, ctx) => {
+      ctx.drawImage(img, 0, 0);
+      const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+      const data = imageData.data;
 
-    // 计算直方图
-    const histogram = new Array(256).fill(0);
-    let totalPixels = 0;
+      // 计算直方图
+      const histogram = new Array(256).fill(0);
+      let totalPixels = 0;
 
-    for (let i = 0; i < data.length; i += 4) {
-      const gray = data[i] * 0.299 + data[i + 1] * 0.587 + data[i + 2] * 0.114;
-      histogram[Math.floor(gray)]++;
-      totalPixels++;
-    }
-
-    // Otsu 算法
-    let sum = 0;
-    for (let i = 0; i < 256; i++) {
-      sum += i * histogram[i];
-    }
-
-    let sumB = 0;
-    let wB = 0;
-    let maxVar = 0;
-    let threshold = 0;
-
-    for (let t = 0; t < 256; t++) {
-      wB += histogram[t];
-      if (wB === 0) continue;
-
-      const wF = totalPixels - wB;
-      if (wF === 0) break;
-
-      sumB += t * histogram[t];
-      const meanB = sumB / wB;
-      const meanF = (sum - sumB) / wF;
-      const variance = wB * wF * Math.pow(meanB - meanF, 2);
-
-      if (variance > maxVar) {
-        maxVar = variance;
-        threshold = t;
+      for (let i = 0; i < data.length; i += 4) {
+        const gray = data[i] * 0.299 + data[i + 1] * 0.587 + data[i + 2] * 0.114;
+        histogram[Math.floor(gray)]++;
+        totalPixels++;
       }
-    }
 
-    // 应用二值化
-    for (let i = 0; i < data.length; i += 4) {
-      const gray = data[i] * 0.299 + data[i + 1] * 0.587 + data[i + 2] * 0.114;
-      const bw = gray > threshold ? 255 : 0;
-      data[i] = bw;
-      data[i + 1] = bw;
-      data[i + 2] = bw;
-    }
+      // Otsu 算法
+      let sum = 0;
+      for (let i = 0; i < 256; i++) {
+        sum += i * histogram[i];
+      }
 
-    ctx.putImageData(imageData, 0, 0);
-    return canvas.toDataURL('image/jpeg', 0.95).split(',')[1];
+      let sumB = 0;
+      let wB = 0;
+      let maxVar = 0;
+      let threshold = 0;
+
+      for (let t = 0; t < 256; t++) {
+        wB += histogram[t];
+        if (wB === 0) continue;
+
+        const wF = totalPixels - wB;
+        if (wF === 0) break;
+
+        sumB += t * histogram[t];
+        const meanB = sumB / wB;
+        const meanF = (sum - sumB) / wF;
+        const variance = wB * wF * Math.pow(meanB - meanF, 2);
+
+        if (variance > maxVar) {
+          maxVar = variance;
+          threshold = t;
+        }
+      }
+
+      // 应用二值化
+      for (let i = 0; i < data.length; i += 4) {
+        const gray = data[i] * 0.299 + data[i + 1] * 0.587 + data[i + 2] * 0.114;
+        const bw = gray > threshold ? 255 : 0;
+        data[i] = bw;
+        data[i + 1] = bw;
+        data[i + 2] = bw;
+      }
+
+      ctx.putImageData(imageData, 0, 0);
+      return canvas.toDataURL('image/jpeg', 0.95).split(',')[1];
+    });
   } catch (error) {
     console.warn('⚠️ [otsuBinarize] 失败');
     return base64Image;
@@ -245,20 +269,16 @@ async function cropToRegion(base64Image: string, x: number, y: number, width: nu
 
   try {
     const img = await loadImageFromBase64(base64Image);
-    const canvas = document.createElement('canvas');
-    const ctx = canvas.getContext('2d');
-    if (!ctx) return base64Image;
 
     const cropX = Math.floor(img.width * x);
     const cropY = Math.floor(img.height * y);
     const cropWidth = Math.floor(img.width * width);
     const cropHeight = Math.floor(img.height * height);
 
-    canvas.width = cropWidth;
-    canvas.height = cropHeight;
-    ctx.drawImage(img, cropX, cropY, cropWidth, cropHeight, 0, 0, cropWidth, cropHeight);
-
-    return canvas.toDataURL('image/jpeg', 0.90).split(',')[1];
+    return await withCanvas(cropWidth, cropHeight, (canvas, ctx) => {
+      ctx.drawImage(img, cropX, cropY, cropWidth, cropHeight, 0, 0, cropWidth, cropHeight);
+      return canvas.toDataURL('image/jpeg', 0.90).split(',')[1];
+    });
   } catch (error) {
     console.warn('⚠️ [cropToRegion] 失败');
     return base64Image;
@@ -279,18 +299,15 @@ async function upscaleIfNeeded(base64Image: string, minWidth: number = 800): Pro
     }
 
     const scale = minWidth / img.width;
-    const canvas = document.createElement('canvas');
-    canvas.width = Math.floor(img.width * scale);
-    canvas.height = Math.floor(img.height * scale);
+    const newWidth = Math.floor(img.width * scale);
+    const newHeight = Math.floor(img.height * scale);
 
-    const ctx = canvas.getContext('2d');
-    if (!ctx) return base64Image;
-
-    ctx.imageSmoothingEnabled = true;
-    ctx.imageSmoothingQuality = 'high';
-    ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-
-    return canvas.toDataURL('image/jpeg', 0.92).split(',')[1];
+    return await withCanvas(newWidth, newHeight, (canvas, ctx) => {
+      ctx.imageSmoothingEnabled = true;
+      ctx.imageSmoothingQuality = 'high';
+      ctx.drawImage(img, 0, 0, newWidth, newHeight);
+      return canvas.toDataURL('image/jpeg', 0.92).split(',')[1];
+    });
   } catch (error) {
     console.warn('⚠️ [upscaleIfNeeded] 失败');
     return base64Image;
