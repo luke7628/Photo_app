@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { AppScreen, Printer, Project, PHOTO_LABELS, PhotoSetItem, UserPreferences, MicrosoftUser, ViewMode } from './types';
 import { MOCK_PRINTERS, MOCK_PROJECTS } from './constants';
 import { storageService } from './services/storageService';
@@ -363,14 +363,26 @@ const App: React.FC = () => {
   // Persist Printers to IndexedDB whenever state changes
   useEffect(() => {
     if (printers.length > 0) {
-      storageService.savePrinters(printers).catch(console.error);
+      storageService.savePrinters(printers).catch((error) => {
+        console.error('❌ [Storage] Failed to persist printers:', error);
+        // Bug Fix: 提示用户存储失败
+        displayToast('⚠️ 本地存储失败，数据可能未保存');
+      });
     }
-  }, [printers]);
+  }, [printers, displayToast]);
 
   // Persist other small configs
-  useEffect(() => { storageService.saveProjects(projects); }, [projects]);
-  useEffect(() => { storageService.saveSettings(settings); }, [settings]);
+  useEffect(() => {
+    storageService.saveProjects(projects);
+  }, [projects]);
+  
+  useEffect(() => {
+    storageService.saveSettings(settings);
+  }, [settings]);
 
+  // Bug Fix: 添加Token刷新状态标志，防止并发刷新
+  const refreshingTokenRef = useRef<boolean>(false);
+  
   // Real Sync Cycle to OneDrive with improved token handling
   const performSyncCycle = useCallback(async () => {
     // Bug Fix: 添加mounted标志防止组件卸载后调用setState
@@ -414,13 +426,25 @@ const App: React.FC = () => {
 
         if (testRes.status === 401) {
           console.warn('⚠️ [Sync] Token expired, attempting refresh...');
-          const refreshSuccess = await microsoftAuthService.refreshAccessToken(MICROSOFT_CLIENT_ID);
-          
-          if (refreshSuccess && microsoftAuthService.accessToken) {
-            console.log('✅ [Sync] Token refreshed successfully');
-            oneDriveService.setToken(microsoftAuthService.accessToken);
+          // Bug Fix: 防止并发Token刷新
+          if (!refreshingTokenRef.current) {
+            refreshingTokenRef.current = true;
+            try {
+              const refreshSuccess = await microsoftAuthService.refreshAccessToken(MICROSOFT_CLIENT_ID);
+              
+              if (refreshSuccess && microsoftAuthService.accessToken) {
+                console.log('✅ [Sync] Token refreshed successfully');
+                oneDriveService.setToken(microsoftAuthService.accessToken);
+              } else {
+                throw new Error('Token expired and refresh failed. Please login again.');
+              }
+            } finally {
+              refreshingTokenRef.current = false;
+            }
           } else {
-            throw new Error('Token expired and refresh failed. Please login again.');
+            // Token正在被刷新，等待一下
+            console.log('⏳ [Sync] Token refresh in progress, retrying later...');
+            return;
           }
         }
       } catch (tokenCheckError) {
@@ -430,7 +454,11 @@ const App: React.FC = () => {
 
       // ==================== OneDrive 同步流程 ====================
       // 1. 确保根文件夹"Dematic/FieldPhotos"存在
-      const drivePath = settings.drivePath || '/Dematic/FieldPhotos/';
+      // Bug Fix: 规范化驱动器路径（移除尾部斜杠）
+      let drivePath = settings.drivePath || '/Dematic/FieldPhotos';
+      if (drivePath.endsWith('/')) {
+        drivePath = drivePath.slice(0, -1);
+      }
       console.log(`📂 [Sync] Checking root folder: ${drivePath}`);
       
       let rootFolderId = await oneDriveService.findFolder(drivePath);
@@ -446,7 +474,7 @@ const App: React.FC = () => {
       // 2. 确保项目文件夹存在
       const project = projects.find(p => p.id === targetPrinter.projectId);
       const projectName = project ? project.name : 'Unassigned Project';
-      const projectPath = `${settings.drivePath}${projectName}`;
+      const projectPath = `${drivePath}/${projectName}`;
       console.log(`📂 [Sync] Checking project folder: ${projectPath}`);
       
       let projectFolderId = await oneDriveService.findFolder(projectPath);
@@ -557,7 +585,7 @@ const App: React.FC = () => {
     
     // Bug Fix: 标记异步操作完成
     isMounted = false;
-  }, [settings.autoUpload, user, printers, projects, selectedPrinter, settings.useSubfoldersBySN, settings.cloudProvider, settings.drivePath, displayToast]);
+  }, [settings.autoUpload, user, printers, projects, selectedPrinter, settings.useSubfoldersBySN, settings.cloudProvider, settings.drivePath, displayToast, handleLogout]);
 
   useEffect(() => {
     let interval: number;
@@ -886,6 +914,22 @@ const App: React.FC = () => {
   };
 
   const finalizeSession = useCallback((finalPhotos: PhotoSetItem[], data: { serialNumber: string; partNumber?: string }) => {
+    // Bug Fix: 验证 activeProjectId 的有效性
+    const validProject = projects.find(p => p.id === activeProjectId);
+    if (!validProject) {
+      console.error('❌ [finalizeSession] Invalid project ID:', activeProjectId);
+      displayToast('❌ 项目已被删除，请重新选择项目');
+      setCurrentScreen(AppScreen.PROJECT_LIST);
+      return;
+    }
+    
+    // Bug Fix: 验证所有必要的照片数据都已准备好
+    if (finalPhotos.length === 0) {
+      console.error('❌ [finalizeSession] No photos to finalize');
+      displayToast('❌ 没有拍摄任何照片，请重新开始');
+      return;
+    }
+    
     const completePhotos: PhotoSetItem[] = PHOTO_LABELS.map((label, i) => {
       const existing = finalPhotos.find(p => p.label === label);
       return existing || { url: '', label, filename: `${data.serialNumber}_${i + 1}.jpg`, isSynced: false };
@@ -893,7 +937,7 @@ const App: React.FC = () => {
 
     const newPrinter: Printer = { 
       id: selectedPrinter?.id || `local-${Date.now()}`, 
-      projectId: activeProjectId || 'proj-1', 
+      projectId: activeProjectId, // 现在已验证有效
       serialNumber: data.serialNumber, 
       partNumber: data.partNumber || '',
       site: 'Site Alpha', 
@@ -910,26 +954,51 @@ const App: React.FC = () => {
       }
     });
     
+    // Bug Fix: 验证状态更新后再导航，避免状态混乱
     setSelectedPrinter(newPrinter);
     setSessionIndex(0);
     setSessionPhotos([]);
     setSessionData(null);
     setBaseSerialNumber('');
+    setBasePartNumber(''); // Bug Fix: 添加缺失的清理
     setIsSingleRetake(false);
+    setLastScreen(AppScreen.GALLERY); // Bug Fix: 显式设置正确的返回屏幕
     setCurrentScreen(AppScreen.DETAILS);
-  }, [selectedPrinter, activeProjectId]);
+  }, [selectedPrinter, activeProjectId, projects, displayToast]);
 
   const processConfirmation = useCallback((img: string, data: { serialNumber: string; partNumber?: string }) => {
+    // Bug Fix: 验证序列号和部件号的有效性
+    if (!data.serialNumber || data.serialNumber.trim().length === 0) {
+      displayToast('❌ 序列号不能为空，请重新拍摄或手动输入');
+      return;
+    }
+    
+    // 清理并验证序列号 - 移除特殊字符但保留必要的格式
+    const cleanedSn = data.serialNumber.replace(/[^\w\-]/g, '');
+    if (cleanedSn.length === 0) {
+      displayToast('❌ 序列号格式无效，请重新输入');
+      return;
+    }
+    
     // 从sessionStorage中读取拍摄时的旋转角度
-    const lastRotationStr = sessionStorage.getItem('lastCaptureRotation');
-    const rotation = lastRotationStr ? parseInt(lastRotationStr, 10) : 0;
+    let rotation = 0;
+    try {
+      const lastRotationStr = sessionStorage.getItem('lastCaptureRotation');
+      if (lastRotationStr) {
+        rotation = parseInt(lastRotationStr, 10);
+        // Bug Fix: 立即清理，防止后续拍摄使用错误的旋转角度
+        sessionStorage.removeItem('lastCaptureRotation');
+      }
+    } catch (error) {
+      console.warn('⚠️ [processConfirmation] Failed to read rotation from sessionStorage:', error);
+    }
     
     const newPhoto: PhotoSetItem = { 
       url: img, 
       label: PHOTO_LABELS[sessionIndex], 
-      filename: `${data.serialNumber}_${sessionIndex + 1}.jpg`, 
+      filename: `${cleanedSn}_${sessionIndex + 1}.jpg`, 
       isSynced: false,
-      rotation // 保存拍摄时的旋转角度
+      rotation
     };
 
     if (isSingleRetake && selectedPrinter) {
@@ -951,9 +1020,9 @@ const App: React.FC = () => {
       setSessionIndex(prev => prev + 1);
       setCurrentScreen(AppScreen.CAMERA);
     } else {
-      finalizeSession(updatedSessionPhotos, data);
+      finalizeSession(updatedSessionPhotos, { ...data, serialNumber: cleanedSn });
     }
-  }, [isSingleRetake, selectedPrinter, sessionIndex, sessionPhotos, lastScreen, finalizeSession]);
+  }, [isSingleRetake, selectedPrinter, sessionIndex, sessionPhotos, lastScreen, finalizeSession, displayToast]);
 
   const activeProject = useMemo(() => projects.find(p => p.id === activeProjectId), [projects, activeProjectId]);
   const activePrinters = useMemo(() => printers.filter(p => p.projectId === activeProjectId), [printers, activeProjectId]);

@@ -28,25 +28,59 @@ const getDB = (): Promise<IDBDatabase> => {
 
 export const storageService = {
   // Sync Small Configs (Local Storage is fine here)
-  saveProjects: (projects: Project[]) => localStorage.setItem(KEYS.PROJECTS, JSON.stringify(projects)),
+  saveProjects: (projects: Project[]) => {
+    try {
+      localStorage.setItem(KEYS.PROJECTS, JSON.stringify(projects));
+    } catch (error) {
+      console.error('❌ [Storage] Failed to save projects:', error);
+    }
+  },
+  
   loadProjects: (): Project[] | null => {
-    const data = localStorage.getItem(KEYS.PROJECTS);
-    return data ? JSON.parse(data) : null;
+    try {
+      const data = localStorage.getItem(KEYS.PROJECTS);
+      return data ? JSON.parse(data) : null;
+    } catch (error) {
+      console.error('❌ [Storage] Failed to load projects:', error);
+      return null;
+    }
   },
 
   saveUser: (user: MicrosoftUser | null) => {
-    if (user) localStorage.setItem(KEYS.USER, JSON.stringify(user));
-    else localStorage.removeItem(KEYS.USER);
+    try {
+      if (user) localStorage.setItem(KEYS.USER, JSON.stringify(user));
+      else localStorage.removeItem(KEYS.USER);
+    } catch (error) {
+      console.error('❌ [Storage] Failed to save user:', error);
+    }
   },
+  
   loadUser: (): MicrosoftUser | null => {
-    const data = localStorage.getItem(KEYS.USER);
-    return data ? JSON.parse(data) : null;
+    try {
+      const data = localStorage.getItem(KEYS.USER);
+      return data ? JSON.parse(data) : null;
+    } catch (error) {
+      console.error('❌ [Storage] Failed to load user:', error);
+      return null;
+    }
   },
 
-  saveSettings: (settings: UserPreferences) => localStorage.setItem(KEYS.SETTINGS, JSON.stringify(settings)),
+  saveSettings: (settings: UserPreferences) => {
+    try {
+      localStorage.setItem(KEYS.SETTINGS, JSON.stringify(settings));
+    } catch (error) {
+      console.error('❌ [Storage] Failed to save settings:', error);
+    }
+  },
+  
   loadSettings: (): UserPreferences | null => {
-    const data = localStorage.getItem(KEYS.SETTINGS);
-    return data ? JSON.parse(data) : null;
+    try {
+      const data = localStorage.getItem(KEYS.SETTINGS);
+      return data ? JSON.parse(data) : null;
+    } catch (error) {
+      console.error('❌ [Storage] Failed to load settings:', error);
+      return null;
+    }
   },
 
   // Heavy Data (IndexedDB)
