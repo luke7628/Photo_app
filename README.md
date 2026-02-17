@@ -2,6 +2,13 @@
 
 A modern web application for capturing and managing printer documentation photos with intelligent barcode/QR code recognition.
 
+## Recent Engineering Updates
+
+- Refined iOS-like image preview interactions with neighbor-image peek during horizontal swipe.
+- Added rubber-band bounds and bounce-back settling for pan/zoom gestures.
+- Improved crop reliability by loading from the current source before canvas processing.
+- Repositioned pagination indicators to avoid overlap with bottom action controls.
+
 ## Features
 
 ✨ **Intelligent Barcode Recognition**:

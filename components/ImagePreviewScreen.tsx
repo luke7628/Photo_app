@@ -35,10 +35,11 @@ const ImagePreviewScreen: React.FC<ImagePreviewScreenProps> = ({
   const [scale, setScale] = useState(1);
   const [position, setPosition] = useState({ x: 0, y: 0 });
   const [isCropping, setIsCropping] = useState(false);
-  const [cropBox, setCropBox] = useState({ x: 10, y: 10, w: 80, h: 80 });
+  const [cropBox, setCropBox] = useState({ x: 0, y: 0, w: 100, h: 100 });
   const [activeHandle, setActiveHandle] = useState<string | null>(null);
   const [pageOffsetX, setPageOffsetX] = useState(0);
   const [isPageAnimating, setIsPageAnimating] = useState(false);
+  const [isTransformAnimating, setIsTransformAnimating] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
 
   const gestureIntentRef = useRef<GestureIntent>('none');
@@ -50,6 +51,7 @@ const ImagePreviewScreen: React.FC<ImagePreviewScreenProps> = ({
   const fileInputRef = useRef<HTMLInputElement>(null);
   const imageRef = useRef<HTMLImageElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
+  const settleTimerRef = useRef<number | null>(null);
 
   const currentPhoto: PhotoSetItem = photos[currentIndex] || { url: '', label: 'Unknown', filename: '', isSynced: false };
 
@@ -58,11 +60,23 @@ const ImagePreviewScreen: React.FC<ImagePreviewScreenProps> = ({
     setPosition({ x: 0, y: 0 });
     setPageOffsetX(0);
     setIsPageAnimating(false);
+    setIsTransformAnimating(false);
+  }, []);
+
+  const clearSettleTimer = useCallback(() => {
+    if (settleTimerRef.current) {
+      window.clearTimeout(settleTimerRef.current);
+      settleTimerRef.current = null;
+    }
   }, []);
 
   useEffect(() => {
+    return () => clearSettleTimer();
+  }, [clearSettleTimer]);
+
+  useEffect(() => {
     resetViewTransform();
-    setCropBox({ x: 8, y: 8, w: 84, h: 84 });
+    setCropBox({ x: 0, y: 0, w: 100, h: 100 });
     setActiveHandle(null);
     gestureIntentRef.current = 'none';
     axisLockRef.current = 'undecided';
@@ -100,6 +114,57 @@ const ImagePreviewScreen: React.FC<ImagePreviewScreenProps> = ({
     };
   };
 
+  const getPanBounds = useCallback(
+    (nextScale: number) => {
+      const displayRect = getImageDisplayRect();
+      if (!displayRect || nextScale <= 1) return { maxX: 0, maxY: 0 };
+
+      const scaledW = displayRect.w * nextScale;
+      const scaledH = displayRect.h * nextScale;
+      return {
+        maxX: Math.max(0, (scaledW - displayRect.w) / 2),
+        maxY: Math.max(0, (scaledH - displayRect.h) / 2),
+      };
+    },
+    []
+  );
+
+  const applyRubberBand = (value: number, min: number, max: number) => {
+    if (value < min) return min + (value - min) * 0.28;
+    if (value > max) return max + (value - max) * 0.28;
+    return value;
+  };
+
+  const settleTransform = useCallback(
+    (targetScale: number = scale, targetPosition: { x: number; y: number } = position) => {
+      const boundedScale = clamp(targetScale, 1, 5);
+      const { maxX, maxY } = getPanBounds(boundedScale);
+      const nextPosition = {
+        x: clamp(targetPosition.x, -maxX, maxX),
+        y: clamp(targetPosition.y, -maxY, maxY),
+      };
+
+      const needScaleAdjust = Math.abs(boundedScale - scale) > 0.001;
+      const needPositionAdjust =
+        Math.abs(nextPosition.x - targetPosition.x) > 0.5 ||
+        Math.abs(nextPosition.y - targetPosition.y) > 0.5;
+
+      if (!needScaleAdjust && !needPositionAdjust) {
+        return;
+      }
+
+      clearSettleTimer();
+      setIsTransformAnimating(true);
+      setScale(boundedScale);
+      setPosition(nextPosition);
+      settleTimerRef.current = window.setTimeout(() => {
+        setIsTransformAnimating(false);
+        settleTimerRef.current = null;
+      }, 280);
+    },
+    [clearSettleTimer, getPanBounds, position, scale]
+  );
+
   const handleNext = useCallback(() => {
     if (currentIndex < photos.length - 1) setCurrentIndex(prev => prev + 1);
   }, [currentIndex, photos.length]);
@@ -134,13 +199,15 @@ const ImagePreviewScreen: React.FC<ImagePreviewScreenProps> = ({
   };
 
   const performCrop = async () => {
-    if (!imageRef.current || isProcessing) return;
+    if (!currentPhoto.url || isProcessing) return;
     setIsProcessing(true);
     try {
-      const img = imageRef.current;
+      const img = await loadImage(currentPhoto.url);
       const canvas = document.createElement('canvas');
       const ctx = canvas.getContext('2d');
-      if (!ctx) return;
+      if (!ctx) {
+        throw new Error('Canvas context unavailable');
+      }
 
       const sourceX = (cropBox.x / 100) * img.naturalWidth;
       const sourceY = (cropBox.y / 100) * img.naturalHeight;
@@ -154,6 +221,8 @@ const ImagePreviewScreen: React.FC<ImagePreviewScreenProps> = ({
       onReplace(currentIndex, canvas.toDataURL('image/jpeg', 0.92));
       setIsCropping(false);
       resetViewTransform();
+    } catch (error) {
+      console.error('Crop failed:', error);
     } finally {
       setIsProcessing(false);
     }
@@ -161,6 +230,8 @@ const ImagePreviewScreen: React.FC<ImagePreviewScreenProps> = ({
 
   const onTouchStart = (event: React.TouchEvent) => {
     if (isProcessing) return;
+    clearSettleTimer();
+    setIsTransformAnimating(false);
 
     const touch = event.touches[0];
     const displayRect = getImageDisplayRect();
@@ -270,7 +341,20 @@ const ImagePreviewScreen: React.FC<ImagePreviewScreenProps> = ({
         event.touches[0].clientY - event.touches[1].clientY
       );
       const delta = distance - pinchDistanceRef.current;
-      setScale(prev => clamp(prev + delta * 0.008, 1, 5));
+      setScale(prev => {
+        const nextScale = clamp(prev + delta * 0.008, 1, 5);
+        if (nextScale <= 1.01) {
+          setPosition({ x: 0, y: 0 });
+          return 1;
+        }
+
+        const { maxX, maxY } = getPanBounds(nextScale);
+        setPosition(prevPosition => ({
+          x: applyRubberBand(prevPosition.x, -maxX, maxX),
+          y: applyRubberBand(prevPosition.y, -maxY, maxY),
+        }));
+        return nextScale;
+      });
       pinchDistanceRef.current = distance;
       event.preventDefault();
       return;
@@ -296,6 +380,7 @@ const ImagePreviewScreen: React.FC<ImagePreviewScreenProps> = ({
       const overPull = (atFirst && deltaX > 0) || (atLast && deltaX < 0);
       const damping = overPull ? 0.35 : 1;
       setPageOffsetX(deltaX * damping);
+      lastTouchRef.current = { x: touch.clientX, y: touch.clientY };
       event.preventDefault();
       return;
     }
@@ -303,7 +388,14 @@ const ImagePreviewScreen: React.FC<ImagePreviewScreenProps> = ({
     if (gestureIntentRef.current === 'pan' && scale > 1) {
       const moveX = touch.clientX - lastTouchRef.current.x;
       const moveY = touch.clientY - lastTouchRef.current.y;
-      setPosition(prev => ({ x: prev.x + moveX, y: prev.y + moveY }));
+      setPosition(prev => {
+        const next = { x: prev.x + moveX, y: prev.y + moveY };
+        const { maxX, maxY } = getPanBounds(scale);
+        return {
+          x: applyRubberBand(next.x, -maxX, maxX),
+          y: applyRubberBand(next.y, -maxY, maxY),
+        };
+      });
       lastTouchRef.current = { x: touch.clientX, y: touch.clientY };
       event.preventDefault();
     }
@@ -324,9 +416,12 @@ const ImagePreviewScreen: React.FC<ImagePreviewScreenProps> = ({
       setPageOffsetX(0);
     }
 
-    if (gestureIntentRef.current === 'pan' && scale <= 1.02) {
-      setScale(1);
-      setPosition({ x: 0, y: 0 });
+    if (gestureIntentRef.current === 'pan' || gestureIntentRef.current === 'pinch') {
+      if (scale <= 1.02) {
+        settleTransform(1, { x: 0, y: 0 });
+      } else {
+        settleTransform(scale, position);
+      }
     }
 
     setActiveHandle(null);
@@ -388,11 +483,57 @@ const ImagePreviewScreen: React.FC<ImagePreviewScreenProps> = ({
         onTouchEnd={onTouchEnd}
         onTouchCancel={onTouchEnd}
       >
+        {!isCropping && scale <= 1.02 && (
+          <>
+            {currentIndex > 0 && (
+              <div
+                className="absolute inset-0 flex items-center justify-center pointer-events-none"
+                style={{
+                  transform: `translateX(calc(-100% + ${pageOffsetX}px))`,
+                  opacity: clamp(0.2 + Math.min(Math.abs(pageOffsetX) / 220, 0.65), 0.2, 0.85),
+                  transition: isPageAnimating ? 'transform 260ms cubic-bezier(0.2, 0.9, 0.2, 1), opacity 220ms ease' : undefined,
+                }}
+              >
+                <img
+                  src={photos[currentIndex - 1].url}
+                  className="max-w-full max-h-full object-contain select-none"
+                  alt={photos[currentIndex - 1].label}
+                  draggable={false}
+                  style={photos[currentIndex - 1].rotation ? { transform: `rotate(${photos[currentIndex - 1].rotation}deg)` } : undefined}
+                />
+              </div>
+            )}
+
+            {currentIndex < photos.length - 1 && (
+              <div
+                className="absolute inset-0 flex items-center justify-center pointer-events-none"
+                style={{
+                  transform: `translateX(calc(100% + ${pageOffsetX}px))`,
+                  opacity: clamp(0.2 + Math.min(Math.abs(pageOffsetX) / 220, 0.65), 0.2, 0.85),
+                  transition: isPageAnimating ? 'transform 260ms cubic-bezier(0.2, 0.9, 0.2, 1), opacity 220ms ease' : undefined,
+                }}
+              >
+                <img
+                  src={photos[currentIndex + 1].url}
+                  className="max-w-full max-h-full object-contain select-none"
+                  alt={photos[currentIndex + 1].label}
+                  draggable={false}
+                  style={photos[currentIndex + 1].rotation ? { transform: `rotate(${photos[currentIndex + 1].rotation}deg)` } : undefined}
+                />
+              </div>
+            )}
+          </>
+        )}
+
         <div
           className="relative w-full h-full flex items-center justify-center"
           style={{
             transform: `translate(${position.x + pageOffsetX}px, ${position.y}px) scale(${scale})`,
-            transition: isPageAnimating ? 'transform 260ms cubic-bezier(0.2, 0.9, 0.2, 1)' : undefined,
+            transition: isPageAnimating
+              ? 'transform 260ms cubic-bezier(0.2, 0.9, 0.2, 1)'
+              : isTransformAnimating
+                ? 'transform 280ms cubic-bezier(0.2, 0.9, 0.2, 1)'
+                : undefined,
           }}
         >
           <img
@@ -404,18 +545,6 @@ const ImagePreviewScreen: React.FC<ImagePreviewScreenProps> = ({
             style={currentPhoto.rotation ? { transform: `rotate(${currentPhoto.rotation}deg)` } : undefined}
           />
         </div>
-
-        {!isCropping && (
-          <div className="absolute bottom-8 left-1/2 -translate-x-1/2 z-30 flex items-center gap-2 px-3 py-1.5 bg-black/50 backdrop-blur-md rounded-full border border-white/10">
-            {photos.map((_, idx) => (
-              <button
-                key={idx}
-                onClick={() => setCurrentIndex(idx)}
-                className={`transition-all duration-300 ${idx === currentIndex ? 'bg-white w-2.5 h-2 rounded-full' : 'bg-white/40 hover:bg-white/60 w-2 h-2 rounded-full'}`}
-              />
-            ))}
-          </div>
-        )}
 
         {isCropping && (() => {
           const displayRect = getImageDisplayRect();
@@ -455,6 +584,19 @@ const ImagePreviewScreen: React.FC<ImagePreviewScreenProps> = ({
       </div>
 
       <footer className="pad-bottom-safe absolute bottom-0 inset-x-0 pt-8 px-6 bg-gradient-to-t from-black/95 via-black/60 to-transparent z-20 backdrop-blur-sm transition-all duration-300">
+        {!isCropping && (
+          <div className="flex justify-center mb-3">
+            <div className="flex items-center gap-2 px-3 py-1.5 bg-black/45 backdrop-blur-md rounded-full border border-white/10">
+              {photos.map((_, idx) => (
+                <button
+                  key={idx}
+                  onClick={() => setCurrentIndex(idx)}
+                  className={`transition-all duration-300 ${idx === currentIndex ? 'bg-white w-2.5 h-2 rounded-full' : 'bg-white/40 hover:bg-white/60 w-2 h-2 rounded-full'}`}
+                />
+              ))}
+            </div>
+          </div>
+        )}
         <div className="flex gap-3">
           {isCropping ? (
             <>
@@ -481,7 +623,10 @@ const ImagePreviewScreen: React.FC<ImagePreviewScreenProps> = ({
                 <span className="material-symbols-outlined text-[18px]">replay</span> Retake
               </button>
               <button
-                onClick={() => setIsCropping(true)}
+                onClick={() => {
+                  setCropBox({ x: 0, y: 0, w: 100, h: 100 });
+                  setIsCropping(true);
+                }}
                 className="flex-1 h-12 bg-blue-500 hover:bg-blue-600 active:bg-blue-700 text-white rounded-2xl flex items-center justify-center gap-2 font-black text-xs uppercase tracking-widest shadow-lg shadow-blue-500/30 active:scale-95 transition-all duration-200"
               >
                 <span className="material-symbols-outlined text-[18px]">crop_free</span> Crop
