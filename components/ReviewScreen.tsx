@@ -4,6 +4,7 @@ import { PHOTO_LABELS } from '../types';
 import { useDeviceOrientation } from '../src/hooks/useDeviceOrientation';
 import { getRotationStyle, getResponsiveSize } from '../src/services/styleService';
 import { isPrinterDataValid } from '../src/utils/modelUtils';
+import { useSwipeToDismiss } from '../src/hooks/useSwipeToDismiss';
 
 interface ReviewScreenProps {
   imageUrl: string;
@@ -37,6 +38,8 @@ const ReviewScreen: React.FC<ReviewScreenProps> = ({ imageUrl, data, isAnalyzing
   const [editSerial, setEditSerial] = useState('');
   const [editPartNumber, setEditPartNumber] = useState('');
   const [showDiscardConfirm, setShowDiscardConfirm] = useState(false);
+  const manualEntrySheetGesture = useSwipeToDismiss({ onDismiss: () => setShowEditModal(false) });
+  const discardSheetGesture = useSwipeToDismiss({ onDismiss: () => setShowDiscardConfirm(false) });
 
   // Validation & Animation
   const [shakeError, setShakeError] = useState(false);
@@ -376,7 +379,8 @@ const ReviewScreen: React.FC<ReviewScreenProps> = ({ imageUrl, data, isAnalyzing
       {/* Manual Entry Modal */}
       {showEditModal && (
             <div className="fixed inset-0 z-[100] bg-black/45 backdrop-blur-md flex items-center justify-center p-6 ios-modal-backdrop">
-              <div className="w-full max-w-[320px] ios-card rounded-[1.5rem] p-6 shadow-2xl ios-modal-sheet">
+              <div className="w-full max-w-[320px] ios-card rounded-[1.5rem] p-6 shadow-2xl ios-modal-sheet" {...manualEntrySheetGesture.bind} style={manualEntrySheetGesture.style}>
+              <div className="w-10 h-1 rounded-full bg-gray-300/80 mx-auto mb-3"></div>
               <div className="mb-6">
                 <h3 className="text-lg font-black text-[#1a2332] uppercase tracking-tight leading-none">Manual Entry</h3>
                 <p className="text-[10px] font-bold text-gray-400 mt-1 uppercase tracking-[0.1em]">Correct Identification</p>
@@ -446,7 +450,8 @@ const ReviewScreen: React.FC<ReviewScreenProps> = ({ imageUrl, data, isAnalyzing
       {/* Discard Confirmation Dialog */}
       {showDiscardConfirm && (
         <div className="fixed inset-0 z-[100] bg-black/50 backdrop-blur-md flex items-center justify-center p-6 ios-modal-backdrop">
-          <div className="w-full max-w-[320px] ios-card rounded-[1.5rem] p-6 shadow-2xl ios-modal-sheet">
+          <div className="w-full max-w-[320px] ios-card rounded-[1.5rem] p-6 shadow-2xl ios-modal-sheet" {...discardSheetGesture.bind} style={discardSheetGesture.style}>
+            <div className="w-10 h-1 rounded-full bg-gray-300/80 mx-auto mb-3"></div>
             <div className="flex flex-col items-center gap-4 mb-6">
               <div className="size-16 rounded-full bg-red-100 flex items-center justify-center">
                 <span className="material-symbols-outlined text-4xl text-red-500">warning</span>

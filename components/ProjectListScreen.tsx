@@ -3,6 +3,7 @@ import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { Project, MicrosoftUser, Printer } from '../types';
 import { getProjectThumbnail, getProjectStats } from '../services/projectUtils';
 import { UserAvatar } from './UserAvatar';
+import { useSwipeToDismiss } from '../src/hooks/useSwipeToDismiss';
 
 interface ProjectListScreenProps {
   projects: Project[];
@@ -27,6 +28,8 @@ const ProjectListScreen: React.FC<ProjectListScreenProps> = ({
   const [batch, setBatch] = useState('');
   const [auditorName, setAuditorName] = useState('');
   const menuContainerRef = useRef<HTMLDivElement>(null);
+  const createSheetGesture = useSwipeToDismiss({ onDismiss: () => setShowCreateModal(false) });
+  const deleteSheetGesture = useSwipeToDismiss({ onDismiss: () => setDeleteConfirmId(null) });
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -192,7 +195,8 @@ const ProjectListScreen: React.FC<ProjectListScreenProps> = ({
       {/* Create Modal */}
       {showCreateModal && (
             <div className="fixed inset-0 z-[100] bg-black/45 backdrop-blur-sm flex items-start pt-8 p-2 sm:p-4 ios-modal-backdrop">
-              <div className="w-full max-w-sm ios-card rounded-2xl p-4 sm:p-8 shadow-2xl ios-modal-sheet">
+              <div className="w-full max-w-sm ios-card rounded-2xl p-4 sm:p-8 shadow-2xl ios-modal-sheet" {...createSheetGesture.bind} style={createSheetGesture.style}>
+              <div className="w-10 h-1 rounded-full bg-gray-300/80 mx-auto mb-3"></div>
               <h2 className="text-lg sm:text-2xl font-bold text-gray-900 mb-1 sm:mb-2">New Project</h2>
               <p className="text-xs sm:text-sm text-gray-500 mb-3 sm:mb-6">Enter project details</p>
               
@@ -287,7 +291,8 @@ const ProjectListScreen: React.FC<ProjectListScreenProps> = ({
       {/* Delete Confirmation Modal */}
       {deleteConfirmId && (
             <div className="fixed inset-0 z-[100] bg-black/45 backdrop-blur-sm flex items-center justify-center p-2 sm:p-4 ios-modal-backdrop">
-              <div className="w-full max-w-sm ios-card rounded-2xl p-4 sm:p-8 shadow-2xl ios-modal-sheet">
+              <div className="w-full max-w-sm ios-card rounded-2xl p-4 sm:p-8 shadow-2xl ios-modal-sheet" {...deleteSheetGesture.bind} style={deleteSheetGesture.style}>
+              <div className="w-10 h-1 rounded-full bg-gray-300/80 mx-auto mb-3"></div>
               <div className="flex items-center gap-2 sm:gap-3 mb-3 sm:mb-4">
                 <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-full bg-red-100 flex items-center justify-center flex-shrink-0">
                   <span className="material-symbols-outlined text-red-600 text-base sm:text-lg">warning</span>

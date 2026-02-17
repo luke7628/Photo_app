@@ -2,6 +2,7 @@
 import React, { useState } from 'react';
 import { Printer, PHOTO_LABELS, PhotoSetItem, MicrosoftUser, ViewMode } from '../types';
 import { UserAvatar } from './UserAvatar';
+import { useSwipeToDismiss } from '../src/hooks/useSwipeToDismiss';
 
 interface DetailsScreenProps {
   printer: Printer;
@@ -49,6 +50,7 @@ const DetailsScreen: React.FC<DetailsScreenProps> = ({
   const [showEditModal, setShowEditModal] = useState(false);
   const [editSerial, setEditSerial] = useState('');
   const [editPartNumber, setEditPartNumber] = useState('');
+  const editSheetGesture = useSwipeToDismiss({ onDismiss: () => setShowEditModal(false) });
 
   // Use printer's actual photos, filling with labels
   const photos: PhotoSetItem[] = printer.photos || Array.from({ length: 12 }, (_, i) => ({
@@ -356,7 +358,8 @@ const DetailsScreen: React.FC<DetailsScreenProps> = ({
       {/* Edit Modal */}
       {showEditModal && (
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-5 ios-modal-backdrop">
-          <div className="ios-card rounded-3xl w-full max-w-md p-6 shadow-2xl ios-modal-sheet">
+          <div className="ios-card rounded-3xl w-full max-w-md p-6 shadow-2xl ios-modal-sheet" {...editSheetGesture.bind} style={editSheetGesture.style}>
+            <div className="w-10 h-1 rounded-full bg-gray-300/80 mx-auto mb-3"></div>
             <div className="flex items-center justify-between mb-5">
               <h2 className="text-xl font-black text-gray-900 uppercase tracking-tight">Edit Information</h2>
               <button
