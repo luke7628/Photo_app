@@ -4,6 +4,7 @@ import { PHOTO_LABELS } from '../types';
 import { useDeviceOrientation } from '../src/hooks/useDeviceOrientation';
 import { getRotationStyle } from '../src/services/styleService';
 import { useEdgeSwipeBack } from '../src/hooks/useEdgeSwipeBack';
+import { hapticService } from '../src/services/hapticService';
 
 interface CameraScreenProps {
   sessionIndex: number;
@@ -311,9 +312,7 @@ const CameraScreen: React.FC<CameraScreenProps> = ({
       return;
     }
 
-    if ('vibrate' in navigator) {
-      navigator.vibrate([50]);
-    }
+    hapticService.impactMedium();
 
     setIsCapturing(true);
     

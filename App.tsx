@@ -7,6 +7,7 @@ import { oneDriveService } from './services/oneDriveService';
 import { microsoftAuthService } from './services/microsoftAuthService';
 import { readBarcode } from './services/barcodeService';
 import eruda from 'eruda';
+import { hapticService } from './src/services/hapticService';
 
 // 初始化移动端调试工具（开发环境）
 if (typeof window !== 'undefined') {
@@ -565,6 +566,7 @@ const App: React.FC = () => {
             });
           });
           displayToast(`✅ 已同步 ${uploadedCount} 张照片到云空间`);
+          hapticService.success();
         }
       } else {
         if (isMounted) { // Bug Fix: 检查mounted状态
@@ -582,9 +584,11 @@ const App: React.FC = () => {
       // 如果是登陆过期，提示用户重新登陆
       if (error?.message?.includes('Token') || error?.message?.includes('401')) {
         displayToast('❌ 登陆已过期，请重新登陆');
+        hapticService.warning();
         handleLogout();
       } else {
         displayToast(`❌ 同步失败: ${error?.message || '未知错误'}`);
+        hapticService.warning();
       }
       
       // Reset syncing flag on error
@@ -1009,6 +1013,8 @@ const App: React.FC = () => {
       isSynced: false,
       rotation
     };
+
+    hapticService.success();
 
     if (isSingleRetake && selectedPrinter) {
       const currentPhotos = selectedPrinter.photos || [];
