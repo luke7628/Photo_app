@@ -824,19 +824,22 @@ async function decodeWithZXing(base64Image: string, preprocessed: boolean = fals
 
   try {
     const img = await loadImageFromBase64(base64Image);
-    console.log(`🖼️ [ZXing] 图像加载成功: ${img.width}x${img.height} ${preprocessed ? '(预处理)' : '(原图)'}`);
+    console.log(`🖼️ [ZXing] image loaded: ${img.width}x${img.height} ${preprocessed ? '(preprocessed)' : '(raw)'}`);
+    
+    if (!img.src || img.width < 50 || img.height < 50) {
+      console.error(`❌ [ZXing] invalid image: ${img.src ? 'has src' : 'no src'}, ${img.width}x${img.height}`);
+      return null;
+    }
     
     const reader = getReader();
-    console.log(`🔍 [ZXing] 开始解码 ${preprocessed ? '(预处理)' : '(原图)'}...`);
+    console.log(`🔍 [ZXing] decoding ${preprocessed ? '(preprocessed)' : '(raw)'}...`);
 
-    // 直接从ImageElement解码（ZXing的标准方式）
     let result;
     try {
-      console.log('🔍 [ZXing] 开始解码（使用ImageElement）...');
       result = await reader.decodeFromImageElement(img);
-      console.log('✅ [ZXing] 解码成功');
-    } catch (decodeError) {
-      console.error(`❌ [ZXing] 解码失败:`, decodeError);
+      console.log('✅ [ZXing] decode success');
+    } catch (decodeError: any) {
+      console.error(`❌ [ZXing] decode failed:`, decodeError?.message || decodeError);
       return null;
     }
     
@@ -1009,6 +1012,7 @@ export async function readBarcode(base64Image: string): Promise<BarcodeResult[]>
       console.log('  └─ 🔬 高级预处理 (全图)...');
       try {
         const advancedProcessed = await advancedPreprocessing(optimizedBase64);
+        console.log(`  │  └─ ✓ 预处理完成，尝试识别...`);
         
         const quaggaAdvResult = await decodeWithQuagga(advancedProcessed, true);
         if (quaggaAdvResult) {
@@ -1019,7 +1023,7 @@ export async function readBarcode(base64Image: string): Promise<BarcodeResult[]>
             region: '全图',
             regionIndex: 0
           });
-          console.log(`     ├─ ✅ Quagga识别: ${quaggaAdvResult.text.substring(0, 30)}`);
+          console.log(`     ├─ ✅ Quagga (preprocessed): ${quaggaAdvResult.text.substring(0, 30)}`);
         } else {
           const zxingAdvResult = await decodeWithZXing(advancedProcessed, true);
           if (zxingAdvResult) {
@@ -1030,13 +1034,13 @@ export async function readBarcode(base64Image: string): Promise<BarcodeResult[]>
               region: '全图',
               regionIndex: 0
             });
-            console.log(`     └─ ✅ ZXing识别: ${zxingAdvResult.text.substring(0, 30)}`);
+            console.log(`     └─ ✅ ZXing (preprocessed): ${zxingAdvResult.text.substring(0, 30)}`);
           } else {
-            console.log(`     └─ 未检测到`);
+            console.log(`     └─ ℹ️ Still no barcode detected`);
           }
         }
       } catch (e) {
-        console.error('     └─ ❌ 异常:', e);
+        console.error('     └─ ❌ Error:', e);
       }
     }
 
