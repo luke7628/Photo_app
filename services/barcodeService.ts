@@ -24,6 +24,7 @@ import { AdvancedBarcodeEngine } from './advancedBarcodeService';
  */
 
 let barcodeReader: BrowserMultiFormatReader | null = null;
+let barcodeReader1D: BrowserMultiFormatReader | null = null;
 let preprocessedImageCache: { base64: string; processed: string } | null = null;
 let barcodeDetectorAvailable: boolean | null = null;
 
@@ -92,6 +93,27 @@ function getReader() {
     barcodeReader = new BrowserMultiFormatReader(hints);
   }
   return barcodeReader;
+}
+
+function get1DReader() {
+  if (!barcodeReader1D) {
+    const hints = new Map();
+    hints.set(DecodeHintType.POSSIBLE_FORMATS, [
+      BarcodeFormat.CODE_128,
+      BarcodeFormat.CODE_39,
+      BarcodeFormat.CODE_93,
+      BarcodeFormat.EAN_13,
+      BarcodeFormat.EAN_8,
+      BarcodeFormat.UPC_A,
+      BarcodeFormat.UPC_E,
+      BarcodeFormat.CODABAR,
+      BarcodeFormat.ITF
+    ]);
+    hints.set(DecodeHintType.TRY_HARDER, true);
+    hints.set(DecodeHintType.ALSO_INVERTED, true);
+    barcodeReader1D = new BrowserMultiFormatReader(hints);
+  }
+  return barcodeReader1D;
 }
 
 /**
@@ -326,6 +348,81 @@ async function optimizeResolution(base64Image: string, maxDimension: number = 16
     return optimizedBase64;
   } catch (error) {
     console.warn('⚠️ [optimizeResolution] 分辨率优化失败，使用原图:', error);
+    return base64Image;
+  }
+}
+
+/**
+ * 旋转图像用于方向兜底
+ */
+async function rotateBase64(base64Image: string, angle: 90 | 180 | 270): Promise<string> {
+  if (!base64Image) return base64Image;
+
+  try {
+    const img = await loadImageFromBase64(base64Image);
+    const canvas = document.createElement('canvas');
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return base64Image;
+
+    if (angle === 180) {
+      canvas.width = img.width;
+      canvas.height = img.height;
+    } else {
+      canvas.width = img.height;
+      canvas.height = img.width;
+    }
+
+    ctx.save();
+    ctx.translate(canvas.width / 2, canvas.height / 2);
+    ctx.rotate((angle * Math.PI) / 180);
+    ctx.drawImage(img, -img.width / 2, -img.height / 2);
+    ctx.restore();
+
+    return canvas.toDataURL('image/jpeg', 0.95).split(',')[1];
+  } catch (error) {
+    console.warn('⚠️ [rotateBase64] 旋转失败，使用原图:', error);
+    return base64Image;
+  }
+}
+
+/**
+ * 1D条码专用二值化（提升条纹对比）
+ */
+async function preprocessFor1D(base64Image: string): Promise<string> {
+  if (!base64Image) return base64Image;
+
+  try {
+    const img = await loadImageFromBase64(base64Image);
+    const canvas = document.createElement('canvas');
+    canvas.width = img.width;
+    canvas.height = img.height;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return base64Image;
+
+    ctx.drawImage(img, 0, 0);
+    const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+    const data = imageData.data;
+
+    // 灰度化
+    for (let i = 0; i < data.length; i += 4) {
+      const gray = data[i] * 0.299 + data[i + 1] * 0.587 + data[i + 2] * 0.114;
+      data[i] = gray;
+      data[i + 1] = gray;
+      data[i + 2] = gray;
+    }
+
+    const threshold = computeOtsuThreshold(data);
+    for (let i = 0; i < data.length; i += 4) {
+      const val = data[i] > threshold ? 255 : 0;
+      data[i] = val;
+      data[i + 1] = val;
+      data[i + 2] = val;
+    }
+
+    ctx.putImageData(imageData, 0, 0);
+    return canvas.toDataURL('image/jpeg', 0.95).split(',')[1];
+  } catch (error) {
+    console.warn('⚠️ [preprocessFor1D] 二值化失败，使用原图:', error);
     return base64Image;
   }
 }
@@ -861,7 +958,11 @@ async function decodeWithBarcodeDetector(base64Image: string, preprocessed: bool
 /**
  * 使用 ZXing 库识别条码，支持预处理
  */
-async function decodeWithZXing(base64Image: string, preprocessed: boolean = false): Promise<{ text: string; format?: string } | null> {
+async function decodeWithZXing(
+  base64Image: string,
+  preprocessed: boolean = false,
+  options: { oneDOnly?: boolean } = {}
+): Promise<{ text: string; format?: string } | null> {
   if (!base64Image) return null;
 
   try {
@@ -873,7 +974,7 @@ async function decodeWithZXing(base64Image: string, preprocessed: boolean = fals
       return null;
     }
     
-    const reader = getReader();
+    const reader = options.oneDOnly ? get1DReader() : getReader();
     console.log(`🔍 [ZXing] decoding ${preprocessed ? '(preprocessed)' : '(raw)'}...`);
 
     let result;
@@ -957,28 +1058,35 @@ export async function readBarcode(base64Image: string): Promise<BarcodeResult[]>
     };
 
     const tryDecode = async (label: string, base64: string) => {
-      console.log(`  ├─ 🐲 Quagga ${label} (halfSample=true)...`);
-      const quaggaFast = await decodeWithQuagga(base64, false, { halfSample: true });
-      if (quaggaFast) {
-        tryAddResult(quaggaFast.text, quaggaFast.format);
-        console.log(`  │  └─ ✅ 识别成功: ${quaggaFast.text.substring(0, 40)}`);
-        return true;
-      }
+      const rotations: Array<0 | 90 | 180 | 270> = [0, 90, 180, 270];
 
-      console.log(`  ├─ 🐲 Quagga ${label} (halfSample=false)...`);
-      const quaggaFull = await decodeWithQuagga(base64, false, { halfSample: false });
-      if (quaggaFull) {
-        tryAddResult(quaggaFull.text, quaggaFull.format);
-        console.log(`  │  └─ ✅ 识别成功: ${quaggaFull.text.substring(0, 40)}`);
-        return true;
-      }
+      for (const angle of rotations) {
+        const rotated = angle === 0 ? base64 : await rotateBase64(base64, angle);
+        const labelWithAngle = angle === 0 ? label : `${label},rot${angle}`;
 
-      console.log(`  └─ ZXing ${label}...`);
-      const zxingResult = await decodeWithZXing(base64, false);
-      if (zxingResult) {
-        tryAddResult(zxingResult.text, zxingResult.format);
-        console.log(`     └─ ✅ 识别成功: ${zxingResult.text.substring(0, 40)}`);
-        return true;
+        console.log(`  ├─ 🐲 Quagga ${labelWithAngle} (halfSample=true)...`);
+        const quaggaFast = await decodeWithQuagga(rotated, false, { halfSample: true });
+        if (quaggaFast) {
+          tryAddResult(quaggaFast.text, quaggaFast.format);
+          console.log(`  │  └─ ✅ 识别成功: ${quaggaFast.text.substring(0, 40)}`);
+          return true;
+        }
+
+        console.log(`  ├─ 🐲 Quagga ${labelWithAngle} (halfSample=false)...`);
+        const quaggaFull = await decodeWithQuagga(rotated, false, { halfSample: false });
+        if (quaggaFull) {
+          tryAddResult(quaggaFull.text, quaggaFull.format);
+          console.log(`  │  └─ ✅ 识别成功: ${quaggaFull.text.substring(0, 40)}`);
+          return true;
+        }
+
+        console.log(`  └─ ZXing ${labelWithAngle} (1D-only)...`);
+        const zxingResult = await decodeWithZXing(rotated, false, { oneDOnly: true });
+        if (zxingResult) {
+          tryAddResult(zxingResult.text, zxingResult.format);
+          console.log(`     └─ ✅ 识别成功: ${zxingResult.text.substring(0, 40)}`);
+          return true;
+        }
       }
 
       return false;
@@ -1018,6 +1126,10 @@ export async function readBarcode(base64Image: string): Promise<BarcodeResult[]>
         const boosted = await upscaleIfNeeded(cropped, 1400);
         const regionOk = await tryDecode(`(区域:${region.name})`, boosted);
         if (regionOk) return results;
+
+        const binarized = await preprocessFor1D(boosted);
+        const binarizedOk = await tryDecode(`(区域:${region.name},二值化)`, binarized);
+        if (binarizedOk) return results;
       } catch (e) {
         console.error(`  │  └─ ❌ 区域${region.name}异常:`, e);
       }
