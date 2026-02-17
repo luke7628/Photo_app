@@ -40,6 +40,12 @@ const MICROSOFT_REDIRECT_URI = import.meta.env.VITE_MICROSOFT_REDIRECT_URI ||
 const MICROSOFT_PKCE_VERIFIER_KEY = 'microsoft_code_verifier';
 const MICROSOFT_AUTH_CODE_KEY = 'microsoft_auth_code';
 
+const normalizeCloudProvider = (provider?: string): UserPreferences['cloudProvider'] => {
+  if (provider === 'onedrive' || provider === 'none') return provider;
+  if (provider === 'drive') return 'onedrive';
+  return undefined;
+};
+
 
 const App: React.FC = () => {
   const [currentScreen, setCurrentScreen] = useState<AppScreen>(AppScreen.SPLASH);
@@ -155,7 +161,7 @@ const App: React.FC = () => {
           storageService.saveUser(userInfo as any);
           // 🎯 自动启用云同步
           setSettings(prev => {
-            const newSettings = { ...prev, cloudProvider: 'onedrive', autoUpload: true };
+            const newSettings: UserPreferences = { ...prev, cloudProvider: 'onedrive', autoUpload: true };
             storageService.saveSettings(newSettings);
             return newSettings;
           });
@@ -309,10 +315,13 @@ const App: React.FC = () => {
       const savedProjects = storageService.loadProjects();
       const savedPrinters = await storageService.loadPrinters(); // Async IDB
       const savedUser = storageService.loadUser();
-      const savedSettings = storageService.loadSettings();
-      const normalizedSettings = savedSettings?.cloudProvider === 'drive'
-        ? { ...savedSettings, cloudProvider: 'onedrive' }
-        : savedSettings;
+      const savedSettings = storageService.loadSettings() as (UserPreferences & { cloudProvider?: string }) | null;
+      const normalizedSettings: UserPreferences | null = savedSettings
+        ? {
+            ...savedSettings,
+            cloudProvider: normalizeCloudProvider(savedSettings.cloudProvider)
+          }
+        : null;
       
       // Bug Fix: 检查组件是否仍在挂载
       if (!mounted) return;

@@ -8,6 +8,8 @@
  * - 180: 倒竖屏
  */
 
+import type { CSSProperties } from 'react';
+
 /**
  * 旋转图像（通过Canvas）
  * @param base64Image - Base64编码的图像
@@ -82,7 +84,7 @@ export async function rotateImage(base64Image: string, rotation: number = 0): Pr
  * @param scale - 缩放因子（用于适应横屏时的UI缩小）
  * @returns CSS transform样式对象
  */
-export function getRotationStyle(rotation: number = 0, scale: number = 1): React.CSSProperties {
+export function getRotationStyle(rotation: number = 0, scale: number = 1): CSSProperties {
   if (!rotation || rotation === 0) {
     return {
       transform: `scale(${scale})`,

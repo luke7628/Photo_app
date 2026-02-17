@@ -7,7 +7,9 @@
  * - 提供一致的过渡效果和性能优化
  */
 
-export interface RotationStyle extends React.CSSProperties {}
+import type { CSSProperties } from 'react';
+
+export interface RotationStyle extends CSSProperties {}
 
 /**
  * 生成旋转和缩放样式

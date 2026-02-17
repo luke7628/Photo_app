@@ -88,7 +88,6 @@ function getReader() {
       BarcodeFormat.AZTEC
     ]);
     hints.set(DecodeHintType.TRY_HARDER, true);
-    hints.set(DecodeHintType.ALSO_INVERTED, true);
     // Initialize reader with hints in one step
     barcodeReader = new BrowserMultiFormatReader(hints);
   }
@@ -110,7 +109,6 @@ function get1DReader() {
       BarcodeFormat.ITF
     ]);
     hints.set(DecodeHintType.TRY_HARDER, true);
-    hints.set(DecodeHintType.ALSO_INVERTED, true);
     barcodeReader1D = new BrowserMultiFormatReader(hints);
   }
   return barcodeReader1D;

@@ -208,7 +208,7 @@ const ImagePreviewScreen: React.FC<ImagePreviewScreenProps> = ({
     onBack();
   };
 
-  const currentPhoto = photos[currentIndex] || { url: '', label: 'Unknown', isSynced: false };
+  const currentPhoto: PhotoSetItem = photos[currentIndex] || { url: '', label: 'Unknown', filename: '', isSynced: false };
   const displayRect = getImageDisplayRect();
 
   return (
