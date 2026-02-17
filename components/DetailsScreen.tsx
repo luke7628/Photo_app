@@ -54,7 +54,7 @@ const DetailsScreen: React.FC<DetailsScreenProps> = ({
   const photos: PhotoSetItem[] = printer.photos || Array.from({ length: 12 }, (_, i) => ({
     url: '',
     label: PHOTO_LABELS[i],
-    filename: `${printer.model}_${printer.serialNumber}_${i + 1}.jpg`,
+    filename: `${printer.serialNumber}_${i + 1}.jpg`,
     isSynced: false
   }));
 
@@ -198,15 +198,13 @@ const DetailsScreen: React.FC<DetailsScreenProps> = ({
   };
 
   const handleSaveEdit = () => {
-    if (!editSerial.trim() || !editPartNumber.trim()) {
+    if (!editSerial.trim()) {
       return;
     }
     const normalizedPart = editPartNumber.trim().toUpperCase();
-    const inferredModel = normalizedPart.includes('ZT421') ? 'ZT421' : 'ZT411';
     onUpdatePrinter?.(printer.id, {
       serialNumber: editSerial.trim(),
-      partNumber: normalizedPart,
-      model: inferredModel
+      partNumber: normalizedPart || ''
     });
     setShowEditModal(false);
   };

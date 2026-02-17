@@ -59,7 +59,7 @@ const PrinterItem = memo(({
           </span>
         </div>
         <div className="flex items-center gap-1.5 mt-1">
-          <span className={`text-[10px] font-medium px-2 py-0.5 bg-gray-100 text-gray-600 rounded-lg transition-colors`}>{printer.partNumber || printer.model}</span>
+          <span className={`text-[10px] font-medium px-2 py-0.5 bg-gray-100 text-gray-600 rounded-lg transition-colors`}>{printer.partNumber || 'N/A'}</span>
           {!isLandscape && <span className={`text-[10px] font-medium text-gray-500 truncate opacity-60`}>{printer.site}</span>}
         </div>
       </div>
@@ -78,14 +78,7 @@ const PrinterItem = memo(({
 const GalleryScreen: React.FC<GalleryScreenProps> = ({ 
   user, activeProject, onLogin, onLogout, printers, onSearch, onAdd, onSelectPrinter, onPreviewImage, onOpenSettings, onManualSync, onBackToProjects
 }) => {
-  const [filter, setFilter] = useState<'ALL' | 'ZT411' | 'ZT421'>('ALL');
   const [searchTerm, setSearchTerm] = useState('');
-
-  // 计算实际存在的打印机型号
-  const availableModels = useMemo(() => {
-    const models = new Set<string>(printers.map(p => p.model));
-    return Array.from(models).sort() as ('ZT411' | 'ZT421')[];
-  }, [printers]);
   const [showUserMenu, setShowUserMenu] = useState(false);
   const [uiRotation, setUiRotation] = useState(0);
 
@@ -97,18 +90,17 @@ const GalleryScreen: React.FC<GalleryScreenProps> = ({
     setUiRotation(uiRotationHook);
   }, [uiRotationHook]);
   const filteredPrinters = useMemo(() => {
-    let result = filter === 'ALL' ? printers : printers.filter(p => p.model === filter);
+    let result = printers;
     if (searchTerm.trim()) {
       const term = searchTerm.toLowerCase();
       result = result.filter(p => 
-        p.serialNumber.toLowerCase().includes(term) || 
-        p.model.toLowerCase().includes(term) ||
+        p.serialNumber.toLowerCase().includes(term) ||
         (p.partNumber || '').toLowerCase().includes(term) ||
         p.site.toLowerCase().includes(term)
       );
     }
     return result;
-  }, [printers, filter, searchTerm]);
+  }, [printers, searchTerm]);
 
   const rotationStyle = useMemo(
     () => getRotationOnlyStyle(uiRotation),
@@ -250,20 +242,6 @@ const GalleryScreen: React.FC<GalleryScreenProps> = ({
           </div>
         )}
 
-        {/* Filter buttons */}
-        <div className={`flex gap-2 overflow-x-auto no-scrollbar transition-all border-b border-gray-100 ${isLandscape ? 'mt-1 pb-2 pt-2' : 'mt-3 pb-3 pt-1'}`}>
-          {(['ALL'] as const).concat(availableModels).map((f) => (
-            <button
-              key={f}
-              onClick={() => setFilter(f as any)}
-              className={`flex items-center px-4 py-1.5 rounded-full text-xs font-medium transition-all whitespace-nowrap flex-shrink-0 ${
-                filter === f ? 'bg-blue-500 text-white shadow-md' : 'bg-gray-50 border border-gray-200 text-gray-700 hover:bg-gray-100'
-              }`}
-            >
-              {f}
-            </button>
-          ))}
-        </div>
       </header>
 
       {/* Printer list */}

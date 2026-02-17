@@ -3,18 +3,18 @@ import React, { useState, useRef, useEffect, useMemo } from 'react';
 import { PHOTO_LABELS } from '../types';
 import { useDeviceOrientation } from '../src/hooks/useDeviceOrientation';
 import { getRotationStyle, getResponsiveSize } from '../src/services/styleService';
-import { inferModelFromPartNumber, isPrinterDataValid } from '../src/utils/modelUtils';
+import { isPrinterDataValid } from '../src/utils/modelUtils';
 
 interface ReviewScreenProps {
   imageUrl: string;
-  data: { serialNumber: string; model: string; partNumber?: string } | null;
+  data: { serialNumber: string; partNumber?: string } | null;
   isAnalyzing: boolean;
   sessionIndex: number;
   isSingleRetake?: boolean;
   photoRotation?: number; // 拍摄时的设备旋转角度
   onRetake: () => void;
   onConfirm: () => void;
-  onUpdateData: (data: { serialNumber: string; model: string; partNumber?: string }) => void;
+  onUpdateData: (data: { serialNumber: string; partNumber?: string }) => void;
   onBack?: () => void;
 }
 
@@ -25,8 +25,8 @@ const ReviewScreen: React.FC<ReviewScreenProps> = ({ imageUrl, data, isAnalyzing
   const startPos = useRef({ x: 0, y: 0, cropX: 0, cropY: 0, cropW: 0, cropH: 0 });
   
   // Generate photo filename
-  const photoName = data?.model && data?.serialNumber 
-    ? `${data.model}_${data.serialNumber}_${sessionIndex + 1}`
+  const photoName = data?.serialNumber 
+    ? `${data.serialNumber}_${sessionIndex + 1}`
     : `Photo_${sessionIndex + 1}`;
   
   const [uiRotation, setUiRotation] = useState(0);
@@ -77,8 +77,7 @@ const ReviewScreen: React.FC<ReviewScreenProps> = ({ imageUrl, data, isAnalyzing
     }
     // partNumber is now optional - user can leave it empty
     const normalizedPart = editPartNumber.trim().toUpperCase();
-    const model = normalizedPart ? inferModelFromPartNumber(normalizedPart) : 'ZT411'; // default to ZT411 if no part number
-    onUpdateData({ serialNumber: editSerial.toUpperCase(), model, partNumber: normalizedPart || '' });
+    onUpdateData({ serialNumber: editSerial.toUpperCase(), partNumber: normalizedPart || '' });
     setShowEditModal(false);
   };
 

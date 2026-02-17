@@ -16,11 +16,11 @@ const PHOTO_LABELS = [
   "Overall View"
 ];
 
-const generateMockPhotos = (serialNumber: string, model: string): PhotoSetItem[] => {
+const generateMockPhotos = (serialNumber: string): PhotoSetItem[] => {
   return Array.from({ length: 12 }, (_, i) => ({
     url: `https://picsum.photos/seed/${serialNumber}-${i}/800/600`,
     label: PHOTO_LABELS[i],
-    filename: `${model}_${serialNumber}_${i + 1}.jpg`,
+    filename: `${serialNumber}_${i + 1}.jpg`,
     isSynced: true
   }));
 };
@@ -57,27 +57,24 @@ export const MOCK_PRINTERS: Printer[] = [
     id: 'test-1',
     projectId: 'proj-test',
     serialNumber: 'TEST123456',
-    model: 'ZT411',
     site: 'Test Site',
     imageUrl: 'https://picsum.photos/seed/test1/200/200',
-    photos: generateMockPhotos('TEST123456', 'ZT411'),
+    photos: generateMockPhotos('TEST123456'),
     syncedCount: 12
   },
   {
     id: 'test-2',
     projectId: 'proj-test',
     serialNumber: 'TEST789012',
-    model: 'ZT421',
     site: 'Test Site',
     imageUrl: 'https://picsum.photos/seed/test2/200/200',
-    photos: generateMockPhotos('TEST789012', 'ZT421'),
+    photos: generateMockPhotos('TEST789012'),
     syncedCount: 12
   },
   {
     id: '1',
     projectId: 'proj-1',
     serialNumber: 's123456789',
-    model: 'ZT411',
     site: 'WRDC',
     imageUrl: 'https://picsum.photos/seed/p1/200/200',
     syncedCount: 12
@@ -86,7 +83,6 @@ export const MOCK_PRINTERS: Printer[] = [
     id: '2',
     projectId: 'proj-1',
     serialNumber: 's234567890',
-    model: 'ZT421',
     site: 'ORD1',
     imageUrl: 'https://picsum.photos/seed/p2/200/200',
     syncedCount: 0
@@ -95,7 +91,6 @@ export const MOCK_PRINTERS: Printer[] = [
     id: '3',
     projectId: 'proj-1',
     serialNumber: 's345678901',
-    model: 'ZT411',
     site: 'PHX2',
     imageUrl: 'https://picsum.photos/seed/p3/200/200',
     syncedCount: 12
@@ -104,7 +99,6 @@ export const MOCK_PRINTERS: Printer[] = [
     id: '4',
     projectId: 'proj-2',
     serialNumber: 's456789012',
-    model: 'ZT421',
     site: 'ATL5',
     imageUrl: 'https://picsum.photos/seed/p4/200/200',
     syncedCount: 5
@@ -113,7 +107,6 @@ export const MOCK_PRINTERS: Printer[] = [
     id: '5',
     projectId: 'proj-2',
     serialNumber: 's567890123',
-    model: 'ZT411',
     site: 'DFW7',
     imageUrl: 'https://picsum.photos/seed/p5/200/200',
     syncedCount: 12
@@ -122,7 +115,6 @@ export const MOCK_PRINTERS: Printer[] = [
     id: '6',
     projectId: 'proj-2',
     serialNumber: 's678901234',
-    model: 'ZT411',
     site: 'LAX1',
     imageUrl: 'https://picsum.photos/seed/p6/200/200',
     syncedCount: 0

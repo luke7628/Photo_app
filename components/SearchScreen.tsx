@@ -9,15 +9,13 @@ interface SearchScreenProps {
 }
 
 const SearchScreen: React.FC<SearchScreenProps> = ({ printers, onBack, onPreviewImage }) => {
-  const [query, setQuery] = useState('ZT4');
-  const [filter, setFilter] = useState<'ALL' | 'ZT411' | 'ZT421'>('ALL');
+  const [query, setQuery] = useState('');
 
   const filteredResults = printers.filter(p => {
     const matchesQuery = p.serialNumber.toLowerCase().includes(query.toLowerCase()) || 
                p.site.toLowerCase().includes(query.toLowerCase()) ||
                (p.partNumber || '').toLowerCase().includes(query.toLowerCase());
-    const matchesFilter = filter === 'ALL' || p.model === filter;
-    return matchesQuery && matchesFilter;
+    return matchesQuery;
   });
 
   return (
@@ -60,25 +58,6 @@ const SearchScreen: React.FC<SearchScreenProps> = ({ printers, onBack, onPreview
           </div>
         </div>
 
-        <div className="flex gap-2 px-5 py-4 overflow-x-auto no-scrollbar">
-          {['ALL', 'ZT411', 'ZT421'].map((f) => (
-            <button
-              key={f}
-              onClick={() => setFilter(f as any)}
-              className={`flex h-9 shrink-0 items-center justify-center rounded-full px-6 border transition-all gap-2 ${
-                filter === f 
-                ? 'bg-primary text-background-dark border-primary shadow-lg shadow-primary/20' 
-                : 'bg-slate-50 text-slate-500 border-slate-200 hover:border-sage/30'
-              }`}
-            >
-              <span className="material-symbols-outlined text-lg">
-                {f === 'ALL' ? 'layers' : 'inventory_2'}
-              </span>
-              <span className="text-xs font-bold uppercase tracking-widest">{f}</span>
-            </button>
-          ))}
-        </div>
-
         <div className="grid grid-cols-12 gap-2 px-6 py-3 bg-slate-50/80 border-t border-slate-100">
           <div className="col-span-5 flex items-center gap-1.5">
             <span className="material-symbols-outlined text-[10px] text-slate-400">id_card</span>
@@ -118,7 +97,7 @@ const SearchScreen: React.FC<SearchScreenProps> = ({ printers, onBack, onPreview
             </div>
             <div className="col-span-3 text-center">
               <span className="inline-block px-2.5 py-1 rounded-lg bg-slate-100 text-slate-600 text-[10px] font-black uppercase tracking-tighter">
-                {p.partNumber || p.model}
+                {p.partNumber || 'N/A'}
               </span>
             </div>
             <div className="col-span-4 text-right flex flex-col items-end">

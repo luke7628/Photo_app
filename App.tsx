@@ -6,7 +6,6 @@ import { storageService } from './services/storageService';
 import { oneDriveService } from './services/oneDriveService';
 import { microsoftAuthService } from './services/microsoftAuthService';
 import { readBarcode } from './services/barcodeService';
-import { inferModelFromPartNumber } from './src/utils/modelUtils';
 import eruda from 'eruda';
 
 // 初始化移动端调试工具（开发环境）
@@ -64,7 +63,7 @@ const App: React.FC = () => {
 
   const [sessionIndex, setSessionIndex] = useState<number>(0);
   const [sessionPhotos, setSessionPhotos] = useState<PhotoSetItem[]>([]);
-  const [sessionData, setSessionData] = useState<{ serialNumber: string; model: string; partNumber?: string } | null>(null);
+  const [sessionData, setSessionData] = useState<{ serialNumber: string; partNumber?: string } | null>(null);
   const [baseSerialNumber, setBaseSerialNumber] = useState<string>('');
   const [basePartNumber, setBasePartNumber] = useState<string>('');
   const [isAnalyzing, setIsAnalyzing] = useState<boolean>(false);
@@ -448,8 +447,8 @@ const App: React.FC = () => {
     return () => clearInterval(interval);
   }, [settings.autoUpload, settings.cloudProvider, user, performSyncCycle]);
 
-  const analyzeWithBarcode = async (base64Image: string): Promise<{ serialNumber: string; model: string; partNumber: string }> => {
-    return new Promise<{ serialNumber: string; model: string; partNumber: string }>((resolve, reject) => {
+  const analyzeWithBarcode = async (base64Image: string): Promise<{ serialNumber: string; partNumber: string }> => {
+    return new Promise<{ serialNumber: string; partNumber: string }>((resolve, reject) => {
       const timeout = setTimeout(() => {
         console.warn('⏱️ [analyzeWithBarcode] Timeout after 30 seconds');
         reject(new Error('Barcode recognition timeout'));
@@ -482,7 +481,6 @@ const App: React.FC = () => {
           }
           
           let serialNumber = '';
-          let model = '';
           let partNumber = '';
 
       const parsePayload = (payload: string, barcodeInfo?: any) => {
@@ -611,14 +609,9 @@ const App: React.FC = () => {
         console.log('❌ [analyzeWithBarcode] 未找到条码结果');
       }
       
-      if (!model && partNumber) {
-        model = inferModelFromPartNumber(partNumber);
-      }
-      if (!model) model = 'ZT411';
-      
-      console.log('📊 [analyzeWithBarcode] 最终返回:', { serialNumber, model, partNumber });
+      console.log('📊 [analyzeWithBarcode] 最终返回:', { serialNumber, partNumber });
       clearTimeout(timeout);
-      resolve({ serialNumber, model, partNumber });
+      resolve({ serialNumber, partNumber });
         } catch (error) {
           console.error('❌ [analyzeWithBarcode] 条形码识别失败');
           console.error('Error object:', error);
@@ -654,10 +647,10 @@ const App: React.FC = () => {
             }
             setBaseSerialNumber(result.serialNumber);
             setBasePartNumber(result.partNumber || '');
-            setSessionData({ serialNumber: result.serialNumber, model: result.model, partNumber: result.partNumber });
+            setSessionData({ serialNumber: result.serialNumber, partNumber: result.partNumber });
             // Auto-confirm after analysis
             setTimeout(() => {
-              const newData = { serialNumber: result.serialNumber, model: result.model, partNumber: result.partNumber };
+              const newData = { serialNumber: result.serialNumber, partNumber: result.partNumber };
               console.log('📸 [handleCapture] 自动确认，数据:', newData);
               processConfirmation(base64, newData);
             }, 300);
@@ -669,7 +662,7 @@ const App: React.FC = () => {
             console.error('Error message:', error?.message);
             console.error('Error stack:', error?.stack);
             displayToast('❌ Barcode recognition failed. Please enter manually.', 4000);
-            const fallbackData = { serialNumber: "", model: "ZT411", partNumber: "" };
+            const fallbackData = { serialNumber: "", partNumber: "" };
             setBaseSerialNumber("");
             setBasePartNumber("");
             setSessionData(fallbackData);
@@ -684,7 +677,7 @@ const App: React.FC = () => {
         console.log('📸 [handleCapture] skipReview=true，但不是第一张图或单次重拍');
         // For Step 2-12, use base serial with suffix
         const suffixedSerial = baseSerialNumber ? `${baseSerialNumber}_${sessionIndex + 1}` : `SERIAL_${sessionIndex + 1}`;
-        const currentData = { serialNumber: suffixedSerial, model: inferModelFromPartNumber(basePartNumber || 'ZT411'), partNumber: basePartNumber };
+        const currentData = { serialNumber: suffixedSerial, partNumber: basePartNumber };
         setSessionData(currentData);
         setTimeout(() => {
           console.log('📸 [handleCapture] 确认后续图像');
@@ -707,19 +700,19 @@ const App: React.FC = () => {
             }
             setBaseSerialNumber(result.serialNumber);
             setBasePartNumber(result.partNumber || '');
-            setSessionData({ serialNumber: result.serialNumber, model: result.model, partNumber: result.partNumber });
+            setSessionData({ serialNumber: result.serialNumber, partNumber: result.partNumber });
           })
           .catch((error) => { 
             console.error('📸 [handleCapture] 分析失败:', error);
             setBaseSerialNumber("");
             setBasePartNumber("");
-            setSessionData({ serialNumber: "", model: "ZT411", partNumber: "" });
+            setSessionData({ serialNumber: "", partNumber: "" });
           })
           .finally(() => setIsAnalyzing(false));
       } else {
         // For Step 2-12, use base serial with suffix
         const suffixedSerial = baseSerialNumber ? `${baseSerialNumber}_${sessionIndex + 1}` : `SERIAL_${sessionIndex + 1}`;
-        setSessionData({ serialNumber: suffixedSerial, model: inferModelFromPartNumber(basePartNumber || 'ZT411'), partNumber: basePartNumber });
+        setSessionData({ serialNumber: suffixedSerial, partNumber: basePartNumber });
         setIsAnalyzing(false);
       }
     }
@@ -757,17 +750,16 @@ const App: React.FC = () => {
     setCurrentScreen(AppScreen.GALLERY);
   };
 
-  const finalizeSession = useCallback((finalPhotos: PhotoSetItem[], data: { serialNumber: string; model: string; partNumber?: string }) => {
+  const finalizeSession = useCallback((finalPhotos: PhotoSetItem[], data: { serialNumber: string; partNumber?: string }) => {
     const completePhotos: PhotoSetItem[] = PHOTO_LABELS.map((label, i) => {
       const existing = finalPhotos.find(p => p.label === label);
-      return existing || { url: '', label, filename: `${data.model}_${data.serialNumber}_${i + 1}.jpg`, isSynced: false };
+      return existing || { url: '', label, filename: `${data.serialNumber}_${i + 1}.jpg`, isSynced: false };
     });
 
     const newPrinter: Printer = { 
       id: selectedPrinter?.id || `local-${Date.now()}`, 
       projectId: activeProjectId || 'proj-1', 
       serialNumber: data.serialNumber, 
-      model: data.model as any, 
       partNumber: data.partNumber || '',
       site: 'Site Alpha', 
       imageUrl: completePhotos.find(p => p.url)?.url || '', 
@@ -792,7 +784,7 @@ const App: React.FC = () => {
     setCurrentScreen(AppScreen.DETAILS);
   }, [selectedPrinter, activeProjectId]);
 
-  const processConfirmation = useCallback((img: string, data: { serialNumber: string; model: string; partNumber?: string }) => {
+  const processConfirmation = useCallback((img: string, data: { serialNumber: string; partNumber?: string }) => {
     // 从sessionStorage中读取拍摄时的旋转角度
     const lastRotationStr = sessionStorage.getItem('lastCaptureRotation');
     const rotation = lastRotationStr ? parseInt(lastRotationStr, 10) : 0;
@@ -800,7 +792,7 @@ const App: React.FC = () => {
     const newPhoto: PhotoSetItem = { 
       url: img, 
       label: PHOTO_LABELS[sessionIndex], 
-      filename: `${data.model}_${data.serialNumber}_${sessionIndex + 1}.jpg`, 
+      filename: `${data.serialNumber}_${sessionIndex + 1}.jpg`, 
       isSynced: false,
       rotation // 保存拍摄时的旋转角度
     };
@@ -838,9 +830,9 @@ const App: React.FC = () => {
         {currentScreen === AppScreen.PROJECT_LIST && <ProjectListScreen projects={projects} printers={printers} onSelectProject={(id) => { setActiveProjectId(id); setCurrentScreen(AppScreen.GALLERY); }} onCreateProject={(name) => setProjects([{ id: `p-${Date.now()}`, name, printerIds: [], createdAt: new Date().toISOString() }, ...projects])} onRenameProject={(id, newName) => setProjects(prev => prev.map(p => p.id === id ? { ...p, name: newName } : p))} onDeleteProject={(id) => { setProjects(prev => prev.filter(p => p.id !== id)); setPrinters(prev => prev.filter(p => p.projectId !== id)); }} onOpenSettings={() => setCurrentScreen(AppScreen.SETTINGS)} user={user} onLogin={handleLogin} onLogout={handleLogout} />}
         {currentScreen === AppScreen.GALLERY && <GalleryScreen user={user} activeProject={activeProject} onLogin={handleLogin} onLogout={handleLogout} printers={activePrinters} onSearch={() => setCurrentScreen(AppScreen.SEARCH)} onAdd={() => { setSessionIndex(0); setSessionPhotos([]); setSessionData(null); setIsSingleRetake(false); setSelectedPrinter(null); setCurrentScreen(AppScreen.CAMERA); }} onSelectPrinter={(p) => { setSelectedPrinter(p); setCurrentScreen(AppScreen.DETAILS); }} onPreviewImage={(url) => { setPreviewPhotos([{url, label: 'Preview', filename: 'p.jpg'}]); setPreviewIndex(0); setLastScreen(AppScreen.GALLERY); setCurrentScreen(AppScreen.PREVIEW); }} onOpenSettings={() => setCurrentScreen(AppScreen.SETTINGS)} onManualSync={performSyncCycle} onBackToProjects={() => setCurrentScreen(AppScreen.PROJECT_LIST)} />}
         {currentScreen === AppScreen.CAMERA && <CameraScreen sessionIndex={sessionIndex} isSingleRetake={isSingleRetake} initialFlash={settings.defaultFlash} onClose={() => { if (sessionPhotos.length > 0 && sessionData) finalizeSession(sessionPhotos, sessionData); else { setCurrentScreen(isSingleRetake ? lastScreen : AppScreen.GALLERY); setIsSingleRetake(false); } }} onCapture={handleCapture} />}
-        {currentScreen === AppScreen.REVIEW && <ReviewScreen imageUrl={capturedImage!} data={sessionData!} isAnalyzing={isAnalyzing} sessionIndex={sessionIndex} isSingleRetake={isSingleRetake} photoRotation={parseInt(sessionStorage.getItem('lastCaptureRotation') || '0', 10)} onRetake={() => setCurrentScreen(AppScreen.CAMERA)} onUpdateData={(newData) => { setSessionData(newData); if (sessionIndex === 0 && !isSingleRetake) { setBaseSerialNumber(newData.serialNumber); setBasePartNumber(newData.partNumber || ''); } }} onConfirm={() => processConfirmation(capturedImage!, sessionData || { serialNumber: 'Manual_SN', model: 'ZT411' })} onBack={handleReviewBack} />}
-        {currentScreen === AppScreen.DETAILS && <DetailsScreen printer={selectedPrinter!} viewMode={detailsViewMode} setViewMode={setDetailsViewMode} onBack={() => setCurrentScreen(AppScreen.GALLERY)} onAddPhoto={(idx) => { setSessionIndex(idx); setIsSingleRetake(true); setSessionData({ serialNumber: selectedPrinter!.serialNumber, model: selectedPrinter!.model, partNumber: selectedPrinter!.partNumber }); setLastScreen(AppScreen.DETAILS); setCurrentScreen(AppScreen.CAMERA); }} onPreviewImage={(photos, index) => { setPreviewPhotos(photos); setPreviewIndex(index); setLastScreen(AppScreen.DETAILS); setCurrentScreen(AppScreen.PREVIEW); }} onManualSync={performSyncCycle} onUpdatePrinter={updatePrinter} onAllPhotosComplete={() => { setSessionIndex(0); setSessionPhotos([]); setSessionData(null); setBaseSerialNumber(''); }} isSyncing={selectedPrinter?.isSyncing} user={user} onLogin={handleLogin} onLogout={handleLogout} />}
-        {currentScreen === AppScreen.PREVIEW && <ImagePreviewScreen photos={previewPhotos} initialIndex={previewIndex} onBack={() => setCurrentScreen(lastScreen)} onRetake={(idx) => { setSessionIndex(idx); setIsSingleRetake(true); if (selectedPrinter) setSessionData({ serialNumber: selectedPrinter.serialNumber, model: selectedPrinter.model }); setCurrentScreen(AppScreen.CAMERA); }} onReplace={(idx, b64) => { if (!selectedPrinter) return; const currentPhotos = selectedPrinter.photos || []; const updatedPhotos = [...currentPhotos]; updatedPhotos[idx] = { ...updatedPhotos[idx], url: b64, isSynced: false }; const updatedPrinter = { ...selectedPrinter, photos: updatedPhotos, imageUrl: idx === 0 ? b64 : selectedPrinter.imageUrl, syncedCount: updatedPhotos.filter(p => p.isSynced).length }; setPrinters(prev => prev.map(p => p.id === selectedPrinter.id ? updatedPrinter : p)); setSelectedPrinter(updatedPrinter); setPreviewPhotos(updatedPhotos); }} />}
+        {currentScreen === AppScreen.REVIEW && <ReviewScreen imageUrl={capturedImage!} data={sessionData!} isAnalyzing={isAnalyzing} sessionIndex={sessionIndex} isSingleRetake={isSingleRetake} photoRotation={parseInt(sessionStorage.getItem('lastCaptureRotation') || '0', 10)} onRetake={() => setCurrentScreen(AppScreen.CAMERA)} onUpdateData={(newData) => { setSessionData(newData); if (sessionIndex === 0 && !isSingleRetake) { setBaseSerialNumber(newData.serialNumber); setBasePartNumber(newData.partNumber || ''); } }} onConfirm={() => processConfirmation(capturedImage!, sessionData || { serialNumber: 'Manual_SN', partNumber: '' })} onBack={handleReviewBack} />}
+        {currentScreen === AppScreen.DETAILS && <DetailsScreen printer={selectedPrinter!} viewMode={detailsViewMode} setViewMode={setDetailsViewMode} onBack={() => setCurrentScreen(AppScreen.GALLERY)} onAddPhoto={(idx) => { setSessionIndex(idx); setIsSingleRetake(true); setSessionData({ serialNumber: selectedPrinter!.serialNumber, partNumber: selectedPrinter!.partNumber }); setLastScreen(AppScreen.DETAILS); setCurrentScreen(AppScreen.CAMERA); }} onPreviewImage={(photos, index) => { setPreviewPhotos(photos); setPreviewIndex(index); setLastScreen(AppScreen.DETAILS); setCurrentScreen(AppScreen.PREVIEW); }} onManualSync={performSyncCycle} onUpdatePrinter={updatePrinter} onAllPhotosComplete={() => { setSessionIndex(0); setSessionPhotos([]); setSessionData(null); setBaseSerialNumber(''); }} isSyncing={selectedPrinter?.isSyncing} user={user} onLogin={handleLogin} onLogout={handleLogout} />}
+        {currentScreen === AppScreen.PREVIEW && <ImagePreviewScreen photos={previewPhotos} initialIndex={previewIndex} onBack={() => setCurrentScreen(lastScreen)} onRetake={(idx) => { setSessionIndex(idx); setIsSingleRetake(true); if (selectedPrinter) setSessionData({ serialNumber: selectedPrinter.serialNumber, partNumber: selectedPrinter.partNumber }); setCurrentScreen(AppScreen.CAMERA); }} onReplace={(idx, b64) => { if (!selectedPrinter) return; const currentPhotos = selectedPrinter.photos || []; const updatedPhotos = [...currentPhotos]; updatedPhotos[idx] = { ...updatedPhotos[idx], url: b64, isSynced: false }; const updatedPrinter = { ...selectedPrinter, photos: updatedPhotos, imageUrl: idx === 0 ? b64 : selectedPrinter.imageUrl, syncedCount: updatedPhotos.filter(p => p.isSynced).length }; setPrinters(prev => prev.map(p => p.id === selectedPrinter.id ? updatedPrinter : p)); setSelectedPrinter(updatedPrinter); setPreviewPhotos(updatedPhotos); }} />}
         {currentScreen === AppScreen.SETTINGS && <SettingsScreen settings={settings} onUpdate={setSettings} activeProject={activeProject} user={user} onBack={() => setCurrentScreen(activeProjectId ? AppScreen.GALLERY : AppScreen.PROJECT_LIST)} />}
         {currentScreen === AppScreen.SEARCH && <SearchScreen printers={printers} onBack={() => setCurrentScreen(AppScreen.GALLERY)} onPreviewImage={(url) => { setPreviewPhotos([{url, label: 'Search', filename: 's.jpg'}]); setPreviewIndex(0); setLastScreen(AppScreen.SEARCH); setCurrentScreen(AppScreen.PREVIEW); }} />}
       </div>
