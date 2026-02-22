@@ -1062,6 +1062,60 @@ export async function readBarcode(base64Image: string): Promise<BarcodeResult[]>
       }
     }
 
+    const pnBottomRois = [
+      { name: 'pn-bottom-1', x: 0.0, y: 0.54, w: 1.0, h: 0.36 },
+      { name: 'pn-bottom-2', x: 0.04, y: 0.58, w: 0.92, h: 0.30 },
+      { name: 'pn-bottom-3', x: 0.08, y: 0.62, w: 0.84, h: 0.24 }
+    ] as const;
+
+    for (let i = 0; i < pnBottomRois.length; i++) {
+      if (shouldStop()) break;
+
+      const roi = pnBottomRois[i];
+      try {
+        const roiImage = await cropToRegion(normalized, roi.x, roi.y, roi.w, roi.h);
+        const upscaled = await upscaleIfNeeded(roiImage, 1700);
+        const contrast = await enhanceContrast(upscaled, 1.75);
+        const binary = await otsuBinarize(upscaled);
+
+        const variants: Array<{ name: 'raw' | 'contrast' | 'binary'; image: string }> = [
+          { name: 'raw', image: upscaled },
+          { name: 'contrast', image: contrast },
+          { name: 'binary', image: binary }
+        ];
+
+        for (const variant of variants) {
+          if (shouldStop()) break;
+
+          for (const angle of [0, -12, 12, -20, 20]) {
+            if (shouldStop()) break;
+
+            const rotated = angle === 0 ? variant.image : await rotateBase64Any(variant.image, angle);
+            const region = angle === 0 ? roi.name : `${roi.name}(rot${angle})`;
+
+            attempts += 1;
+            const quaggaRes = await decodeWithQuagga(rotated, {
+              halfSample: false,
+              preprocessed: variant.name === 'binary'
+            });
+            if (quaggaRes) {
+              tryAddResult(quaggaRes.text, quaggaRes.format, region, 100 + i, variant.name, 'quagga', quaggaRes.confidence, 'bottom');
+            }
+
+            if (shouldStop()) break;
+
+            attempts += 1;
+            const zxingRes = await decodeWithZXing(rotated, { variant: variant.name, oneDOnly: true });
+            for (const candidate of zxingRes) {
+              tryAddResult(candidate.text, candidate.format, region, 100 + i, variant.name, 'zxing', candidate.confidence, 'bottom');
+            }
+          }
+        }
+      } catch (error) {
+        console.warn(`⚠️ [PNSweep] ${roi.name} 处理异常`);
+      }
+    }
+
     const optimized = await optimizeResolution(normalized, 1800);
 
     const multiBoxes = await detectBarcodeBoxesFromImage(optimized);
