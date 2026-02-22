@@ -634,6 +634,20 @@ const App: React.FC = () => {
           const rawResults = await readBarcode(base64Image);
           console.log('📊 [analyzeWithBarcode] 解码返回:', rawResults.length, '个候选');
 
+          if (rawResults.length > 0) {
+            console.log('🧾 [analyzeWithBarcode] 候选明细:');
+            console.table(rawResults.map((item, index) => ({
+              index: index + 1,
+              text: item.value,
+              engine: item.engine || 'unknown',
+              confidence: item.engineConfidence ?? 0,
+              format: item.format || 'UNKNOWN',
+              region: item.region || 'n/a',
+              variant: item.variant || 'n/a',
+              regionIndex: item.regionIndex ?? 0
+            })));
+          }
+
           if (rawResults.length === 0) {
             console.warn('⚠️ [analyzeWithBarcode] 未检测到条码');
             displayToast('💡 Cannot detect barcode. Please: get closer, improve lighting, hold steady, try different angle.', 5000);

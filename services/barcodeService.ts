@@ -1276,6 +1276,21 @@ export async function readBarcode(base64Image: string): Promise<BarcodeResult[]>
       });
     }
 
+    if (results.length > 0) {
+      const ranked = results
+        .map(item => ({
+          text: item.value,
+          engine: item.engine || 'unknown',
+          confidence: Number((item.engineConfidence ?? 0).toFixed(3)),
+          region: item.region || 'n/a',
+          variant: item.variant || 'n/a'
+        }))
+        .sort((a, b) => b.confidence - a.confidence);
+
+      console.log('🧾 [readBarcode] 最终候选排行:');
+      console.table(ranked);
+    }
+
     if (results.length === 0) {
       console.warn('❌ [readBarcode] 无法识别条码');
     } else {
