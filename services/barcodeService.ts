@@ -827,6 +827,88 @@ async function enhanceContrast(base64Image: string, factor: number = 1.45): Prom
   }
 }
 
+async function sharpenImage(base64Image: string, amount: number = 1.0): Promise<string> {
+  if (!base64Image) return base64Image;
+
+  try {
+    const img = await loadImageFromBase64(base64Image);
+    return await withCanvas(img.width, img.height, (canvas, ctx) => {
+      ctx.drawImage(img, 0, 0);
+      const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+      const src = imageData.data;
+      const out = new Uint8ClampedArray(src.length);
+
+      const width = canvas.width;
+      const height = canvas.height;
+      const kernel = [
+        0, -1, 0,
+        -1, 5, -1,
+        0, -1, 0
+      ];
+
+      const clamp = (value: number) => Math.max(0, Math.min(255, value));
+
+      for (let y = 1; y < height - 1; y++) {
+        for (let x = 1; x < width - 1; x++) {
+          let r = 0;
+          let g = 0;
+          let b = 0;
+          let k = 0;
+
+          for (let ky = -1; ky <= 1; ky++) {
+            for (let kx = -1; kx <= 1; kx++) {
+              const idx = ((y + ky) * width + (x + kx)) * 4;
+              const w = kernel[k++];
+              r += src[idx] * w;
+              g += src[idx + 1] * w;
+              b += src[idx + 2] * w;
+            }
+          }
+
+          const idx = (y * width + x) * 4;
+          out[idx] = clamp(src[idx] * (1 - amount) + r * amount);
+          out[idx + 1] = clamp(src[idx + 1] * (1 - amount) + g * amount);
+          out[idx + 2] = clamp(src[idx + 2] * (1 - amount) + b * amount);
+          out[idx + 3] = src[idx + 3];
+        }
+      }
+
+      for (let x = 0; x < width; x++) {
+        const top = x * 4;
+        const bottom = ((height - 1) * width + x) * 4;
+        out[top] = src[top];
+        out[top + 1] = src[top + 1];
+        out[top + 2] = src[top + 2];
+        out[top + 3] = src[top + 3];
+        out[bottom] = src[bottom];
+        out[bottom + 1] = src[bottom + 1];
+        out[bottom + 2] = src[bottom + 2];
+        out[bottom + 3] = src[bottom + 3];
+      }
+
+      for (let y = 0; y < height; y++) {
+        const left = (y * width) * 4;
+        const right = (y * width + width - 1) * 4;
+        out[left] = src[left];
+        out[left + 1] = src[left + 1];
+        out[left + 2] = src[left + 2];
+        out[left + 3] = src[left + 3];
+        out[right] = src[right];
+        out[right + 1] = src[right + 1];
+        out[right + 2] = src[right + 2];
+        out[right + 3] = src[right + 3];
+      }
+
+      imageData.data.set(out);
+      ctx.putImageData(imageData, 0, 0);
+      return canvas.toDataURL('image/jpeg', 0.95).split(',')[1];
+    });
+  } catch (error) {
+    console.warn('⚠️ [sharpenImage] 失败');
+    return base64Image;
+  }
+}
+
 function getZXingReader(oneDOnly: boolean = false): BrowserMultiFormatReader {
   if (oneDOnly && zxingReader1D) return zxingReader1D;
   if (!oneDOnly && zxingReader) return zxingReader;
@@ -1051,8 +1133,8 @@ export async function readBarcode(base64Image: string): Promise<BarcodeResult[]>
 
   try {
     const startedAt = Date.now();
-    const TIME_BUDGET_MS = 7600;
-    const MAX_DECODE_ATTEMPTS = 140;
+    const TIME_BUDGET_MS = 12500;
+    const MAX_DECODE_ATTEMPTS = 280;
     const MAX_CANDIDATES = 120;
     let attempts = 0;
     const candidateMap = new Map<string, CandidateAggregate>();
@@ -1113,6 +1195,63 @@ export async function readBarcode(base64Image: string): Promise<BarcodeResult[]>
       existing.cumulativeConfidence += weightedConfidence;
       if (!existing.format && format) existing.format = format;
     };
+
+    const smallTargetSources = [
+      { name: 'small-full', x: 0, y: 0, w: 1, h: 1, hint: 'mid' as const },
+      { name: 'small-right', x: 0.46, y: 0.1, w: 0.54, h: 0.82, hint: 'right' as const },
+      { name: 'small-bottom', x: 0.06, y: 0.5, w: 0.88, h: 0.44, hint: 'bottom' as const }
+    ];
+
+    for (let i = 0; i < smallTargetSources.length; i++) {
+      if (shouldStop()) break;
+      const source = smallTargetSources[i];
+      try {
+        const roiImage = source.name === 'small-full'
+          ? normalized
+          : await cropToRegion(normalized, source.x, source.y, source.w, source.h);
+
+        const upscaled = await upscaleIfNeeded(roiImage, 2600);
+        const contrast = await enhanceContrast(upscaled, 1.95);
+        const sharpened = await sharpenImage(contrast, 0.85);
+        const binary = await otsuBinarize(sharpened);
+
+        const variants: Array<{ name: 'raw' | 'contrast' | 'binary'; image: string }> = [
+          { name: 'raw', image: upscaled },
+          { name: 'contrast', image: sharpened },
+          { name: 'binary', image: binary }
+        ];
+
+        for (const variant of variants) {
+          if (shouldStop()) break;
+
+          for (const angle of [0, -8, 8]) {
+            if (shouldStop()) break;
+
+            const rotated = angle === 0 ? variant.image : await rotateBase64Any(variant.image, angle);
+            const region = angle === 0 ? source.name : `${source.name}(rot${angle})`;
+
+            attempts += 1;
+            const zxingResults = await decodeWithZXing(rotated, { variant: variant.name, oneDOnly: true });
+            for (const item of zxingResults) {
+              tryAddResult(item.text, item.format, region, 300 + i, variant.name, 'zxing', item.confidence, source.hint);
+            }
+
+            if (shouldStop()) break;
+
+            attempts += 1;
+            const quaggaFull = await decodeWithQuagga(rotated, {
+              halfSample: false,
+              preprocessed: variant.name === 'binary'
+            });
+            if (quaggaFull) {
+              tryAddResult(quaggaFull.text, quaggaFull.format, region, 300 + i, variant.name, 'quagga', quaggaFull.confidence, source.hint);
+            }
+          }
+        }
+      } catch (error) {
+        console.warn(`⚠️ [SmallTargetSweep] ${source.name} 处理异常`);
+      }
+    }
 
     const focusedImage = await loadImageFromBase64(normalized);
     const focusedCanvas = await preprocessImageForFocusedSweep(focusedImage, 1200, 1.7);
