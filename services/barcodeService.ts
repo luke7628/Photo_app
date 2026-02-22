@@ -32,10 +32,13 @@ interface BarcodeResult {
   format?: string;
   region?: string;
   regionIndex?: number;
-  variant?: 'raw' | 'contrast' | 'binary';
+  variant?: 'raw' | 'contrast' | 'binary' | 'focused';
   engine?: 'quagga' | 'native' | 'zxing';
   engineConfidence?: number;
 }
+
+const serialRegex = /^[a-zA-Z]{2,4}\d{8,12}$/i;
+const partRegex = /^[a-zA-Z0-9-]{6,20}$/i;
 
 let preprocessedImageCache: { base64: string; processed: string } | null = null;
 let nativeBarcodeDetectorInit: Promise<any | null> | null = null;
@@ -130,6 +133,138 @@ async function withCanvas<T>(
     canvas.width = 0;
     canvas.height = 0;
   }
+}
+
+async function preprocessImageForFocusedSweep(
+  img: HTMLImageElement,
+  minWidth: number = 1200,
+  contrastFactor: number = 1.7
+): Promise<HTMLCanvasElement> {
+  const canvas = document.createElement('canvas');
+  let scale = 1;
+  if (img.width < minWidth) scale = minWidth / img.width;
+  canvas.width = Math.floor(img.width * scale);
+  canvas.height = Math.floor(img.height * scale);
+  const ctx = canvas.getContext('2d');
+  if (!ctx) return canvas;
+
+  ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+  const data = ctx.getImageData(0, 0, canvas.width, canvas.height);
+
+  for (let i = 0; i < data.data.length; i += 4) {
+    const gray = 0.299 * data.data[i] + 0.587 * data.data[i + 1] + 0.114 * data.data[i + 2];
+    const enhanced = Math.max(0, Math.min(255, (gray - 128) * contrastFactor + 128));
+    data.data[i] = enhanced;
+    data.data[i + 1] = enhanced;
+    data.data[i + 2] = enhanced;
+  }
+
+  ctx.putImageData(data, 0, 0);
+  return canvas;
+}
+
+function cropCanvasByRoi(
+  source: HTMLCanvasElement,
+  roi: { x: number; y: number; w: number; h: number }
+): HTMLCanvasElement {
+  const roiCanvas = document.createElement('canvas');
+  roiCanvas.width = Math.floor(source.width * roi.w);
+  roiCanvas.height = Math.floor(source.height * roi.h);
+  const ctx = roiCanvas.getContext('2d');
+  if (!ctx) return roiCanvas;
+
+  ctx.drawImage(
+    source,
+    Math.floor(source.width * roi.x),
+    Math.floor(source.height * roi.y),
+    roiCanvas.width,
+    roiCanvas.height,
+    0,
+    0,
+    roiCanvas.width,
+    roiCanvas.height
+  );
+
+  return roiCanvas;
+}
+
+function rotateCanvasByAngle(source: HTMLCanvasElement, angle: number): HTMLCanvasElement {
+  if (angle === 0) return source;
+
+  const radians = (angle * Math.PI) / 180;
+  const cos = Math.abs(Math.cos(radians));
+  const sin = Math.abs(Math.sin(radians));
+
+  const rotated = document.createElement('canvas');
+  rotated.width = Math.ceil(source.width * cos + source.height * sin);
+  rotated.height = Math.ceil(source.width * sin + source.height * cos);
+  const ctx = rotated.getContext('2d');
+  if (!ctx) return source;
+
+  ctx.translate(rotated.width / 2, rotated.height / 2);
+  ctx.rotate(radians);
+  ctx.drawImage(source, -source.width / 2, -source.height / 2);
+  return rotated;
+}
+
+async function decodeQuaggaFromCanvas(canvas: HTMLCanvasElement): Promise<{ text: string; format?: string; confidence: number } | null> {
+  return new Promise((resolve) => {
+    Quagga.decodeSingle({
+      src: canvas.toDataURL('image/jpeg', 0.95),
+      numOfWorkers: 0,
+      inputStream: { size: canvas.width },
+      locator: { halfSample: false },
+      decoder: {
+        readers: [
+          'code_128_reader',
+          'code_39_reader',
+          'code_93_reader',
+          'ean_reader',
+          'upc_reader',
+          'upc_e_reader'
+        ]
+      }
+    }, (result: any) => {
+      if (result?.codeResult?.code) {
+        resolve({
+          text: result.codeResult.code.trim(),
+          format: result.codeResult.format || 'UNKNOWN',
+          confidence: 0.84
+        });
+      } else {
+        resolve(null);
+      }
+    });
+  });
+}
+
+async function decodeZXingFromCanvas(canvas: HTMLCanvasElement): Promise<{ text: string; format?: string; confidence: number } | null> {
+  const reader = getZXingReader(true);
+  const image = new Image();
+
+  await new Promise<void>((resolve, reject) => {
+    image.onload = () => resolve();
+    image.onerror = () => reject(new Error('Failed to load canvas image'));
+    image.src = canvas.toDataURL('image/jpeg', 0.95);
+  });
+
+  try {
+    const result = await reader.decodeFromImageElement(image);
+    reader.reset();
+    const text = result?.getText()?.trim();
+    if (!text) return null;
+    const formatValue = result.getBarcodeFormat();
+    const format = BarcodeFormat[formatValue] || String(formatValue);
+    return { text, format, confidence: 0.86 };
+  } catch {
+    return null;
+  }
+}
+
+function getRuleBonus(text: string): number {
+  if (serialRegex.test(text)) return 0.08;
+  if (partRegex.test(text)) return 0.06;
+  return 0;
 }
 
 /**
@@ -599,22 +734,58 @@ export async function readBarcode(base64Image: string): Promise<BarcodeResult[]>
       format: string | undefined,
       region: string,
       regionIndex: number,
-      variant: 'raw' | 'contrast' | 'binary',
+      variant: 'raw' | 'contrast' | 'binary' | 'focused',
       engine: 'quagga' | 'native' | 'zxing',
       engineConfidence: number
     ) => {
       if (!text || !text.trim()) return;
+      const cleaned = text.trim();
+      const bonus = getRuleBonus(cleaned);
       addUniqueResult(results, {
         type: 'barcode',
-        value: text.trim(),
+        value: cleaned,
         format,
         region,
         regionIndex,
         variant,
         engine,
-        engineConfidence
+        engineConfidence: Math.min(0.98, engineConfidence + bonus)
       });
     };
+
+    const focusedImage = await loadImageFromBase64(normalized);
+    const focusedCanvas = await preprocessImageForFocusedSweep(focusedImage, 1200, 1.7);
+    const focusedRois = [
+      { name: 'focused-center', x: 0.2, y: 0.2, w: 0.6, h: 0.6 },
+      { name: 'focused-extended', x: 0.1, y: 0.1, w: 0.8, h: 0.8 },
+      { name: 'focused-full', x: 0, y: 0, w: 1, h: 1 }
+    ];
+    const focusedAngles = [0, 15, -15, 30, -30];
+
+    for (let i = 0; i < focusedRois.length; i++) {
+      if (shouldStop()) break;
+      const roi = focusedRois[i];
+      const roiCanvas = cropCanvasByRoi(focusedCanvas, roi);
+
+      for (const angle of focusedAngles) {
+        if (shouldStop()) break;
+        const rotatedCanvas = rotateCanvasByAngle(roiCanvas, angle);
+        const region = angle === 0 ? roi.name : `${roi.name}(rot${angle})`;
+
+        attempts += 1;
+        const [quaggaRes, zxingRes] = await Promise.all([
+          decodeQuaggaFromCanvas(rotatedCanvas),
+          decodeZXingFromCanvas(rotatedCanvas)
+        ]);
+
+        if (quaggaRes) {
+          tryAddResult(quaggaRes.text, quaggaRes.format, region, i + 1, 'focused', 'quagga', quaggaRes.confidence);
+        }
+        if (zxingRes) {
+          tryAddResult(zxingRes.text, zxingRes.format, region, i + 1, 'focused', 'zxing', zxingRes.confidence);
+        }
+      }
+    }
 
     const optimized = await optimizeResolution(normalized, 1800);
     const roiDefs = [
