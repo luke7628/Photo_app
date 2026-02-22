@@ -43,6 +43,24 @@ interface StripeBand {
   score: number;
 }
 
+interface StripeProjectionResult {
+  bands: StripeBand[];
+  rowDensity: number[];
+  imageHeight: number;
+}
+
+interface CandidateAggregate {
+  value: string;
+  format?: string;
+  count: number;
+  engines: Set<'quagga' | 'native' | 'zxing'>;
+  regions: Set<string>;
+  regionIndex: number;
+  variant: 'raw' | 'contrast' | 'binary' | 'focused';
+  bestConfidence: number;
+  cumulativeConfidence: number;
+}
+
 const serialRegex = /^[a-zA-Z]{2,4}\d{8,12}$/i;
 const partRegex = /^[a-zA-Z0-9-]{6,28}$/i;
 const ztPartRegex = /ZT[0-9A-Z]{3,8}-[0-9A-Z]{4,20}/i;
@@ -465,7 +483,7 @@ async function detectBarcodeBands(
     minBandHeight: 40,
     densityFactor: 1.5
   }
-): Promise<StripeBand[]> {
+): Promise<StripeProjectionResult> {
   const img = await loadImageFromBase64(base64);
 
   return withCanvas(img.width, img.height, (_canvas, ctx) => {
@@ -515,8 +533,56 @@ async function detectBarcodeBands(
       }
     }
 
-    return bands;
+    return {
+      bands,
+      rowDensity,
+      imageHeight: height
+    };
   });
+}
+
+function splitBandVertically(
+  band: StripeBand,
+  rowDensity: number[],
+  thresholdFactor: number = 2.0
+): StripeBand[] {
+  const rows = rowDensity.slice(band.top, band.bottom);
+  if (!rows.length) return [band];
+
+  const avg = rows.reduce((sum, value) => sum + value, 0) / rows.length;
+  const threshold = avg * thresholdFactor;
+
+  const subs: StripeBand[] = [];
+  let start = -1;
+  let acc = 0;
+
+  for (let y = band.top; y <= band.bottom; y++) {
+    const density = rowDensity[y] || 0;
+
+    if (density > threshold) {
+      if (start < 0) start = y;
+      acc += density;
+    } else if (start >= 0) {
+      const height = y - start;
+      if (height >= 25) {
+        subs.push({
+          top: start,
+          bottom: y,
+          score: acc / height
+        });
+      }
+      start = -1;
+      acc = 0;
+    }
+  }
+
+  return subs.length >= 2 ? subs : [band];
+}
+
+function isLikelyPNText(text: string): boolean {
+  if (!text || text.length < 6) return false;
+  const alpha = text.replace(/[^A-Za-z]/g, '').length;
+  return text.includes('-') || (alpha / Math.max(1, text.length)) > 0.35;
 }
 
 async function cropBand(base64: string, band: StripeBand): Promise<string> {
@@ -814,6 +880,7 @@ export async function readBarcode(base64Image: string): Promise<BarcodeResult[]>
     const MAX_DECODE_ATTEMPTS = 140;
     const MAX_CANDIDATES = 120;
     let attempts = 0;
+    const candidateMap = new Map<string, CandidateAggregate>();
 
     const normalized = normalizeBase64(base64Image);
     if (!normalized) {
@@ -824,7 +891,7 @@ export async function readBarcode(base64Image: string): Promise<BarcodeResult[]>
     console.log('🔍 [readBarcode] 启动激进识别矩阵...');
 
     const shouldStop = () => {
-      if (results.length >= MAX_CANDIDATES) return true;
+      if (candidateMap.size >= MAX_CANDIDATES) return true;
       if (attempts >= MAX_DECODE_ATTEMPTS) return true;
       if (Date.now() - startedAt >= TIME_BUDGET_MS) return true;
       return false;
@@ -837,21 +904,39 @@ export async function readBarcode(base64Image: string): Promise<BarcodeResult[]>
       regionIndex: number,
       variant: 'raw' | 'contrast' | 'binary' | 'focused',
       engine: 'quagga' | 'native' | 'zxing',
-      engineConfidence: number
+      engineConfidence: number,
+      positionHint: 'top' | 'mid' | 'bottom' = 'mid'
     ) => {
       if (!text || !text.trim()) return;
       const cleaned = text.trim();
-      const bonus = getRuleBonus(cleaned);
-      addUniqueResult(results, {
-        type: 'barcode',
-        value: cleaned,
-        format,
-        region,
-        regionIndex,
-        variant,
-        engine,
-        engineConfidence: Math.min(0.98, engineConfidence + bonus)
-      });
+      const pnBoost = isLikelyPNText(cleaned)
+        ? (positionHint === 'bottom' ? 0.12 : 0.06)
+        : 0;
+      const bonus = getRuleBonus(cleaned) + pnBoost;
+      const weightedConfidence = Math.min(0.99, engineConfidence + bonus);
+
+      const existing = candidateMap.get(cleaned);
+      if (!existing) {
+        candidateMap.set(cleaned, {
+          value: cleaned,
+          format,
+          count: 1,
+          engines: new Set([engine]),
+          regions: new Set([region]),
+          regionIndex,
+          variant,
+          bestConfidence: weightedConfidence,
+          cumulativeConfidence: weightedConfidence
+        });
+        return;
+      }
+
+      existing.count += 1;
+      existing.engines.add(engine);
+      existing.regions.add(region);
+      existing.bestConfidence = Math.max(existing.bestConfidence, weightedConfidence);
+      existing.cumulativeConfidence += weightedConfidence;
+      if (!existing.format && format) existing.format = format;
     };
 
     const focusedImage = await loadImageFromBase64(normalized);
@@ -892,26 +977,48 @@ export async function readBarcode(base64Image: string): Promise<BarcodeResult[]>
 
     const optimized = await optimizeResolution(normalized, 1800);
     let stripeBands: StripeBand[] = [];
+    let rowDensity: number[] = [];
+    let imageHeight = 1;
 
     try {
-      stripeBands = await detectBarcodeBands(optimized, { minBandHeight: 40, densityFactor: 1.45 });
+      const projection = await detectBarcodeBands(optimized, { minBandHeight: 40, densityFactor: 1.45 });
+      stripeBands = projection.bands;
+      rowDensity = projection.rowDensity;
+      imageHeight = projection.imageHeight;
       console.log(`📊 [StripeProjection] 检测到 ${stripeBands.length} 个band`);
     } catch (error) {
       console.warn('⚠️ [StripeProjection] band检测失败，回退固定ROI:', error);
     }
 
-    const dynamicSources: Array<{ name: string; image: string; index: number }> = [];
+    const dynamicSources: Array<{ name: string; image: string; index: number; positionHint: 'top' | 'mid' | 'bottom' }> = [];
     const sortedBands = stripeBands
       .slice()
       .sort((a, b) => b.score - a.score)
       .slice(0, 5);
 
+    let bandIndex = 1;
     for (let i = 0; i < sortedBands.length; i++) {
-      try {
-        const bandImage = await cropBand(optimized, sortedBands[i]);
-        dynamicSources.push({ name: `stripe-band-${i + 1}`, image: bandImage, index: i + 1 });
-      } catch (error) {
-        console.warn(`⚠️ [StripeProjection] crop band ${i + 1} 失败`);
+      const splitBands = rowDensity.length
+        ? splitBandVertically(sortedBands[i], rowDensity, 2.0)
+        : [sortedBands[i]];
+
+      for (const splitBand of splitBands) {
+        try {
+          const bandImage = await cropBand(optimized, splitBand);
+          const mid = (splitBand.top + splitBand.bottom) / 2;
+          const ratio = mid / Math.max(1, imageHeight);
+          const positionHint = ratio > 0.62 ? 'bottom' : ratio < 0.35 ? 'top' : 'mid';
+
+          dynamicSources.push({
+            name: `stripe-band-${bandIndex}`,
+            image: bandImage,
+            index: bandIndex,
+            positionHint
+          });
+          bandIndex += 1;
+        } catch (error) {
+          console.warn(`⚠️ [StripeProjection] crop band ${bandIndex} 失败`);
+        }
       }
     }
 
@@ -929,7 +1036,8 @@ export async function readBarcode(base64Image: string): Promise<BarcodeResult[]>
           const roiImage = roi.name === 'full'
             ? optimized
             : await cropToRegion(optimized, roi.x, roi.y, roi.w, roi.h);
-          dynamicSources.push({ name: roi.name, image: roiImage, index: i + 1 });
+          const positionHint = roi.name === 'lower-focus' ? 'bottom' : 'mid';
+          dynamicSources.push({ name: roi.name, image: roiImage, index: i + 1, positionHint });
         } catch {
           // ignore this roi
         }
@@ -966,7 +1074,7 @@ export async function readBarcode(base64Image: string): Promise<BarcodeResult[]>
             attempts += 1;
             const nativeResults = await decodeWithNativeBarcodeDetector(rotated);
             for (const native of nativeResults) {
-              tryAddResult(native.text, native.format, regionWithAngle, regionIndex, variant.name, 'native', native.confidence);
+              tryAddResult(native.text, native.format, regionWithAngle, regionIndex, variant.name, 'native', native.confidence, source.positionHint);
             }
 
             if (shouldStop()) break;
@@ -974,7 +1082,7 @@ export async function readBarcode(base64Image: string): Promise<BarcodeResult[]>
             attempts += 1;
             const zxingResults = await decodeWithZXing(rotated, { variant: variant.name, oneDOnly: true });
             for (const zxing of zxingResults) {
-              tryAddResult(zxing.text, zxing.format, regionWithAngle, regionIndex, variant.name, 'zxing', zxing.confidence);
+              tryAddResult(zxing.text, zxing.format, regionWithAngle, regionIndex, variant.name, 'zxing', zxing.confidence, source.positionHint);
             }
 
             if (shouldStop()) break;
@@ -985,7 +1093,7 @@ export async function readBarcode(base64Image: string): Promise<BarcodeResult[]>
               preprocessed: variant.name === 'binary'
             });
             if (quaggaFast) {
-              tryAddResult(quaggaFast.text, quaggaFast.format, regionWithAngle, regionIndex, variant.name, 'quagga', quaggaFast.confidence);
+              tryAddResult(quaggaFast.text, quaggaFast.format, regionWithAngle, regionIndex, variant.name, 'quagga', quaggaFast.confidence, source.positionHint);
             }
 
             if (shouldStop()) break;
@@ -996,7 +1104,7 @@ export async function readBarcode(base64Image: string): Promise<BarcodeResult[]>
               preprocessed: variant.name === 'binary'
             });
             if (quaggaFull) {
-              tryAddResult(quaggaFull.text, quaggaFull.format, regionWithAngle, regionIndex, variant.name, 'quagga', quaggaFull.confidence);
+              tryAddResult(quaggaFull.text, quaggaFull.format, regionWithAngle, regionIndex, variant.name, 'quagga', quaggaFull.confidence, source.positionHint);
             }
           }
         }
@@ -1005,12 +1113,32 @@ export async function readBarcode(base64Image: string): Promise<BarcodeResult[]>
       }
     }
 
-    if (results.length === 0) {
+    if (candidateMap.size === 0) {
       console.warn('⚠️ [readBarcode] 激进矩阵无结果，回退 legacy 识别链...');
       const legacy = await legacyReadBarcode(normalized);
       for (const item of legacy) {
-        tryAddResult(item.value, item.format, item.region || 'legacy', item.regionIndex || 0, 'raw', 'zxing', 0.72);
+        const legacyRegion = item.region || 'legacy';
+        const legacyHint = legacyRegion.includes('bottom') ? 'bottom' : 'mid';
+        tryAddResult(item.value, item.format, legacyRegion, item.regionIndex || 0, 'raw', 'zxing', 0.72, legacyHint);
       }
+    }
+
+    for (const aggregate of candidateMap.values()) {
+      const diversityBoost = Math.min(0.12, aggregate.engines.size * 0.03 + aggregate.regions.size * 0.01);
+      const countBoost = Math.min(0.2, Math.log2(aggregate.count + 1) * 0.06);
+      const avgConfidence = aggregate.cumulativeConfidence / Math.max(1, aggregate.count);
+      const engineConfidence = Math.min(0.99, Math.max(aggregate.bestConfidence, avgConfidence + diversityBoost + countBoost));
+
+      results.push({
+        type: 'barcode',
+        value: aggregate.value,
+        format: aggregate.format,
+        region: Array.from(aggregate.regions)[0],
+        regionIndex: aggregate.regionIndex,
+        variant: aggregate.variant,
+        engine: Array.from(aggregate.engines)[0],
+        engineConfidence
+      });
     }
 
     if (results.length === 0) {
