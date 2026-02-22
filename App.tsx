@@ -648,6 +648,31 @@ const App: React.FC = () => {
             regionIndex: result.regionIndex
           }));
 
+          const normalizePartNumber = (raw: string): string => {
+            if (!raw) return '';
+
+            let normalized = raw.trim().toUpperCase();
+
+            normalized = normalized
+              .replace(/[“”"]/g, '4')
+              .replace(/[‘’']/g, '1')
+              .replace(/O/g, '0')
+              .replace(/[IL]/g, '1')
+              .replace(/S/g, '5');
+
+            normalized = normalized.replace(/[^A-Z0-9-]/g, '');
+
+            if (/^ZT\d{4,8}[A-Z0-9]{4,20}$/.test(normalized)) {
+              normalized = normalized.replace(/^(ZT\d{4,8})([A-Z0-9]{4,20})$/, '$1-$2');
+            }
+
+            if (/^ZT1\d{4,8}-/.test(normalized)) {
+              normalized = normalized.replace(/^ZT1/, 'ZT4');
+            }
+
+            return normalized;
+          };
+
           const serialDecision = runRecognitionArbitration(candidates, 'serial', 0.68);
           const partDecision = runRecognitionArbitration(candidates, 'part', 0.68);
 
@@ -656,17 +681,19 @@ const App: React.FC = () => {
               .map(item => String(item.value || '').toUpperCase())
               .map(text => text.match(/ZT[0-9A-Z]{3,8}-[0-9A-Z]{4,20}/)?.[0] || '')
               .find(Boolean);
-            if (direct) return direct;
+            if (direct) return normalizePartNumber(direct);
 
-            return rawResults
+            const fallback = rawResults
               .map(item => String(item.value || '').toUpperCase().replace(/[^A-Z0-9-]/g, ''))
               .map(text => text.match(/ZT[0-9A-Z]{3,8}-?[0-9A-Z]{4,20}/)?.[0] || '')
               .map(text => text.includes('-') ? text : text.replace(/^(ZT[0-9A-Z]{3,8})([0-9A-Z]{4,20})$/, '$1-$2'))
               .find(Boolean) || '';
+
+            return normalizePartNumber(fallback);
           })();
 
           const serialNumber = serialDecision?.value ?? '';
-          const partNumber = partDecision?.value ?? partFallbackFromCandidates;
+          const partNumber = normalizePartNumber(partDecision?.value ?? partFallbackFromCandidates);
 
           console.log('📊 [analyzeWithBarcode] Serial决策:', serialDecision);
           console.log('📊 [analyzeWithBarcode] Part决策:', partDecision);
