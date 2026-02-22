@@ -50,6 +50,18 @@ interface StripeProjectionResult {
   imageHeight: number;
 }
 
+interface ColumnBand {
+  left: number;
+  right: number;
+  score: number;
+}
+
+interface ColumnProjectionResult {
+  bands: ColumnBand[];
+  colDensity: number[];
+  imageWidth: number;
+}
+
 interface CandidateAggregate {
   value: string;
   format?: string;
@@ -540,6 +552,80 @@ async function detectBarcodeBands(
       rowDensity,
       imageHeight: height
     };
+  });
+}
+
+async function detectBarcodeColumns(
+  base64: string,
+  options: { minBandWidth: number; densityFactor: number } = {
+    minBandWidth: 34,
+    densityFactor: 1.35
+  }
+): Promise<ColumnProjectionResult> {
+  const img = await loadImageFromBase64(base64);
+
+  return withCanvas(img.width, img.height, (_canvas, ctx) => {
+    ctx.drawImage(img, 0, 0);
+    const { data, width, height } = ctx.getImageData(0, 0, img.width, img.height);
+
+    const colDensity: number[] = new Array(width).fill(0);
+
+    for (let x = 0; x < width; x++) {
+      let transitions = 0;
+      let last = data[x * 4];
+
+      for (let y = 1; y < height; y++) {
+        const idx = (y * width + x) * 4;
+        const value = data[idx];
+        if (Math.abs(value - last) > 25) transitions++;
+        last = value;
+      }
+
+      colDensity[x] = transitions;
+    }
+
+    const avg = colDensity.reduce((sum, value) => sum + value, 0) / width;
+    const threshold = avg * options.densityFactor;
+
+    const bands: ColumnBand[] = [];
+    let start = -1;
+    let acc = 0;
+
+    for (let x = 0; x <= width; x++) {
+      const density = colDensity[x] || 0;
+
+      if (density > threshold) {
+        if (start < 0) start = x;
+        acc += density;
+      } else if (start >= 0) {
+        const w = x - start;
+        if (w >= options.minBandWidth) {
+          bands.push({
+            left: Math.max(0, start - Math.floor(w * 0.2)),
+            right: Math.min(width, x + Math.floor(w * 0.2)),
+            score: acc / w
+          });
+        }
+        start = -1;
+        acc = 0;
+      }
+    }
+
+    return {
+      bands,
+      colDensity,
+      imageWidth: width
+    };
+  });
+}
+
+async function cropColumn(base64: string, band: ColumnBand): Promise<string> {
+  const img = await loadImageFromBase64(base64);
+  const bandWidth = Math.max(1, band.right - band.left);
+
+  return withCanvas(bandWidth, img.height, (canvas, ctx) => {
+    ctx.drawImage(img, band.left, 0, bandWidth, img.height, 0, 0, bandWidth, img.height);
+    return canvas.toDataURL('image/jpeg', 0.92).split(',')[1];
   });
 }
 
@@ -1235,7 +1321,7 @@ export async function readBarcode(base64Image: string): Promise<BarcodeResult[]>
       console.warn('⚠️ [StripeProjection] band检测失败，回退固定ROI:', error);
     }
 
-    const dynamicSources: Array<{ name: string; image: string; index: number; positionHint: 'top' | 'mid' | 'bottom' }> = [];
+    const dynamicSources: Array<{ name: string; image: string; index: number; positionHint: 'top' | 'mid' | 'bottom' | 'right' }> = [];
     const sortedBands = stripeBands
       .slice()
       .sort((a, b) => b.score - a.score)
@@ -1265,6 +1351,40 @@ export async function readBarcode(base64Image: string): Promise<BarcodeResult[]>
           console.warn(`⚠️ [StripeProjection] crop band ${bandIndex} 失败`);
         }
       }
+    }
+
+    try {
+      const colProjection = await detectBarcodeColumns(optimized, { minBandWidth: 36, densityFactor: 1.32 });
+      const sortedCols = colProjection.bands
+        .filter((band) => ((band.left + band.right) / 2) / Math.max(1, colProjection.imageWidth) > 0.50)
+        .sort((a, b) => b.score - a.score)
+        .slice(0, 3);
+
+      let columnIndex = 1;
+      for (const col of sortedCols) {
+        if (shouldStop()) break;
+        try {
+          const colImage = await cropColumn(optimized, col);
+          const xMid = (col.left + col.right) / 2;
+          const ratio = xMid / Math.max(1, colProjection.imageWidth);
+          const positionHint: 'top' | 'mid' | 'bottom' | 'right' = ratio > 0.58 ? 'right' : 'mid';
+          dynamicSources.push({
+            name: `stripe-column-${columnIndex}`,
+            image: colImage,
+            index: 200 + columnIndex,
+            positionHint
+          });
+          columnIndex += 1;
+        } catch {
+          // ignore this column
+        }
+      }
+
+      if (sortedCols.length > 0) {
+        console.log(`📊 [ColumnProjection] 检测到 ${sortedCols.length} 个右侧候选列`);
+      }
+    } catch (error) {
+      console.warn('⚠️ [ColumnProjection] 列检测失败');
     }
 
     if (dynamicSources.length === 0) {
