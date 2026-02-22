@@ -634,7 +634,7 @@ function resultPointsToBox(points: any[], width: number, height: number) {
   };
 }
 
-async function detectBarcodeBoxesFromImage(base64: string): Promise<Array<{ name: string; image: string; index: number; positionHint: 'top' | 'mid' | 'bottom' }>> {
+async function detectBarcodeBoxesFromImage(base64: string): Promise<Array<{ name: string; image: string; index: number; positionHint: 'top' | 'mid' | 'bottom' | 'right' }>> {
   try {
     const img = await loadImageFromBase64(base64);
     const reader = getZXingMultiReader();
@@ -642,7 +642,7 @@ async function detectBarcodeBoxesFromImage(base64: string): Promise<Array<{ name
 
     if (!decoded || decoded.length === 0) return [];
 
-    const boxes: Array<{ name: string; image: string; index: number; positionHint: 'top' | 'mid' | 'bottom' }> = [];
+    const boxes: Array<{ name: string; image: string; index: number; positionHint: 'top' | 'mid' | 'bottom' | 'right' }> = [];
     const seen = new Set<string>();
     let index = 1;
 
@@ -661,8 +661,10 @@ async function detectBarcodeBoxesFromImage(base64: string): Promise<Array<{ name
       });
 
       const centerY = box.y + box.h / 2;
-      const ratio = centerY / Math.max(1, img.height);
-      const positionHint: 'top' | 'mid' | 'bottom' = ratio > 0.62 ? 'bottom' : ratio < 0.35 ? 'top' : 'mid';
+      const centerX = box.x + box.w / 2;
+      const yRatio = centerY / Math.max(1, img.height);
+      const xRatio = centerX / Math.max(1, img.width);
+      const positionHint: 'top' | 'mid' | 'bottom' | 'right' = xRatio > 0.62 ? 'right' : yRatio > 0.62 ? 'bottom' : yRatio < 0.35 ? 'top' : 'mid';
 
       boxes.push({
         name: `zxing-bbox-${index}`,
@@ -992,12 +994,12 @@ export async function readBarcode(base64Image: string): Promise<BarcodeResult[]>
       variant: 'raw' | 'contrast' | 'binary' | 'focused',
       engine: 'quagga' | 'native' | 'zxing',
       engineConfidence: number,
-      positionHint: 'top' | 'mid' | 'bottom' = 'mid'
+      positionHint: 'top' | 'mid' | 'bottom' | 'right' = 'mid'
     ) => {
       if (!text || !text.trim()) return;
       const cleaned = text.trim();
       const pnBoost = isLikelyPNText(cleaned)
-        ? (positionHint === 'bottom' ? 0.12 : 0.06)
+        ? (positionHint === 'bottom' || positionHint === 'right' ? 0.12 : 0.06)
         : 0;
       const bonus = getRuleBonus(cleaned) + pnBoost;
       const weightedConfidence = Math.min(0.99, engineConfidence + bonus);
@@ -1108,6 +1110,60 @@ export async function readBarcode(base64Image: string): Promise<BarcodeResult[]>
             const zxingRes = await decodeWithZXing(rotated, { variant: variant.name, oneDOnly: true });
             for (const candidate of zxingRes) {
               tryAddResult(candidate.text, candidate.format, region, 100 + i, variant.name, 'zxing', candidate.confidence, 'bottom');
+            }
+          }
+        }
+      } catch (error) {
+        console.warn(`⚠️ [PNSweep] ${roi.name} 处理异常`);
+      }
+    }
+
+    const pnRightRois = [
+      { name: 'pn-right-1', x: 0.50, y: 0.16, w: 0.48, h: 0.74 },
+      { name: 'pn-right-2', x: 0.56, y: 0.22, w: 0.40, h: 0.62 },
+      { name: 'pn-right-3', x: 0.62, y: 0.30, w: 0.32, h: 0.50 }
+    ] as const;
+
+    for (let i = 0; i < pnRightRois.length; i++) {
+      if (shouldStop()) break;
+
+      const roi = pnRightRois[i];
+      try {
+        const roiImage = await cropToRegion(normalized, roi.x, roi.y, roi.w, roi.h);
+        const upscaled = await upscaleIfNeeded(roiImage, 1700);
+        const contrast = await enhanceContrast(upscaled, 1.72);
+        const binary = await otsuBinarize(upscaled);
+
+        const variants: Array<{ name: 'raw' | 'contrast' | 'binary'; image: string }> = [
+          { name: 'raw', image: upscaled },
+          { name: 'contrast', image: contrast },
+          { name: 'binary', image: binary }
+        ];
+
+        for (const variant of variants) {
+          if (shouldStop()) break;
+
+          for (const angle of [0, -8, 8, -15, 15]) {
+            if (shouldStop()) break;
+
+            const rotated = angle === 0 ? variant.image : await rotateBase64Any(variant.image, angle);
+            const region = angle === 0 ? roi.name : `${roi.name}(rot${angle})`;
+
+            attempts += 1;
+            const quaggaRes = await decodeWithQuagga(rotated, {
+              halfSample: false,
+              preprocessed: variant.name === 'binary'
+            });
+            if (quaggaRes) {
+              tryAddResult(quaggaRes.text, quaggaRes.format, region, 120 + i, variant.name, 'quagga', quaggaRes.confidence, 'right');
+            }
+
+            if (shouldStop()) break;
+
+            attempts += 1;
+            const zxingRes = await decodeWithZXing(rotated, { variant: variant.name, oneDOnly: true });
+            for (const candidate of zxingRes) {
+              tryAddResult(candidate.text, candidate.format, region, 120 + i, variant.name, 'zxing', candidate.confidence, 'right');
             }
           }
         }
