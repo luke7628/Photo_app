@@ -23,6 +23,7 @@
  */
 
 import Quagga from '@ericblade/quagga2';
+import { BrowserMultiFormatReader, BarcodeFormat, DecodeHintType } from '@zxing/library';
 
 interface BarcodeResult {
   type: 'barcode' | 'qrcode';
@@ -30,12 +31,14 @@ interface BarcodeResult {
   format?: string;
   region?: string;
   regionIndex?: number;
-  engine?: 'quagga' | 'native';
+  variant?: 'raw' | 'contrast' | 'binary';
+  engine?: 'quagga' | 'native' | 'zxing';
   engineConfidence?: number;
 }
 
 let preprocessedImageCache: { base64: string; processed: string } | null = null;
 let nativeBarcodeDetectorInit: Promise<any | null> | null = null;
+let zxingReader: BrowserMultiFormatReader | null = null;
 
 /**
  * 加载 Base64 图像（带内存清理）
@@ -318,6 +321,79 @@ async function upscaleIfNeeded(base64Image: string, minWidth: number = 800): Pro
 }
 
 /**
+ * 对比度增强（用于弱条码场景）
+ */
+async function enhanceContrast(base64Image: string, factor: number = 1.45): Promise<string> {
+  if (!base64Image) return base64Image;
+
+  try {
+    const img = await loadImageFromBase64(base64Image);
+    return await withCanvas(img.width, img.height, (canvas, ctx) => {
+      ctx.drawImage(img, 0, 0);
+      const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+      const data = imageData.data;
+
+      for (let i = 0; i < data.length; i += 4) {
+        data[i] = Math.max(0, Math.min(255, (data[i] - 128) * factor + 128));
+        data[i + 1] = Math.max(0, Math.min(255, (data[i + 1] - 128) * factor + 128));
+        data[i + 2] = Math.max(0, Math.min(255, (data[i + 2] - 128) * factor + 128));
+      }
+
+      ctx.putImageData(imageData, 0, 0);
+      return canvas.toDataURL('image/jpeg', 0.94).split(',')[1];
+    });
+  } catch (error) {
+    console.warn('⚠️ [enhanceContrast] 失败');
+    return base64Image;
+  }
+}
+
+function getZXingReader(): BrowserMultiFormatReader {
+  if (zxingReader) return zxingReader;
+
+  const hints = new Map();
+  hints.set(DecodeHintType.POSSIBLE_FORMATS, [
+    BarcodeFormat.CODE_128,
+    BarcodeFormat.CODE_39,
+    BarcodeFormat.CODE_93,
+    BarcodeFormat.EAN_13,
+    BarcodeFormat.EAN_8,
+    BarcodeFormat.UPC_A,
+    BarcodeFormat.UPC_E,
+    BarcodeFormat.ITF,
+    BarcodeFormat.CODABAR,
+    BarcodeFormat.QR_CODE
+  ]);
+  zxingReader = new BrowserMultiFormatReader(hints, 300);
+  return zxingReader;
+}
+
+async function decodeWithZXing(
+  base64Image: string,
+  options: { variant?: 'raw' | 'contrast' | 'binary' } = {}
+): Promise<Array<{ text: string; format?: string; confidence: number }>> {
+  if (!base64Image) return [];
+
+  try {
+    const reader = getZXingReader();
+    const img = await loadImageFromBase64(base64Image);
+    const result = await reader.decodeFromImageElement(img);
+    reader.reset();
+
+    const text = result?.getText()?.trim();
+    if (!text) return [];
+
+    const formatValue = result.getBarcodeFormat();
+    const format = BarcodeFormat[formatValue] || String(formatValue);
+    const confidence = options.variant === 'binary' ? 0.78 : options.variant === 'contrast' ? 0.8 : 0.82;
+
+    return [{ text, format, confidence }];
+  } catch (error) {
+    return [];
+  }
+}
+
+/**
  * 使用 Quagga2 解码（轻量化、工业友好）
  */
 async function decodeWithQuagga(
@@ -451,21 +527,7 @@ async function decodeWithNativeBarcodeDetector(base64Image: string): Promise<Arr
  * 添加唯一结果（避免重复）
  */
 function addUniqueResult(results: BarcodeResult[], result: BarcodeResult) {
-  const existing = results.find(r => r.value === result.value && r.type === result.type);
-  if (!existing) {
-    results.push(result);
-    return;
-  }
-
-  const existingConf = existing.engineConfidence ?? 0;
-  const newConf = result.engineConfidence ?? 0;
-  if (newConf > existingConf) {
-    existing.engine = result.engine;
-    existing.engineConfidence = result.engineConfidence;
-    existing.format = result.format || existing.format;
-    existing.region = result.region || existing.region;
-    existing.regionIndex = result.regionIndex || existing.regionIndex;
-  }
+  results.push(result);
 }
 
 /**
@@ -473,148 +535,135 @@ function addUniqueResult(results: BarcodeResult[], result: BarcodeResult) {
  * 
  * 识别流程：
  * 1. 原图：快速模式 → 完整模式 → 4个旋转
- * 2. 优化图(1200px)：快速 → 完整 → 旋转
+ * 2. 优化图(1600px)：快速 → 完整 → 旋转
  * 3. 5个ROI区域：上采样 + 二值化重试
  */
 export async function readBarcode(base64Image: string): Promise<BarcodeResult[]> {
   const results: BarcodeResult[] = [];
 
   try {
+    const startedAt = Date.now();
+    const TIME_BUDGET_MS = 4800;
+    const MAX_DECODE_ATTEMPTS = 96;
+    const MAX_CANDIDATES = 120;
+    let attempts = 0;
+
     const normalized = normalizeBase64(base64Image);
     if (!normalized) {
       console.warn('❌ [readBarcode] 输入为空');
       return results;
     }
 
-    console.log('🔍 [readBarcode] 启动识别...');
+    console.log('🔍 [readBarcode] 启动激进识别矩阵...');
+
+    const shouldStop = () => {
+      if (results.length >= MAX_CANDIDATES) return true;
+      if (attempts >= MAX_DECODE_ATTEMPTS) return true;
+      if (Date.now() - startedAt >= TIME_BUDGET_MS) return true;
+      return false;
+    };
 
     const tryAddResult = (
       text: string,
       format: string | undefined,
       region: string,
       regionIndex: number,
-      engine: 'quagga' | 'native',
+      variant: 'raw' | 'contrast' | 'binary',
+      engine: 'quagga' | 'native' | 'zxing',
       engineConfidence: number
     ) => {
+      if (!text || !text.trim()) return;
       addUniqueResult(results, {
         type: 'barcode',
-        value: text,
+        value: text.trim(),
         format,
         region,
         regionIndex,
+        variant,
         engine,
         engineConfidence
       });
     };
 
-    const hasEnoughCandidates = () => results.length >= 2;
+    const optimized = await optimizeResolution(normalized, 1800);
+    const roiDefs = [
+      { name: 'center', x: 0.22, y: 0.22, w: 0.56, h: 0.56 },
+      { name: 'expanded', x: 0.12, y: 0.12, w: 0.76, h: 0.76 },
+      { name: 'lower-focus', x: 0.1, y: 0.52, w: 0.82, h: 0.4 },
+      { name: 'full', x: 0, y: 0, w: 1, h: 1 }
+    ] as const;
 
-    // 阶段0：原生 BarcodeDetector 快速兜底
-    const nativeResults = await decodeWithNativeBarcodeDetector(normalized);
-    for (const native of nativeResults) {
-      tryAddResult(native.text, native.format, 'native(full)', 0, 'native', native.confidence);
-    }
-    if (hasEnoughCandidates()) {
-      return results;
-    }
+    for (let i = 0; i < roiDefs.length; i++) {
+      if (shouldStop()) break;
 
-    // 阶段1：原图（快速 → 完整 → 旋转）
-    console.log('📍 [Phase 1] 原图扫描');
-    
-    let quaggaResult = await decodeWithQuagga(normalized, { halfSample: true });
-    if (quaggaResult) {
-      tryAddResult(quaggaResult.text, quaggaResult.format, 'full', 0, 'quagga', quaggaResult.confidence);
-      if (hasEnoughCandidates()) return results;
-    }
-
-    quaggaResult = await decodeWithQuagga(normalized, { halfSample: false });
-    if (quaggaResult) {
-      tryAddResult(quaggaResult.text, quaggaResult.format, 'full', 0, 'quagga', quaggaResult.confidence);
-      if (hasEnoughCandidates()) return results;
-    }
-
-    // 尝试旋转
-    for (const angle of [90, 180, 270] as const) {
-      const rotated = await rotateBase64(normalized, angle);
-      console.log(`  └─ 尝试旋转 ${angle}°...`);
-      
-      quaggaResult = await decodeWithQuagga(rotated, { halfSample: true });
-      if (quaggaResult) {
-        tryAddResult(quaggaResult.text, quaggaResult.format, `full(rotated-${angle})`, 0, 'quagga', quaggaResult.confidence);
-        if (hasEnoughCandidates()) return results;
-      }
-    }
-
-    // 阶段2：优化分辨率
-    console.log('📍 [Phase 2] 优化分辨率扫描');
-    const optimized = await optimizeResolution(normalized, 1200);
-    
-    quaggaResult = await decodeWithQuagga(optimized, { halfSample: true });
-    if (quaggaResult) {
-      tryAddResult(quaggaResult.text, quaggaResult.format, 'optimized', 0, 'quagga', quaggaResult.confidence);
-      if (hasEnoughCandidates()) return results;
-    }
-
-    quaggaResult = await decodeWithQuagga(optimized, { halfSample: false });
-    if (quaggaResult) {
-      tryAddResult(quaggaResult.text, quaggaResult.format, 'optimized', 0, 'quagga', quaggaResult.confidence);
-      if (hasEnoughCandidates()) return results;
-    }
-
-    const nativeOptimized = await decodeWithNativeBarcodeDetector(optimized);
-    for (const native of nativeOptimized) {
-      tryAddResult(native.text, native.format, 'native(optimized)', 0, 'native', native.confidence);
-    }
-    if (hasEnoughCandidates()) {
-      return results;
-    }
-
-    // 阶段3：多区域 + 二值化
-    console.log('📍 [Phase 3] 多区域扫描');
-    const regions = [
-      { name: 'top', x: 0, y: 0.1, w: 1, h: 0.25 },
-      { name: 'mid', x: 0, y: 0.35, w: 1, h: 0.3 },
-      { name: 'bottom', x: 0, y: 0.65, w: 1, h: 0.25 },
-      { name: 'left', x: 0, y: 0.2, w: 0.55, h: 0.6 },
-      { name: 'right', x: 0.45, y: 0.2, w: 0.55, h: 0.6 }
-    ];
-
-    for (let i = 0; i < regions.length; i++) {
-      const region = regions[i];
+      const roi = roiDefs[i];
       const regionIndex = i + 1;
+      let roiImage = optimized;
+
       try {
-        console.log(`  ├─ 区域: ${region.name}`);
-        const cropped = await cropToRegion(optimized, region.x, region.y, region.w, region.h);
-        const upscaled = await upscaleIfNeeded(cropped, 800);
-
-        const regionNative = await decodeWithNativeBarcodeDetector(upscaled);
-        for (const native of regionNative) {
-          tryAddResult(native.text, native.format, `${region.name}(native)`, regionIndex, 'native', native.confidence);
-        }
-        if (hasEnoughCandidates()) {
-          return results;
+        if (roi.name !== 'full') {
+          roiImage = await cropToRegion(optimized, roi.x, roi.y, roi.w, roi.h);
         }
 
-        // 原图识别
-        quaggaResult = await decodeWithQuagga(upscaled, { halfSample: true });
-        if (quaggaResult) {
-          tryAddResult(quaggaResult.text, quaggaResult.format, region.name, regionIndex, 'quagga', quaggaResult.confidence);
-          if (hasEnoughCandidates()) return results;
-        }
+        const upscaled = await upscaleIfNeeded(roiImage, 900);
+        const contrast = await enhanceContrast(upscaled, 1.5);
+        const binary = await otsuBinarize(upscaled);
 
-        // 二值化识别
-        const binarized = await otsuBinarize(upscaled);
-        quaggaResult = await decodeWithQuagga(binarized, { halfSample: false, preprocessed: true });
-        if (quaggaResult) {
-          tryAddResult(quaggaResult.text, quaggaResult.format, `${region.name}(binary)`, regionIndex, 'quagga', quaggaResult.confidence);
-          if (hasEnoughCandidates()) return results;
+        const variants: Array<{ name: 'raw' | 'contrast' | 'binary'; image: string }> = [
+          { name: 'raw', image: upscaled },
+          { name: 'contrast', image: contrast },
+          { name: 'binary', image: binary }
+        ];
+
+        for (const variant of variants) {
+          if (shouldStop()) break;
+
+          attempts += 1;
+          const nativeResults = await decodeWithNativeBarcodeDetector(variant.image);
+          for (const native of nativeResults) {
+            tryAddResult(native.text, native.format, roi.name, regionIndex, variant.name, 'native', native.confidence);
+          }
+
+          if (shouldStop()) break;
+
+          attempts += 1;
+          const zxingResults = await decodeWithZXing(variant.image, { variant: variant.name });
+          for (const zxing of zxingResults) {
+            tryAddResult(zxing.text, zxing.format, roi.name, regionIndex, variant.name, 'zxing', zxing.confidence);
+          }
+
+          if (shouldStop()) break;
+
+          attempts += 1;
+          const quaggaFast = await decodeWithQuagga(variant.image, {
+            halfSample: true,
+            preprocessed: variant.name === 'binary'
+          });
+          if (quaggaFast) {
+            tryAddResult(quaggaFast.text, quaggaFast.format, roi.name, regionIndex, variant.name, 'quagga', quaggaFast.confidence);
+          }
+
+          if (shouldStop()) break;
+
+          attempts += 1;
+          const quaggaFull = await decodeWithQuagga(variant.image, {
+            halfSample: false,
+            preprocessed: variant.name === 'binary'
+          });
+          if (quaggaFull) {
+            tryAddResult(quaggaFull.text, quaggaFull.format, roi.name, regionIndex, variant.name, 'quagga', quaggaFull.confidence);
+          }
         }
       } catch (e) {
-        console.error(`  │  └─ 区域${region.name}异常:`, e);
+        console.error(`⚠️ [readBarcode] ROI ${roi.name} 处理异常:`, e);
       }
     }
 
-    console.warn('❌ [readBarcode] 无法识别条码');
+    if (results.length === 0) {
+      console.warn('❌ [readBarcode] 无法识别条码');
+    } else {
+      console.log(`✅ [readBarcode] 收集到 ${results.length} 个候选结果，尝试次数 ${attempts}，耗时 ${Date.now() - startedAt}ms`);
+    }
     return results;
   } catch (error) {
     console.error('❌ [readBarcode] 异常:', error);

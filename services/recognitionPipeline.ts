@@ -67,22 +67,32 @@ export function normalizeNumericHeavy(text: string): string {
     .join('');
 }
 
-function scoreCandidate(text: string, conf: number, mode: ScanMode) {
-  let score = conf * 0.6;
-
+function getFormatScore(text: string, mode: ScanMode) {
   const serialLike = isLikelySerial(text);
   const partLike = isLikelyPart(text);
+  const hasIllegalChars = /[^a-z0-9-]/.test(text);
 
-  if (serialLike) score += 0.25;
-  if (partLike) score += 0.25;
-  if (/[^a-z0-9-]/.test(text)) score -= 0.3;
+  let score = 0;
 
-  if (mode === 'serial' && serialLike) score += 0.1;
-  if (mode === 'part' && partLike) score += 0.1;
-  if (mode === 'serial' && !serialLike) score -= 0.1;
-  if (mode === 'part' && !partLike) score -= 0.1;
+  if (serialLike) score += 0.6;
+  if (partLike) score += 0.6;
+  if (mode === 'serial' && serialLike) score += 0.25;
+  if (mode === 'part' && partLike) score += 0.25;
+  if (mode === 'serial' && !serialLike) score -= 0.2;
+  if (mode === 'part' && !partLike) score -= 0.2;
+  if (hasIllegalChars) score -= 0.35;
 
-  return Math.max(0, Math.min(1.2, score));
+  return Math.max(0, Math.min(1, score));
+}
+
+function scoreCandidate(text: string, conf: number, mode: ScanMode) {
+  const confScore = Math.max(0, Math.min(1, conf));
+  const formatScore = getFormatScore(text, mode);
+  return {
+    confScore,
+    formatScore,
+    composite: confScore * 0.5 + formatScore * 0.2
+  };
 }
 
 function getModeAwareText(input: string, mode: ScanMode): string {
@@ -103,15 +113,17 @@ export function runRecognitionArbitration(
 ): RecognitionDecision | null {
   if (!candidates.length) return null;
 
-  const grouped = new Map<string, { scores: number[]; rawCount: number }>();
+  const grouped = new Map<string, { scores: number[]; confScores: number[]; formatScores: number[]; rawCount: number }>();
 
   for (const candidate of candidates) {
     const modeAwareText = getModeAwareText(candidate.text, mode);
     if (!modeAwareText) continue;
 
     const score = scoreCandidate(modeAwareText, candidate.engineConfidence, mode);
-    const bucket = grouped.get(modeAwareText) ?? { scores: [], rawCount: 0 };
-    bucket.scores.push(score);
+    const bucket = grouped.get(modeAwareText) ?? { scores: [], confScores: [], formatScores: [], rawCount: 0 };
+    bucket.scores.push(score.composite);
+    bucket.confScores.push(score.confScore);
+    bucket.formatScores.push(score.formatScore);
     bucket.rawCount += 1;
     grouped.set(modeAwareText, bucket);
   }
@@ -119,9 +131,16 @@ export function runRecognitionArbitration(
   const ranked = Array.from(grouped.entries())
     .map(([value, aggregate]) => {
       const avgScore = aggregate.scores.reduce((sum, score) => sum + score, 0) / aggregate.scores.length;
+      const avgConfidence = aggregate.confScores.reduce((sum, score) => sum + score, 0) / aggregate.confScores.length;
+      const avgFormat = aggregate.formatScores.reduce((sum, score) => sum + score, 0) / aggregate.formatScores.length;
+      const occurrenceScore = Math.min(1, aggregate.rawCount / 5);
+
+      const score = avgConfidence * 0.5 + occurrenceScore * 0.3 + avgFormat * 0.2;
+
       return {
         value,
-        score: avgScore,
+        score,
+        avgScore,
         votes: aggregate.rawCount
       };
     })
