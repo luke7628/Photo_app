@@ -24,6 +24,7 @@
 
 import Quagga from '@ericblade/quagga2';
 import { BrowserMultiFormatReader, BarcodeFormat, DecodeHintType } from '@zxing/library';
+import { readBarcode as legacyReadBarcode } from './barcodeService_legacy';
 
 interface BarcodeResult {
   type: 'barcode' | 'qrcode';
@@ -39,6 +40,7 @@ interface BarcodeResult {
 let preprocessedImageCache: { base64: string; processed: string } | null = null;
 let nativeBarcodeDetectorInit: Promise<any | null> | null = null;
 let zxingReader: BrowserMultiFormatReader | null = null;
+let zxingReader1D: BrowserMultiFormatReader | null = null;
 
 /**
  * 加载 Base64 图像（带内存清理）
@@ -348,34 +350,56 @@ async function enhanceContrast(base64Image: string, factor: number = 1.45): Prom
   }
 }
 
-function getZXingReader(): BrowserMultiFormatReader {
-  if (zxingReader) return zxingReader;
+function getZXingReader(oneDOnly: boolean = false): BrowserMultiFormatReader {
+  if (oneDOnly && zxingReader1D) return zxingReader1D;
+  if (!oneDOnly && zxingReader) return zxingReader;
 
   const hints = new Map();
-  hints.set(DecodeHintType.POSSIBLE_FORMATS, [
-    BarcodeFormat.CODE_128,
-    BarcodeFormat.CODE_39,
-    BarcodeFormat.CODE_93,
-    BarcodeFormat.EAN_13,
-    BarcodeFormat.EAN_8,
-    BarcodeFormat.UPC_A,
-    BarcodeFormat.UPC_E,
-    BarcodeFormat.ITF,
-    BarcodeFormat.CODABAR,
-    BarcodeFormat.QR_CODE
-  ]);
-  zxingReader = new BrowserMultiFormatReader(hints, 300);
+  hints.set(DecodeHintType.TRY_HARDER, true);
+  hints.set(DecodeHintType.POSSIBLE_FORMATS, oneDOnly
+    ? [
+      BarcodeFormat.CODE_128,
+      BarcodeFormat.CODE_39,
+      BarcodeFormat.CODE_93,
+      BarcodeFormat.EAN_13,
+      BarcodeFormat.EAN_8,
+      BarcodeFormat.UPC_A,
+      BarcodeFormat.UPC_E,
+      BarcodeFormat.ITF,
+      BarcodeFormat.CODABAR
+    ]
+    : [
+      BarcodeFormat.CODE_128,
+      BarcodeFormat.CODE_39,
+      BarcodeFormat.CODE_93,
+      BarcodeFormat.EAN_13,
+      BarcodeFormat.EAN_8,
+      BarcodeFormat.UPC_A,
+      BarcodeFormat.UPC_E,
+      BarcodeFormat.ITF,
+      BarcodeFormat.CODABAR,
+      BarcodeFormat.QR_CODE
+    ]
+  );
+
+  const reader = new BrowserMultiFormatReader(hints, 500);
+  if (oneDOnly) {
+    zxingReader1D = reader;
+    return zxingReader1D;
+  }
+
+  zxingReader = reader;
   return zxingReader;
 }
 
 async function decodeWithZXing(
   base64Image: string,
-  options: { variant?: 'raw' | 'contrast' | 'binary' } = {}
+  options: { variant?: 'raw' | 'contrast' | 'binary'; oneDOnly?: boolean } = {}
 ): Promise<Array<{ text: string; format?: string; confidence: number }>> {
   if (!base64Image) return [];
 
   try {
-    const reader = getZXingReader();
+    const reader = getZXingReader(options.oneDOnly !== false);
     const img = await loadImageFromBase64(base64Image);
     const result = await reader.decodeFromImageElement(img);
     reader.reset();
@@ -387,8 +411,10 @@ async function decodeWithZXing(
     const format = BarcodeFormat[formatValue] || String(formatValue);
     const confidence = options.variant === 'binary' ? 0.78 : options.variant === 'contrast' ? 0.8 : 0.82;
 
+    console.log(`✅ [ZXing] ${options.variant || 'raw'} 识别成功: ${text.substring(0, 40)} (${format})`);
     return [{ text, format, confidence }];
   } catch (error) {
+    console.log(`ℹ️ [ZXing] ${options.variant || 'raw'} 未检测到`);
     return [];
   }
 }
@@ -516,6 +542,11 @@ async function decodeWithNativeBarcodeDetector(base64Image: string): Promise<Arr
         });
       }
     }
+    if (results.length > 0) {
+      console.log(`✅ [Native] 检测到 ${results.length} 个结果`);
+    } else {
+      console.log('ℹ️ [Native] 未检测到条码');
+    }
     return results;
   } catch (error) {
     console.warn('⚠️ [NativeBarcodeDetector] 检测失败:', error);
@@ -618,44 +649,59 @@ export async function readBarcode(base64Image: string): Promise<BarcodeResult[]>
         for (const variant of variants) {
           if (shouldStop()) break;
 
-          attempts += 1;
-          const nativeResults = await decodeWithNativeBarcodeDetector(variant.image);
-          for (const native of nativeResults) {
-            tryAddResult(native.text, native.format, roi.name, regionIndex, variant.name, 'native', native.confidence);
-          }
+          for (const angle of [0, 90, 180, 270] as const) {
+            if (shouldStop()) break;
 
-          if (shouldStop()) break;
+            const rotated = angle === 0 ? variant.image : await rotateBase64(variant.image, angle);
+            const regionWithAngle = angle === 0 ? roi.name : `${roi.name}(rot${angle})`;
 
-          attempts += 1;
-          const zxingResults = await decodeWithZXing(variant.image, { variant: variant.name });
-          for (const zxing of zxingResults) {
-            tryAddResult(zxing.text, zxing.format, roi.name, regionIndex, variant.name, 'zxing', zxing.confidence);
-          }
+            attempts += 1;
+            const nativeResults = await decodeWithNativeBarcodeDetector(rotated);
+            for (const native of nativeResults) {
+              tryAddResult(native.text, native.format, regionWithAngle, regionIndex, variant.name, 'native', native.confidence);
+            }
 
-          if (shouldStop()) break;
+            if (shouldStop()) break;
 
-          attempts += 1;
-          const quaggaFast = await decodeWithQuagga(variant.image, {
-            halfSample: true,
-            preprocessed: variant.name === 'binary'
-          });
-          if (quaggaFast) {
-            tryAddResult(quaggaFast.text, quaggaFast.format, roi.name, regionIndex, variant.name, 'quagga', quaggaFast.confidence);
-          }
+            attempts += 1;
+            const zxingResults = await decodeWithZXing(rotated, { variant: variant.name, oneDOnly: true });
+            for (const zxing of zxingResults) {
+              tryAddResult(zxing.text, zxing.format, regionWithAngle, regionIndex, variant.name, 'zxing', zxing.confidence);
+            }
 
-          if (shouldStop()) break;
+            if (shouldStop()) break;
 
-          attempts += 1;
-          const quaggaFull = await decodeWithQuagga(variant.image, {
-            halfSample: false,
-            preprocessed: variant.name === 'binary'
-          });
-          if (quaggaFull) {
-            tryAddResult(quaggaFull.text, quaggaFull.format, roi.name, regionIndex, variant.name, 'quagga', quaggaFull.confidence);
+            attempts += 1;
+            const quaggaFast = await decodeWithQuagga(rotated, {
+              halfSample: true,
+              preprocessed: variant.name === 'binary'
+            });
+            if (quaggaFast) {
+              tryAddResult(quaggaFast.text, quaggaFast.format, regionWithAngle, regionIndex, variant.name, 'quagga', quaggaFast.confidence);
+            }
+
+            if (shouldStop()) break;
+
+            attempts += 1;
+            const quaggaFull = await decodeWithQuagga(rotated, {
+              halfSample: false,
+              preprocessed: variant.name === 'binary'
+            });
+            if (quaggaFull) {
+              tryAddResult(quaggaFull.text, quaggaFull.format, regionWithAngle, regionIndex, variant.name, 'quagga', quaggaFull.confidence);
+            }
           }
         }
       } catch (e) {
         console.error(`⚠️ [readBarcode] ROI ${roi.name} 处理异常:`, e);
+      }
+    }
+
+    if (results.length === 0) {
+      console.warn('⚠️ [readBarcode] 激进矩阵无结果，回退 legacy 识别链...');
+      const legacy = await legacyReadBarcode(normalized);
+      for (const item of legacy) {
+        tryAddResult(item.value, item.format, item.region || 'legacy', item.regionIndex || 0, 'raw', 'zxing', 0.72);
       }
     }
 
