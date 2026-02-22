@@ -41,13 +41,18 @@ function sanitizeText(input: string): string {
 }
 
 export function isLikelySerial(text: string): boolean {
-  if (!/^[a-z0-9]{12,18}$/.test(text)) return false;
+  if (!/^[a-z0-9]{10,20}$/.test(text)) return false;
   if (text.includes('-')) return false;
 
   const digits = text.replace(/[^0-9]/g, '').length;
   const letters = text.replace(/[^a-z]/g, '').length;
 
-  return digits >= letters * 2;
+  if (digits < 6 || letters < 2) return false;
+
+  const prefixThenDigits = /^[a-z]{2,6}\d{6,14}$/;
+  if (prefixThenDigits.test(text)) return true;
+
+  return digits >= letters;
 }
 
 export function isLikelyPart(text: string): boolean {

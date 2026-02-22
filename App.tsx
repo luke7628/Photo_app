@@ -687,6 +687,18 @@ const App: React.FC = () => {
             return normalized;
           };
 
+          const normalizeSerialNumber = (raw: string): string => {
+            if (!raw) return '';
+
+            return raw
+              .trim()
+              .toUpperCase()
+              .replace(/[^A-Z0-9]/g, '')
+              .replace(/O/g, '0')
+              .replace(/[IL]/g, '1')
+              .replace(/S/g, '5');
+          };
+
           const serialDecision = runRecognitionArbitration(candidates, 'serial', 0.68);
           const partDecision = runRecognitionArbitration(candidates, 'part', 0.68);
 
@@ -706,11 +718,29 @@ const App: React.FC = () => {
             return normalizePartNumber(fallback);
           })();
 
-          const serialNumber = serialDecision?.value ?? '';
+          const serialFallbackFromCandidates = (() => {
+            const direct = rawResults
+              .map(item => normalizeSerialNumber(String(item.value || '')))
+              .map(text => text.match(/[A-Z]{2,6}[0-9]{6,14}/)?.[0] || '')
+              .find(Boolean);
+            if (direct) return direct;
+
+            const fallback = rawResults
+              .map(item => normalizeSerialNumber(String(item.value || '')))
+              .map(text => text.match(/[A-Z0-9]{10,20}/)?.[0] || '')
+              .find(text => /[A-Z]{2,}/.test(text) && /[0-9]{6,}/.test(text)) || '';
+
+            return fallback;
+          })();
+
+          const serialNumber = normalizeSerialNumber(serialDecision?.value ?? serialFallbackFromCandidates);
           const partNumber = normalizePartNumber(partDecision?.value ?? partFallbackFromCandidates);
 
           console.log('📊 [analyzeWithBarcode] Serial决策:', serialDecision);
           console.log('📊 [analyzeWithBarcode] Part决策:', partDecision);
+          if (!serialDecision && serialFallbackFromCandidates) {
+            console.log('📊 [analyzeWithBarcode] Serial回退提取:', serialFallbackFromCandidates);
+          }
           if (!partDecision && partFallbackFromCandidates) {
             console.log('📊 [analyzeWithBarcode] Part回退提取:', partFallbackFromCandidates);
           }
