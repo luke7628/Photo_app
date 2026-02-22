@@ -23,6 +23,7 @@
  */
 
 import Quagga from '@ericblade/quagga2';
+import { BrowserMultiFormatReader as ZXingBrowserReader } from '@zxing/browser';
 import { BrowserMultiFormatReader, BarcodeFormat, DecodeHintType } from '@zxing/library';
 import { readBarcode as legacyReadBarcode } from './barcodeService_legacy';
 
@@ -69,6 +70,7 @@ let preprocessedImageCache: { base64: string; processed: string } | null = null;
 let nativeBarcodeDetectorInit: Promise<any | null> | null = null;
 let zxingReader: BrowserMultiFormatReader | null = null;
 let zxingReader1D: BrowserMultiFormatReader | null = null;
+let zxingMultiReader: ZXingBrowserReader | null = null;
 
 /**
  * 加载 Base64 图像（带内存清理）
@@ -595,6 +597,91 @@ async function cropBand(base64: string, band: StripeBand): Promise<string> {
   });
 }
 
+function getZXingMultiReader(): ZXingBrowserReader {
+  if (zxingMultiReader) return zxingMultiReader;
+  zxingMultiReader = new ZXingBrowserReader();
+  return zxingMultiReader;
+}
+
+function resultPointsToBox(points: any[], width: number, height: number) {
+  if (!points || points.length < 2) return null;
+
+  const xs = points.map(point => {
+    if (typeof point?.getX === 'function') return point.getX();
+    return typeof point?.x === 'number' ? point.x : 0;
+  });
+
+  const ys = points.map(point => {
+    if (typeof point?.getY === 'function') return point.getY();
+    return typeof point?.y === 'number' ? point.y : 0;
+  });
+
+  const minX = Math.max(Math.floor(Math.min(...xs) - 10), 0);
+  const maxX = Math.min(Math.ceil(Math.max(...xs) + 10), width);
+  const minY = Math.max(Math.floor(Math.min(...ys) - 10), 0);
+  const maxY = Math.min(Math.ceil(Math.max(...ys) + 10), height);
+
+  const boxWidth = maxX - minX;
+  const boxHeight = maxY - minY;
+
+  if (boxWidth < 24 || boxHeight < 18) return null;
+
+  return {
+    x: minX,
+    y: minY,
+    w: boxWidth,
+    h: boxHeight
+  };
+}
+
+async function detectBarcodeBoxesFromImage(base64: string): Promise<Array<{ name: string; image: string; index: number; positionHint: 'top' | 'mid' | 'bottom' }>> {
+  try {
+    const img = await loadImageFromBase64(base64);
+    const reader = getZXingMultiReader();
+    const decoded = await (reader as any).decodeMultipleFromImageElement(img as any);
+
+    if (!decoded || decoded.length === 0) return [];
+
+    const boxes: Array<{ name: string; image: string; index: number; positionHint: 'top' | 'mid' | 'bottom' }> = [];
+    const seen = new Set<string>();
+    let index = 1;
+
+    for (const item of decoded) {
+      const points = (item as any)?.getResultPoints?.() || [];
+      const box = resultPointsToBox(points, img.width, img.height);
+      if (!box) continue;
+
+      const dedupeKey = `${box.x}:${box.y}:${box.w}:${box.h}`;
+      if (seen.has(dedupeKey)) continue;
+      seen.add(dedupeKey);
+
+      const cropped = await withCanvas(box.w, box.h, (canvas, ctx) => {
+        ctx.drawImage(img, box.x, box.y, box.w, box.h, 0, 0, box.w, box.h);
+        return canvas.toDataURL('image/jpeg', 0.94).split(',')[1];
+      });
+
+      const centerY = box.y + box.h / 2;
+      const ratio = centerY / Math.max(1, img.height);
+      const positionHint: 'top' | 'mid' | 'bottom' = ratio > 0.62 ? 'bottom' : ratio < 0.35 ? 'top' : 'mid';
+
+      boxes.push({
+        name: `zxing-bbox-${index}`,
+        image: cropped,
+        index,
+        positionHint
+      });
+
+      index += 1;
+    }
+
+    console.log(`📦 [ZXingMulti] 定位到 ${boxes.length} 个bbox`);
+    return boxes;
+  } catch (error) {
+    console.log('ℹ️ [ZXingMulti] 未检测到多个条码定位点');
+    return [];
+  }
+}
+
 /**
  * 裁剪后上采样
  */
@@ -976,6 +1063,54 @@ export async function readBarcode(base64Image: string): Promise<BarcodeResult[]>
     }
 
     const optimized = await optimizeResolution(normalized, 1800);
+
+    const multiBoxes = await detectBarcodeBoxesFromImage(optimized);
+    if (multiBoxes.length > 0) {
+      for (let i = 0; i < multiBoxes.length; i++) {
+        if (shouldStop()) break;
+        const box = multiBoxes[i];
+
+        try {
+          const upscaled = await upscaleIfNeeded(box.image, 1000);
+          const contrast = await enhanceContrast(upscaled, 1.6);
+          const binary = await otsuBinarize(upscaled);
+
+          const variants: Array<{ name: 'raw' | 'contrast' | 'binary'; image: string }> = [
+            { name: 'raw', image: upscaled },
+            { name: 'contrast', image: contrast },
+            { name: 'binary', image: binary }
+          ];
+
+          for (const variant of variants) {
+            if (shouldStop()) break;
+
+            for (const angle of [0, 15, -15, 30, -30]) {
+              if (shouldStop()) break;
+              const rotated = angle === 0 ? variant.image : await rotateBase64Any(variant.image, angle);
+              const region = angle === 0 ? box.name : `${box.name}(rot${angle})`;
+
+              attempts += 1;
+              const quagga = await decodeWithQuagga(rotated, {
+                halfSample: false,
+                preprocessed: variant.name === 'binary'
+              });
+              if (quagga) {
+                tryAddResult(quagga.text, quagga.format, region, box.index, variant.name, 'quagga', quagga.confidence, box.positionHint);
+              }
+
+              attempts += 1;
+              const zxing = await decodeWithZXing(rotated, { variant: variant.name, oneDOnly: true });
+              for (const candidate of zxing) {
+                tryAddResult(candidate.text, candidate.format, region, box.index, variant.name, 'zxing', candidate.confidence, box.positionHint);
+              }
+            }
+          }
+        } catch (error) {
+          console.warn(`⚠️ [ZXingMulti] bbox ${box.name} 解码异常`);
+        }
+      }
+    }
+
     let stripeBands: StripeBand[] = [];
     let rowDensity: number[] = [];
     let imageHeight = 1;
