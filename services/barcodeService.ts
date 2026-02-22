@@ -30,9 +30,12 @@ interface BarcodeResult {
   format?: string;
   region?: string;
   regionIndex?: number;
+  engine?: 'quagga' | 'native';
+  engineConfidence?: number;
 }
 
 let preprocessedImageCache: { base64: string; processed: string } | null = null;
+let nativeBarcodeDetectorInit: Promise<any | null> | null = null;
 
 /**
  * 加载 Base64 图像（带内存清理）
@@ -320,7 +323,7 @@ async function upscaleIfNeeded(base64Image: string, minWidth: number = 800): Pro
 async function decodeWithQuagga(
   base64Image: string,
   options: { halfSample?: boolean; preprocessed?: boolean } = {}
-): Promise<{ text: string; format?: string } | null> {
+): Promise<{ text: string; format?: string; confidence: number } | null> {
   if (!base64Image) return null;
 
   try {
@@ -364,8 +367,13 @@ async function decodeWithQuagga(
           if (result?.codeResult?.code) {
             const text = result.codeResult.code.trim();
             const format = result.codeResult.format || 'UNKNOWN';
+            const confidence = options.preprocessed
+              ? 0.74
+              : options.halfSample === false
+                ? 0.83
+                : 0.76;
             console.log(`✅ Quagga ${label} → ${text.substring(0, 40)} (${format})`);
-            resolve({ text, format });
+            resolve({ text, format, confidence });
           } else {
             console.log(`ℹ️ [Quagga] 未检测到 ${label}`);
             resolve(null);
@@ -384,12 +392,79 @@ async function decodeWithQuagga(
 }
 
 /**
+ * 使用浏览器原生 BarcodeDetector 兜底（若支持）
+ */
+async function getNativeBarcodeDetector(): Promise<any | null> {
+  if (nativeBarcodeDetectorInit) {
+    return nativeBarcodeDetectorInit;
+  }
+
+  nativeBarcodeDetectorInit = (async () => {
+    if (!(window as any).BarcodeDetector) {
+      return null;
+    }
+
+    try {
+      const supportedFormats = await (window as any).BarcodeDetector.getSupportedFormats();
+      return new (window as any).BarcodeDetector({ formats: supportedFormats });
+    } catch (error) {
+      console.warn('⚠️ [NativeBarcodeDetector] 初始化失败:', error);
+      return null;
+    }
+  })();
+
+  return nativeBarcodeDetectorInit;
+}
+
+async function decodeWithNativeBarcodeDetector(base64Image: string): Promise<Array<{ text: string; format?: string; confidence: number }>> {
+  const detector = await getNativeBarcodeDetector();
+  if (!detector) {
+    return [];
+  }
+
+  try {
+    const img = await loadImageFromBase64(base64Image);
+    const detections = await detector.detect(img);
+
+    if (!detections || detections.length === 0) {
+      return [];
+    }
+
+    const results: Array<{ text: string; format?: string; confidence: number }> = [];
+    for (const item of detections) {
+      if (item?.rawValue) {
+        results.push({
+          text: String(item.rawValue).trim(),
+          format: item.format || 'UNKNOWN',
+          confidence: 0.88
+        });
+      }
+    }
+    return results;
+  } catch (error) {
+    console.warn('⚠️ [NativeBarcodeDetector] 检测失败:', error);
+    return [];
+  }
+}
+
+/**
  * 添加唯一结果（避免重复）
  */
 function addUniqueResult(results: BarcodeResult[], result: BarcodeResult) {
-  const exists = results.some(r => r.value === result.value && r.type === result.type);
-  if (!exists) {
+  const existing = results.find(r => r.value === result.value && r.type === result.type);
+  if (!existing) {
     results.push(result);
+    return;
+  }
+
+  const existingConf = existing.engineConfidence ?? 0;
+  const newConf = result.engineConfidence ?? 0;
+  if (newConf > existingConf) {
+    existing.engine = result.engine;
+    existing.engineConfidence = result.engineConfidence;
+    existing.format = result.format || existing.format;
+    existing.region = result.region || existing.region;
+    existing.regionIndex = result.regionIndex || existing.regionIndex;
   }
 }
 
@@ -413,29 +488,49 @@ export async function readBarcode(base64Image: string): Promise<BarcodeResult[]>
 
     console.log('🔍 [readBarcode] 启动识别...');
 
-    const tryAddResult = (text: string, format?: string, region: string = 'full') => {
+    const tryAddResult = (
+      text: string,
+      format: string | undefined,
+      region: string,
+      regionIndex: number,
+      engine: 'quagga' | 'native',
+      engineConfidence: number
+    ) => {
       addUniqueResult(results, {
         type: 'barcode',
         value: text,
         format,
         region,
-        regionIndex: 0
+        regionIndex,
+        engine,
+        engineConfidence
       });
     };
+
+    const hasEnoughCandidates = () => results.length >= 2;
+
+    // 阶段0：原生 BarcodeDetector 快速兜底
+    const nativeResults = await decodeWithNativeBarcodeDetector(normalized);
+    for (const native of nativeResults) {
+      tryAddResult(native.text, native.format, 'native(full)', 0, 'native', native.confidence);
+    }
+    if (hasEnoughCandidates()) {
+      return results;
+    }
 
     // 阶段1：原图（快速 → 完整 → 旋转）
     console.log('📍 [Phase 1] 原图扫描');
     
     let quaggaResult = await decodeWithQuagga(normalized, { halfSample: true });
     if (quaggaResult) {
-      tryAddResult(quaggaResult.text, quaggaResult.format);
-      return results;
+      tryAddResult(quaggaResult.text, quaggaResult.format, 'full', 0, 'quagga', quaggaResult.confidence);
+      if (hasEnoughCandidates()) return results;
     }
 
     quaggaResult = await decodeWithQuagga(normalized, { halfSample: false });
     if (quaggaResult) {
-      tryAddResult(quaggaResult.text, quaggaResult.format);
-      return results;
+      tryAddResult(quaggaResult.text, quaggaResult.format, 'full', 0, 'quagga', quaggaResult.confidence);
+      if (hasEnoughCandidates()) return results;
     }
 
     // 尝试旋转
@@ -445,8 +540,8 @@ export async function readBarcode(base64Image: string): Promise<BarcodeResult[]>
       
       quaggaResult = await decodeWithQuagga(rotated, { halfSample: true });
       if (quaggaResult) {
-        tryAddResult(quaggaResult.text, quaggaResult.format);
-        return results;
+        tryAddResult(quaggaResult.text, quaggaResult.format, `full(rotated-${angle})`, 0, 'quagga', quaggaResult.confidence);
+        if (hasEnoughCandidates()) return results;
       }
     }
 
@@ -456,13 +551,21 @@ export async function readBarcode(base64Image: string): Promise<BarcodeResult[]>
     
     quaggaResult = await decodeWithQuagga(optimized, { halfSample: true });
     if (quaggaResult) {
-      tryAddResult(quaggaResult.text, quaggaResult.format);
-      return results;
+      tryAddResult(quaggaResult.text, quaggaResult.format, 'optimized', 0, 'quagga', quaggaResult.confidence);
+      if (hasEnoughCandidates()) return results;
     }
 
     quaggaResult = await decodeWithQuagga(optimized, { halfSample: false });
     if (quaggaResult) {
-      tryAddResult(quaggaResult.text, quaggaResult.format);
+      tryAddResult(quaggaResult.text, quaggaResult.format, 'optimized', 0, 'quagga', quaggaResult.confidence);
+      if (hasEnoughCandidates()) return results;
+    }
+
+    const nativeOptimized = await decodeWithNativeBarcodeDetector(optimized);
+    for (const native of nativeOptimized) {
+      tryAddResult(native.text, native.format, 'native(optimized)', 0, 'native', native.confidence);
+    }
+    if (hasEnoughCandidates()) {
       return results;
     }
 
@@ -476,25 +579,35 @@ export async function readBarcode(base64Image: string): Promise<BarcodeResult[]>
       { name: 'right', x: 0.45, y: 0.2, w: 0.55, h: 0.6 }
     ];
 
-    for (const region of regions) {
+    for (let i = 0; i < regions.length; i++) {
+      const region = regions[i];
+      const regionIndex = i + 1;
       try {
         console.log(`  ├─ 区域: ${region.name}`);
         const cropped = await cropToRegion(optimized, region.x, region.y, region.w, region.h);
         const upscaled = await upscaleIfNeeded(cropped, 800);
 
+        const regionNative = await decodeWithNativeBarcodeDetector(upscaled);
+        for (const native of regionNative) {
+          tryAddResult(native.text, native.format, `${region.name}(native)`, regionIndex, 'native', native.confidence);
+        }
+        if (hasEnoughCandidates()) {
+          return results;
+        }
+
         // 原图识别
         quaggaResult = await decodeWithQuagga(upscaled, { halfSample: true });
         if (quaggaResult) {
-          tryAddResult(quaggaResult.text, quaggaResult.format, region.name);
-          return results;
+          tryAddResult(quaggaResult.text, quaggaResult.format, region.name, regionIndex, 'quagga', quaggaResult.confidence);
+          if (hasEnoughCandidates()) return results;
         }
 
         // 二值化识别
         const binarized = await otsuBinarize(upscaled);
         quaggaResult = await decodeWithQuagga(binarized, { halfSample: false, preprocessed: true });
         if (quaggaResult) {
-          tryAddResult(quaggaResult.text, quaggaResult.format, `${region.name}(binary)`);
-          return results;
+          tryAddResult(quaggaResult.text, quaggaResult.format, `${region.name}(binary)`, regionIndex, 'quagga', quaggaResult.confidence);
+          if (hasEnoughCandidates()) return results;
         }
       } catch (e) {
         console.error(`  │  └─ 区域${region.name}异常:`, e);

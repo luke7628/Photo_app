@@ -10,6 +10,9 @@ interface CameraScreenProps {
   sessionIndex: number;
   isSingleRetake?: boolean;
   initialFlash?: 'on' | 'off' | 'auto';
+  scanMode?: 'serial' | 'part' | null;
+  requireScanModeSelection?: boolean;
+  onScanModeChange?: (mode: 'serial' | 'part') => void;
   onClose: () => void;
   onCapture: (base64: string) => void;
 }
@@ -20,6 +23,9 @@ const CameraScreen: React.FC<CameraScreenProps> = ({
   sessionIndex, 
   isSingleRetake, 
   initialFlash = 'off',
+  scanMode = null,
+  requireScanModeSelection = false,
+  onScanModeChange,
   onClose, 
   onCapture 
 }) => {
@@ -298,6 +304,11 @@ const CameraScreen: React.FC<CameraScreenProps> = ({
   }, [retryCount]);
 
   const handleTakePhoto = () => {
+    if (requireScanModeSelection && !scanMode) {
+      setCameraError('Please choose Scan Serial or Scan Part before capture');
+      return;
+    }
+
     if (!videoRef.current || !canvasRef.current) {
       setCameraError('Camera not initialized');
       return;
@@ -494,13 +505,48 @@ const CameraScreen: React.FC<CameraScreenProps> = ({
 
           <div className="flex-1"></div>
 
+          {requireScanModeSelection && (
+            <div className={`w-full flex justify-center pointer-events-auto ${isLandscape ? 'pb-2' : 'pb-3'}`}>
+              <div className="bg-black/45 border border-white/20 rounded-2xl p-1.5 backdrop-blur-md flex items-center gap-1.5">
+                <button
+                  onClick={() => {
+                    setCameraError(null);
+                    onScanModeChange?.('serial');
+                  }}
+                  style={rotationStyle}
+                  className={`px-4 py-2 rounded-xl text-xs font-bold uppercase tracking-wide transition-colors ${
+                    scanMode === 'serial'
+                      ? 'bg-primary text-black'
+                      : 'bg-black/30 text-white border border-white/15'
+                  }`}
+                >
+                  Scan Serial
+                </button>
+                <button
+                  onClick={() => {
+                    setCameraError(null);
+                    onScanModeChange?.('part');
+                  }}
+                  style={rotationStyle}
+                  className={`px-4 py-2 rounded-xl text-xs font-bold uppercase tracking-wide transition-colors ${
+                    scanMode === 'part'
+                      ? 'bg-primary text-black'
+                      : 'bg-black/30 text-white border border-white/15'
+                  }`}
+                >
+                  Scan Part
+                </button>
+              </div>
+            </div>
+          )}
+
           <footer 
             className={`pad-bottom-safe w-full bg-gradient-to-t from-black/90 via-black/40 to-transparent flex flex-col items-center pointer-events-auto transition-all duration-500 ${isLandscape ? 'px-12 pt-1' : 'pt-4'}`}
           >
             <div className="w-full flex items-center justify-center">
                <button 
                 onClick={handleTakePhoto}
-                disabled={isCapturing || !isCameraReady}
+                disabled={isCapturing || !isCameraReady || (requireScanModeSelection && !scanMode)}
                 style={rotationStyle}
                 className="group relative size-20 active:scale-95 transition-transform disabled:opacity-50"
               >

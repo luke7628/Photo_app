@@ -6,6 +6,7 @@ import { storageService } from './services/storageService';
 import { oneDriveService } from './services/oneDriveService';
 import { microsoftAuthService } from './services/microsoftAuthService';
 import { readBarcode } from './services/barcodeService';
+import { extractSerialAndPart, runRecognitionArbitration, ScanMode } from './services/recognitionPipeline';
 import eruda from 'eruda';
 import { hapticService } from './src/services/hapticService';
 
@@ -73,6 +74,7 @@ const App: React.FC = () => {
   const [sessionData, setSessionData] = useState<{ serialNumber: string; partNumber?: string } | null>(null);
   const [baseSerialNumber, setBaseSerialNumber] = useState<string>('');
   const [basePartNumber, setBasePartNumber] = useState<string>('');
+  const [scanMode, setScanMode] = useState<ScanMode | null>(null);
   const [isAnalyzing, setIsAnalyzing] = useState<boolean>(false);
   const [isSingleRetake, setIsSingleRetake] = useState<boolean>(false);
   const [previewPhotos, setPreviewPhotos] = useState<PhotoSetItem[]>([]);
@@ -612,7 +614,7 @@ const App: React.FC = () => {
     return () => clearInterval(interval);
   }, [settings.autoUpload, settings.cloudProvider, user, performSyncCycle]);
 
-  const analyzeWithBarcode = async (base64Image: string): Promise<{ serialNumber: string; partNumber: string }> => {
+  const analyzeWithBarcode = async (base64Image: string, mode: ScanMode): Promise<{ serialNumber: string; partNumber: string }> => {
     return new Promise<{ serialNumber: string; partNumber: string }>((resolve, reject) => {
       let isResolved = false; // Bug Fix: 防止多次调用resolve/reject
       
@@ -628,158 +630,42 @@ const App: React.FC = () => {
         try {
           console.log('📊 [analyzeWithBarcode] 开始...输入长度:', base64Image.length);
           console.log('📊 [analyzeWithBarcode] Base64前100字符:', base64Image.substring(0, 100));
-          
-          // 直接使用 ZXing 多区域识别
-          console.log('🔍 [analyzeWithBarcode] 使用 ZXing 多区域识别...');
-          const legacyResults = await readBarcode(base64Image);
-          console.log('📊 [analyzeWithBarcode] ZXing返回:', legacyResults.length, '个结果');
-          console.log('📊 [analyzeWithBarcode] ZXing结果详情:', JSON.stringify(legacyResults, null, 2));
-          
-          const barcodeResults = legacyResults.map(r => ({
-            type: r.type as any,
-            value: r.value,
-            format: r.format,
-            confidence: 0.9,
-            localized: false,
-          }));
-      
-          if (barcodeResults.length === 0) {
+
+          console.log('🔍 [analyzeWithBarcode] 执行多引擎解码...');
+          const rawResults = await readBarcode(base64Image);
+          console.log('📊 [analyzeWithBarcode] 解码返回:', rawResults.length, '个候选');
+
+          if (rawResults.length === 0) {
             console.warn('⚠️ [analyzeWithBarcode] 未检测到条码');
             displayToast('💡 Cannot detect barcode. Please: get closer, improve lighting, hold steady, try different angle.', 5000);
-          } else {
-            console.log('✅ [analyzeWithBarcode] 成功检测到', barcodeResults.length, '个条码');
-          }
-          
-          let serialNumber = '';
-          let partNumber = '';
-
-      const parsePayload = (payload: string, barcodeInfo?: any) => {
-        console.log('📊 [parsePayload] 输入:', payload);
-        console.log('📊 [parsePayload] 条码信息:', barcodeInfo);
-        const parts = payload
-          .toUpperCase()
-          .split(/[\n|;]+/)
-          .map(p => p.trim())
-          .filter(Boolean);
-
-        console.log('📊 [parsePayload] 分割后:', parts.length, '部分', parts);
-
-        parts.forEach((part, idx) => {
-          console.log(`📊 [parsePayload] 处理部分 ${idx}:`, part);
-          const compact = part.replace(/\s+/g, '');
-          const cleaned = compact.replace(/[^A-Z0-9-_]/g, '');
-          console.log(`📊 [parsePayload] 清理后:`, cleaned);
-
-          // 优先识别部件号（Part Number）- ZT4开头
-          if (!partNumber) {
-            const partMatch = cleaned.match(/ZT4\d{3,6}[-_]?[A-Z0-9]{5,}/i);
-            if (partMatch) {
-              let normalized = partMatch[0].replace(/_/g, '-');
-              if (!normalized.includes('-') && normalized.length > 9) {
-                const match = normalized.match(/^(ZT4\d{3,6})([A-Z0-9]+)$/);
-                if (match) {
-                  normalized = `${match[1]}-${match[2]}`;
-                }
-              }
-              partNumber = normalized;
-              console.log('✅ [parsePayload] 识别为部件号:', partNumber);
-              return; // 发现PN后直接返回，避免继续识别为SN
-            }
           }
 
-          // 识别序列号（Serial Number）
-          // 优先级1：带标签的序列号
-          if (!serialNumber) {
-            const labeledSerial = cleaned.match(/(?:SN|SERIAL|S-N|S_N)[:=\s]*([A-Z0-9]{8,})/i);
-            if (labeledSerial) {
-              serialNumber = labeledSerial[1];
-              console.log('✅ [parsePayload] 识别为序列号（带标签）:', serialNumber);
-              return; // 发现SN后直接返回
-            }
+          const candidates = rawResults.map(result => ({
+            text: result.value,
+            engine: (result.engine || 'quagga') as 'quagga' | 'native',
+            engineConfidence: result.engineConfidence ?? 0.7,
+            format: result.format,
+            region: result.region,
+            regionIndex: result.regionIndex
+          }));
+
+          const pipeline = extractSerialAndPart(candidates, mode);
+          let serialNumber = pipeline.serialNumber;
+          let partNumber = pipeline.partNumber;
+
+          if (mode === 'serial' && !serialNumber) {
+            const fallback = runRecognitionArbitration(candidates, 'serial', 0.68);
+            if (fallback) serialNumber = fallback.value;
+          }
+          if (mode === 'part' && !partNumber) {
+            const fallback = runRecognitionArbitration(candidates, 'part', 0.68);
+            if (fallback) partNumber = fallback.value;
           }
 
-          // 优先级2：位置策略 - 使用条码所在区域判断
-          // 底部区域更可能是PN（且以ZT4开头或长数字），顶部/上部更可能是SN
-          const isBottomRegion = barcodeInfo?.regionIndex && barcodeInfo.regionIndex >= 4; // 底部80%以后
-          const isTopRegion = barcodeInfo?.regionIndex && barcodeInfo.regionIndex <= 2; // 顶部40%以前
-          
-          if (isBottomRegion && cleaned.length > 8) {
-            // 底部区域：优先当作PN
-            if (!partNumber && cleaned.match(/^[A-Z0-9]{8,}/i)) {
-              partNumber = cleaned;
-              console.log('✅ [parsePayload] 识别为部件号（底部位置）:', partNumber);
-              return;
-            }
-          }
+          console.log('📊 [analyzeWithBarcode] 模式:', mode);
+          console.log('📊 [analyzeWithBarcode] 决策:', pipeline.decisions);
+          console.log('📊 [analyzeWithBarcode] 最终返回:', { serialNumber, partNumber });
 
-          if (isTopRegion && !serialNumber && cleaned.length >= 8 && cleaned.length <= 20) {
-            // 顶部区域：优先当作SN
-            serialNumber = cleaned;
-            console.log('✅ [parsePayload] 识别为序列号（顶部位置）:', serialNumber);
-            return;
-          }
-
-          // 优先级3：Zebra 典型序列号格式（数字+字母+数字）
-          if (!serialNumber) {
-            const pattern1 = cleaned.match(/(?<![A-Z0-9])(\d{2,4}[A-Z]{2,4}\d{6,})(?![A-Z0-9])/i);
-            if (pattern1 && pattern1[1].length >= 8 && pattern1[1].length <= 20 && !cleaned.startsWith('ZT4')) {
-              serialNumber = pattern1[1];
-              console.log('✅ [parsePayload] 识别为序列号（格式: 数字+字母+数字）:', serialNumber);
-              return;
-            }
-          }
-          
-          // 优先级4：其他Zebra格式（字母开头）
-          if (!serialNumber) {
-            const pattern2 = cleaned.match(/(?<![A-Z0-9])([A-Z]{2,4}\d{6,}|[A-Z0-9]{2}[A-Z]\d{6,})(?![A-Z0-9])/i);
-            if (pattern2 && pattern2[1].length >= 8 && pattern2[1].length <= 20 && !cleaned.startsWith('ZT4')) {
-              serialNumber = pattern2[1];
-              console.log('✅ [parsePayload] 识别为序列号（格式: 字母+数字）:', serialNumber);
-              return;
-            }
-          }
-
-          // 优先级5：纯数字序列号（10-15位）
-          if (!serialNumber && cleaned.match(/^\d{10,15}$/)) {
-            serialNumber = cleaned;
-            console.log('✅ [parsePayload] 识别为序列号（纯数字）:', serialNumber);
-            return;
-          }
-
-          // 优先级6：通用格式（避免误识别PN）
-          if (!serialNumber && !partNumber && !cleaned.startsWith('ZT4')) {
-            if (cleaned.length >= 8 && cleaned.length <= 20) {
-              serialNumber = cleaned;
-              console.log('✅ [parsePayload] 识别为序列号（通用格式）:', serialNumber);
-              return;
-            }
-          }
-        });
-        
-        console.log('📊 [parsePayload] 完成，最终: SN=', serialNumber, ', PN=', partNumber);
-      };
-      
-      if (barcodeResults && barcodeResults.length > 0) {
-        console.log(`✅ [analyzeWithBarcode] 找到 ${barcodeResults.length} 个条码:`, barcodeResults);
-        
-        // 解析条形码/QR码结果
-        for (const result of barcodeResults) {
-          if (!result.value) {
-            console.log('⚠️ [analyzeWithBarcode] 跳过空值结果');
-            continue;
-          }
-          const typeStr = result.type === 'qrcode' ? 'QR码' : '条形码';
-          const confStr = (result as any).confidence ? ` (置信度: ${((result as any).confidence * 100).toFixed(0)}%)` : '';
-          const locStr = (result as any).localized ? ' [已定位]' : '';
-          const regionStr = (result as any).region ? ` [区域: ${(result as any).region}]` : '';
-          console.log(`[analyzeWithBarcode] ${typeStr}内容:`, result.value, `${result.format || ''}${confStr}${locStr}${regionStr}`);
-          parsePayload(result.value, result);
-        }
-      } else {
-        console.log('❌ [analyzeWithBarcode] 未找到条码结果');
-      }
-      
-      console.log('📊 [analyzeWithBarcode] 最终返回:', { serialNumber, partNumber });
       clearTimeout(timeout);
       if (!isResolved) { // Bug Fix: 确保只resolve一次
         isResolved = true;
@@ -815,7 +701,7 @@ const App: React.FC = () => {
         setIsAnalyzing(true);
         const cleanBase64 = base64.split(',')[1];
         console.log('📸 [handleCapture] 清理后Base64长度:', cleanBase64.length);
-        analyzeWithBarcode(cleanBase64)
+        analyzeWithBarcode(cleanBase64, (scanMode || 'serial'))
           .then(result => { 
             console.log('📸 [handleCapture] ✅ 分析成功，结果:', result);
             if (!result.serialNumber && !result.partNumber) {
@@ -868,7 +754,7 @@ const App: React.FC = () => {
         console.log('📸 [handleCapture] 首次拍摄，开始分析...');
         setIsAnalyzing(true);
         const cleanBase64 = base64.split(',')[1];
-        analyzeWithBarcode(cleanBase64)
+        analyzeWithBarcode(cleanBase64, (scanMode || 'serial'))
           .then(result => { 
             console.log('📸 [handleCapture] 分析成功，设置sessionData:', result);
             if (!result.serialNumber && !result.partNumber) {
@@ -916,6 +802,7 @@ const App: React.FC = () => {
       setSessionData(null);
       setBaseSerialNumber('');
       setBasePartNumber('');
+      setScanMode(null);
       setIsAnalyzing(false);
       setCurrentScreen(AppScreen.GALLERY);
       return;
@@ -974,6 +861,7 @@ const App: React.FC = () => {
     setSessionData(null);
     setBaseSerialNumber('');
     setBasePartNumber(''); // Bug Fix: 添加缺失的清理
+    setScanMode(null);
     setIsSingleRetake(false);
     setLastScreen(AppScreen.GALLERY); // Bug Fix: 显式设置正确的返回屏幕
     setCurrentScreen(AppScreen.DETAILS);
@@ -1051,10 +939,10 @@ const App: React.FC = () => {
       <div key={currentScreen} className="w-full h-full screen-enter flex flex-col overflow-hidden">
         {currentScreen === AppScreen.SPLASH && <SplashScreen />}
         {currentScreen === AppScreen.PROJECT_LIST && <ProjectListScreen projects={projects} printers={printers} onSelectProject={(id) => { setActiveProjectId(id); setCurrentScreen(AppScreen.GALLERY); }} onCreateProject={(name) => setProjects([{ id: `p-${Date.now()}`, name, printerIds: [], createdAt: new Date().toISOString() }, ...projects])} onRenameProject={(id, newName) => setProjects(prev => prev.map(p => p.id === id ? { ...p, name: newName } : p))} onDeleteProject={(id) => { setProjects(prev => prev.filter(p => p.id !== id)); setPrinters(prev => prev.filter(p => p.projectId !== id)); }} onOpenSettings={() => setCurrentScreen(AppScreen.SETTINGS)} user={user} pendingSyncCount={pendingSyncCount} />}
-        {currentScreen === AppScreen.GALLERY && <GalleryScreen user={user} pendingSyncCount={pendingSyncCount} activeProject={activeProject} printers={activePrinters} onSearch={() => setCurrentScreen(AppScreen.SEARCH)} onAdd={() => { setSessionIndex(0); setSessionPhotos([]); setSessionData(null); setIsSingleRetake(false); setSelectedPrinter(null); setCurrentScreen(AppScreen.CAMERA); }} onSelectPrinter={(p) => { setSelectedPrinter(p); setCurrentScreen(AppScreen.DETAILS); }} onPreviewImage={(url) => { setPreviewPhotos([{url, label: 'Preview', filename: 'p.jpg'}]); setPreviewIndex(0); setLastScreen(AppScreen.GALLERY); setCurrentScreen(AppScreen.PREVIEW); }} onOpenSettings={() => setCurrentScreen(AppScreen.SETTINGS)} onManualSync={performSyncCycle} onBackToProjects={() => setCurrentScreen(AppScreen.PROJECT_LIST)} />}
-        {currentScreen === AppScreen.CAMERA && <CameraScreen sessionIndex={sessionIndex} isSingleRetake={isSingleRetake} initialFlash={settings.defaultFlash} onClose={() => { if (sessionPhotos.length > 0 && sessionData) finalizeSession(sessionPhotos, sessionData); else { setCurrentScreen(isSingleRetake ? lastScreen : AppScreen.GALLERY); setIsSingleRetake(false); } }} onCapture={handleCapture} />}
+        {currentScreen === AppScreen.GALLERY && <GalleryScreen user={user} pendingSyncCount={pendingSyncCount} activeProject={activeProject} printers={activePrinters} onSearch={() => setCurrentScreen(AppScreen.SEARCH)} onAdd={() => { setSessionIndex(0); setSessionPhotos([]); setSessionData(null); setIsSingleRetake(false); setSelectedPrinter(null); setScanMode(null); setCurrentScreen(AppScreen.CAMERA); }} onSelectPrinter={(p) => { setSelectedPrinter(p); setCurrentScreen(AppScreen.DETAILS); }} onPreviewImage={(url) => { setPreviewPhotos([{url, label: 'Preview', filename: 'p.jpg'}]); setPreviewIndex(0); setLastScreen(AppScreen.GALLERY); setCurrentScreen(AppScreen.PREVIEW); }} onOpenSettings={() => setCurrentScreen(AppScreen.SETTINGS)} onManualSync={performSyncCycle} onBackToProjects={() => setCurrentScreen(AppScreen.PROJECT_LIST)} />}
+        {currentScreen === AppScreen.CAMERA && <CameraScreen sessionIndex={sessionIndex} isSingleRetake={isSingleRetake} initialFlash={settings.defaultFlash} scanMode={scanMode} requireScanModeSelection={sessionIndex === 0 && !isSingleRetake} onScanModeChange={setScanMode} onClose={() => { if (sessionPhotos.length > 0 && sessionData) finalizeSession(sessionPhotos, sessionData); else { setCurrentScreen(isSingleRetake ? lastScreen : AppScreen.GALLERY); setIsSingleRetake(false); setScanMode(null); } }} onCapture={handleCapture} />}
         {currentScreen === AppScreen.REVIEW && <ReviewScreen imageUrl={capturedImage!} data={sessionData!} isAnalyzing={isAnalyzing} sessionIndex={sessionIndex} isSingleRetake={isSingleRetake} photoRotation={parseInt(sessionStorage.getItem('lastCaptureRotation') || '0', 10)} onRetake={() => setCurrentScreen(AppScreen.CAMERA)} onUpdateData={(newData) => { setSessionData(newData); if (sessionIndex === 0 && !isSingleRetake) { setBaseSerialNumber(newData.serialNumber); setBasePartNumber(newData.partNumber || ''); } }} onConfirm={() => processConfirmation(capturedImage!, sessionData || { serialNumber: 'Manual_SN', partNumber: '' })} onBack={handleReviewBack} />}
-        {currentScreen === AppScreen.DETAILS && <DetailsScreen printer={selectedPrinter!} viewMode={detailsViewMode} setViewMode={setDetailsViewMode} onBack={() => setCurrentScreen(AppScreen.GALLERY)} onAddPhoto={(idx) => { setSessionIndex(idx); setIsSingleRetake(true); setSessionData({ serialNumber: selectedPrinter!.serialNumber, partNumber: selectedPrinter!.partNumber }); setLastScreen(AppScreen.DETAILS); setCurrentScreen(AppScreen.CAMERA); }} onPreviewImage={(photos, index) => { setPreviewPhotos(photos); setPreviewIndex(index); setLastScreen(AppScreen.DETAILS); setCurrentScreen(AppScreen.PREVIEW); }} onManualSync={performSyncCycle} onUpdatePrinter={updatePrinter} onAllPhotosComplete={() => { setSessionIndex(0); setSessionPhotos([]); setSessionData(null); setBaseSerialNumber(''); }} isSyncing={selectedPrinter?.isSyncing} user={user} pendingSyncCount={pendingSyncCount} onOpenSettings={() => setCurrentScreen(AppScreen.SETTINGS)} />}
+        {currentScreen === AppScreen.DETAILS && <DetailsScreen printer={selectedPrinter!} viewMode={detailsViewMode} setViewMode={setDetailsViewMode} onBack={() => setCurrentScreen(AppScreen.GALLERY)} onAddPhoto={(idx) => { setSessionIndex(idx); setIsSingleRetake(true); setSessionData({ serialNumber: selectedPrinter!.serialNumber, partNumber: selectedPrinter!.partNumber }); setLastScreen(AppScreen.DETAILS); setCurrentScreen(AppScreen.CAMERA); }} onPreviewImage={(photos, index) => { setPreviewPhotos(photos); setPreviewIndex(index); setLastScreen(AppScreen.DETAILS); setCurrentScreen(AppScreen.PREVIEW); }} onManualSync={performSyncCycle} onUpdatePrinter={updatePrinter} onAllPhotosComplete={() => { setSessionIndex(0); setSessionPhotos([]); setSessionData(null); setBaseSerialNumber(''); setScanMode(null); }} isSyncing={selectedPrinter?.isSyncing} user={user} pendingSyncCount={pendingSyncCount} onOpenSettings={() => setCurrentScreen(AppScreen.SETTINGS)} />}
         {currentScreen === AppScreen.PREVIEW && <ImagePreviewScreen photos={previewPhotos} initialIndex={previewIndex} onBack={() => setCurrentScreen(lastScreen)} onRetake={(idx) => { setSessionIndex(idx); setIsSingleRetake(true); if (selectedPrinter) setSessionData({ serialNumber: selectedPrinter.serialNumber, partNumber: selectedPrinter.partNumber }); setCurrentScreen(AppScreen.CAMERA); }} onReplace={(idx, b64) => { if (!selectedPrinter) return; const currentPhotos = selectedPrinter.photos || []; const updatedPhotos = [...currentPhotos]; updatedPhotos[idx] = { ...updatedPhotos[idx], url: b64, isSynced: false, rotation: 0 }; const updatedPrinter = { ...selectedPrinter, photos: updatedPhotos, imageUrl: idx === 0 ? b64 : selectedPrinter.imageUrl, syncedCount: updatedPhotos.filter(p => p.isSynced).length }; setPrinters(prev => prev.map(p => p.id === selectedPrinter.id ? updatedPrinter : p)); setSelectedPrinter(updatedPrinter); setPreviewPhotos(updatedPhotos); }} />}
         {currentScreen === AppScreen.SETTINGS && <SettingsScreen settings={settings} onUpdate={setSettings} activeProject={activeProject} user={user} pendingSyncCount={pendingSyncCount} onLogin={handleLogin} onLogout={handleLogout} onBack={() => setCurrentScreen(activeProjectId ? AppScreen.GALLERY : AppScreen.PROJECT_LIST)} />}
         {currentScreen === AppScreen.SEARCH && <SearchScreen printers={printers} onBack={() => setCurrentScreen(AppScreen.GALLERY)} onPreviewImage={(url) => { setPreviewPhotos([{url, label: 'Search', filename: 's.jpg'}]); setPreviewIndex(0); setLastScreen(AppScreen.SEARCH); setCurrentScreen(AppScreen.PREVIEW); }} />}
