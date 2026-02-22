@@ -651,11 +651,28 @@ const App: React.FC = () => {
           const serialDecision = runRecognitionArbitration(candidates, 'serial', 0.68);
           const partDecision = runRecognitionArbitration(candidates, 'part', 0.68);
 
+          const partFallbackFromCandidates = (() => {
+            const direct = rawResults
+              .map(item => String(item.value || '').toUpperCase())
+              .map(text => text.match(/ZT[0-9A-Z]{3,8}-[0-9A-Z]{4,20}/)?.[0] || '')
+              .find(Boolean);
+            if (direct) return direct;
+
+            return rawResults
+              .map(item => String(item.value || '').toUpperCase().replace(/[^A-Z0-9-]/g, ''))
+              .map(text => text.match(/ZT[0-9A-Z]{3,8}-?[0-9A-Z]{4,20}/)?.[0] || '')
+              .map(text => text.includes('-') ? text : text.replace(/^(ZT[0-9A-Z]{3,8})([0-9A-Z]{4,20})$/, '$1-$2'))
+              .find(Boolean) || '';
+          })();
+
           const serialNumber = serialDecision?.value ?? '';
-          const partNumber = partDecision?.value ?? '';
+          const partNumber = partDecision?.value ?? partFallbackFromCandidates;
 
           console.log('📊 [analyzeWithBarcode] Serial决策:', serialDecision);
           console.log('📊 [analyzeWithBarcode] Part决策:', partDecision);
+          if (!partDecision && partFallbackFromCandidates) {
+            console.log('📊 [analyzeWithBarcode] Part回退提取:', partFallbackFromCandidates);
+          }
           console.log('📊 [analyzeWithBarcode] 最终返回:', { serialNumber, partNumber });
 
       clearTimeout(timeout);

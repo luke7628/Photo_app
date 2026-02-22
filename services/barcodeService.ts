@@ -37,8 +37,15 @@ interface BarcodeResult {
   engineConfidence?: number;
 }
 
+interface StripeBand {
+  top: number;
+  bottom: number;
+  score: number;
+}
+
 const serialRegex = /^[a-zA-Z]{2,4}\d{8,12}$/i;
-const partRegex = /^[a-zA-Z0-9-]{6,20}$/i;
+const partRegex = /^[a-zA-Z0-9-]{6,28}$/i;
+const ztPartRegex = /ZT[0-9A-Z]{3,8}-[0-9A-Z]{4,20}/i;
 
 let preprocessedImageCache: { base64: string; processed: string } | null = null;
 let nativeBarcodeDetectorInit: Promise<any | null> | null = null;
@@ -262,6 +269,7 @@ async function decodeZXingFromCanvas(canvas: HTMLCanvasElement): Promise<{ text:
 }
 
 function getRuleBonus(text: string): number {
+  if (ztPartRegex.test(text)) return 0.14;
   if (serialRegex.test(text)) return 0.08;
   if (partRegex.test(text)) return 0.06;
   return 0;
@@ -329,6 +337,29 @@ async function rotateBase64(base64Image: string, angle: 90 | 180 | 270): Promise
     });
   } catch (error) {
     console.warn(`⚠️ [rotate] ${angle}° 失败`);
+    return base64Image;
+  }
+}
+
+async function rotateBase64Any(base64Image: string, angle: number): Promise<string> {
+  if (!base64Image || angle === 0) return base64Image;
+
+  try {
+    const img = await loadImageFromBase64(base64Image);
+    const radians = (angle * Math.PI) / 180;
+    const cos = Math.abs(Math.cos(radians));
+    const sin = Math.abs(Math.sin(radians));
+    const width = Math.ceil(img.width * cos + img.height * sin);
+    const height = Math.ceil(img.width * sin + img.height * cos);
+
+    return await withCanvas(width, height, (canvas, ctx) => {
+      ctx.translate(canvas.width / 2, canvas.height / 2);
+      ctx.rotate(radians);
+      ctx.drawImage(img, -img.width / 2, -img.height / 2);
+      return canvas.toDataURL('image/jpeg', 0.92).split(',')[1];
+    });
+  } catch (error) {
+    console.warn(`⚠️ [rotateAny] ${angle}° 失败`);
     return base64Image;
   }
 }
@@ -426,6 +457,76 @@ async function cropToRegion(base64Image: string, x: number, y: number, width: nu
     console.warn('⚠️ [cropToRegion] 失败');
     return base64Image;
   }
+}
+
+async function detectBarcodeBands(
+  base64: string,
+  options: { minBandHeight: number; densityFactor: number } = {
+    minBandHeight: 40,
+    densityFactor: 1.5
+  }
+): Promise<StripeBand[]> {
+  const img = await loadImageFromBase64(base64);
+
+  return withCanvas(img.width, img.height, (_canvas, ctx) => {
+    ctx.drawImage(img, 0, 0);
+    const { data, width, height } = ctx.getImageData(0, 0, img.width, img.height);
+
+    const rowDensity: number[] = new Array(height).fill(0);
+
+    for (let y = 0; y < height; y++) {
+      let transitions = 0;
+      let last = data[(y * width) * 4];
+
+      for (let x = 1; x < width; x++) {
+        const idx = (y * width + x) * 4;
+        const value = data[idx];
+        if (Math.abs(value - last) > 25) transitions++;
+        last = value;
+      }
+
+      rowDensity[y] = transitions;
+    }
+
+    const avg = rowDensity.reduce((sum, value) => sum + value, 0) / height;
+    const threshold = avg * options.densityFactor;
+
+    const bands: StripeBand[] = [];
+    let start = -1;
+    let acc = 0;
+
+    for (let y = 0; y <= height; y++) {
+      const density = rowDensity[y] || 0;
+
+      if (density > threshold) {
+        if (start < 0) start = y;
+        acc += density;
+      } else if (start >= 0) {
+        const h = y - start;
+        if (h >= options.minBandHeight) {
+          bands.push({
+            top: Math.max(0, start - Math.floor(h * 0.2)),
+            bottom: Math.min(height, y + Math.floor(h * 0.2)),
+            score: acc / h
+          });
+        }
+        start = -1;
+        acc = 0;
+      }
+    }
+
+    return bands;
+  });
+}
+
+async function cropBand(base64: string, band: StripeBand): Promise<string> {
+  const img = await loadImageFromBase64(base64);
+  const bandHeight = Math.max(1, band.bottom - band.top);
+
+  return withCanvas(img.width, bandHeight, (canvas, ctx) => {
+    ctx.drawImage(img, 0, band.top, img.width, bandHeight, 0, 0, img.width, bandHeight);
+    return canvas.toDataURL('image/jpeg', 0.92).split(',')[1];
+  });
 }
 
 /**
@@ -709,8 +810,8 @@ export async function readBarcode(base64Image: string): Promise<BarcodeResult[]>
 
   try {
     const startedAt = Date.now();
-    const TIME_BUDGET_MS = 4800;
-    const MAX_DECODE_ATTEMPTS = 96;
+    const TIME_BUDGET_MS = 7600;
+    const MAX_DECODE_ATTEMPTS = 140;
     const MAX_CANDIDATES = 120;
     let attempts = 0;
 
@@ -756,6 +857,8 @@ export async function readBarcode(base64Image: string): Promise<BarcodeResult[]>
     const focusedImage = await loadImageFromBase64(normalized);
     const focusedCanvas = await preprocessImageForFocusedSweep(focusedImage, 1200, 1.7);
     const focusedRois = [
+      { name: 'focused-bottom-strip', x: 0.04, y: 0.56, w: 0.92, h: 0.22 },
+      { name: 'focused-bottom-wide', x: 0.02, y: 0.5, w: 0.96, h: 0.36 },
       { name: 'focused-center', x: 0.2, y: 0.2, w: 0.6, h: 0.6 },
       { name: 'focused-extended', x: 0.1, y: 0.1, w: 0.8, h: 0.8 },
       { name: 'focused-full', x: 0, y: 0, w: 1, h: 1 }
@@ -788,25 +891,59 @@ export async function readBarcode(base64Image: string): Promise<BarcodeResult[]>
     }
 
     const optimized = await optimizeResolution(normalized, 1800);
-    const roiDefs = [
-      { name: 'center', x: 0.22, y: 0.22, w: 0.56, h: 0.56 },
-      { name: 'expanded', x: 0.12, y: 0.12, w: 0.76, h: 0.76 },
-      { name: 'lower-focus', x: 0.1, y: 0.52, w: 0.82, h: 0.4 },
-      { name: 'full', x: 0, y: 0, w: 1, h: 1 }
-    ] as const;
+    let stripeBands: StripeBand[] = [];
 
-    for (let i = 0; i < roiDefs.length; i++) {
+    try {
+      stripeBands = await detectBarcodeBands(optimized, { minBandHeight: 40, densityFactor: 1.45 });
+      console.log(`📊 [StripeProjection] 检测到 ${stripeBands.length} 个band`);
+    } catch (error) {
+      console.warn('⚠️ [StripeProjection] band检测失败，回退固定ROI:', error);
+    }
+
+    const dynamicSources: Array<{ name: string; image: string; index: number }> = [];
+    const sortedBands = stripeBands
+      .slice()
+      .sort((a, b) => b.score - a.score)
+      .slice(0, 5);
+
+    for (let i = 0; i < sortedBands.length; i++) {
+      try {
+        const bandImage = await cropBand(optimized, sortedBands[i]);
+        dynamicSources.push({ name: `stripe-band-${i + 1}`, image: bandImage, index: i + 1 });
+      } catch (error) {
+        console.warn(`⚠️ [StripeProjection] crop band ${i + 1} 失败`);
+      }
+    }
+
+    if (dynamicSources.length === 0) {
+      const roiDefs = [
+        { name: 'center', x: 0.22, y: 0.22, w: 0.56, h: 0.56 },
+        { name: 'expanded', x: 0.12, y: 0.12, w: 0.76, h: 0.76 },
+        { name: 'lower-focus', x: 0.1, y: 0.52, w: 0.82, h: 0.4 },
+        { name: 'full', x: 0, y: 0, w: 1, h: 1 }
+      ] as const;
+
+      for (let i = 0; i < roiDefs.length; i++) {
+        try {
+          const roi = roiDefs[i];
+          const roiImage = roi.name === 'full'
+            ? optimized
+            : await cropToRegion(optimized, roi.x, roi.y, roi.w, roi.h);
+          dynamicSources.push({ name: roi.name, image: roiImage, index: i + 1 });
+        } catch {
+          // ignore this roi
+        }
+      }
+    }
+
+    for (let i = 0; i < dynamicSources.length; i++) {
       if (shouldStop()) break;
 
-      const roi = roiDefs[i];
-      const regionIndex = i + 1;
-      let roiImage = optimized;
+      const source = dynamicSources[i];
+      const regionIndex = source.index;
+      let roiImage = source.image;
 
       try {
-        if (roi.name !== 'full') {
-          roiImage = await cropToRegion(optimized, roi.x, roi.y, roi.w, roi.h);
-        }
-
         const upscaled = await upscaleIfNeeded(roiImage, 900);
         const contrast = await enhanceContrast(upscaled, 1.5);
         const binary = await otsuBinarize(upscaled);
@@ -820,11 +957,11 @@ export async function readBarcode(base64Image: string): Promise<BarcodeResult[]>
         for (const variant of variants) {
           if (shouldStop()) break;
 
-          for (const angle of [0, 90, 180, 270] as const) {
+          for (const angle of [0, 15, -15, 30, -30]) {
             if (shouldStop()) break;
 
-            const rotated = angle === 0 ? variant.image : await rotateBase64(variant.image, angle);
-            const regionWithAngle = angle === 0 ? roi.name : `${roi.name}(rot${angle})`;
+            const rotated = angle === 0 ? variant.image : await rotateBase64Any(variant.image, angle);
+            const regionWithAngle = angle === 0 ? source.name : `${source.name}(rot${angle})`;
 
             attempts += 1;
             const nativeResults = await decodeWithNativeBarcodeDetector(rotated);
@@ -864,7 +1001,7 @@ export async function readBarcode(base64Image: string): Promise<BarcodeResult[]>
           }
         }
       } catch (e) {
-        console.error(`⚠️ [readBarcode] ROI ${roi.name} 处理异常:`, e);
+        console.error(`⚠️ [readBarcode] ROI ${source.name} 处理异常:`, e);
       }
     }
 
