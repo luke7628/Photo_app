@@ -25,7 +25,6 @@
 import Quagga from '@ericblade/quagga2';
 import { BrowserMultiFormatReader as ZXingBrowserReader } from '@zxing/browser';
 import { BrowserMultiFormatReader, BarcodeFormat, DecodeHintType } from '@zxing/library';
-import { readBarcode as legacyReadBarcode } from './barcodeService_legacy';
 
 interface BarcodeResult {
   type: 'barcode' | 'qrcode';
@@ -176,12 +175,12 @@ async function withCanvas<T>(
 
 async function preprocessImageForFocusedSweep(
   img: HTMLImageElement,
-  minWidth: number = 1200,
+  targetWidth: number = 1200,
   contrastFactor: number = 1.7
 ): Promise<HTMLCanvasElement> {
   const canvas = document.createElement('canvas');
   let scale = 1;
-  if (img.width < minWidth) scale = minWidth / img.width;
+  if (img.width !== targetWidth) scale = targetWidth / img.width;
   canvas.width = Math.floor(img.width * scale);
   canvas.height = Math.floor(img.height * scale);
   const ctx = canvas.getContext('2d');
@@ -1147,6 +1146,9 @@ export async function readBarcode(base64Image: string): Promise<BarcodeResult[]>
 
     console.log('🔍 [readBarcode] 启动激进识别矩阵...');
 
+    // 1. 全局分辨率优化：将图片限制在 1600px，大幅提升多条码扫描速度
+    const optimizedBase64 = await optimizeResolution(normalized, 1600);
+
     const shouldStop = () => {
       if (candidateMap.size >= MAX_CANDIDATES) return true;
       if (attempts >= MAX_DECODE_ATTEMPTS) return true;
@@ -1196,6 +1198,45 @@ export async function readBarcode(base64Image: string): Promise<BarcodeResult[]>
       if (!existing.format && format) existing.format = format;
     };
 
+    // 2. 调整策略顺序：优先执行中心区域扫描 (Focused Sweep)
+    // 这通常能最快找到 SN，为后续找 PN 留出时间
+    const focusedImage = await loadImageFromBase64(optimizedBase64);
+    const focusedCanvas = await preprocessImageForFocusedSweep(focusedImage, 1200, 1.7);
+    const focusedRois = [
+      { name: 'focused-bottom-strip', x: 0.04, y: 0.56, w: 0.92, h: 0.22 },
+      { name: 'focused-bottom-wide', x: 0.02, y: 0.5, w: 0.96, h: 0.36 },
+      { name: 'focused-center', x: 0.2, y: 0.2, w: 0.6, h: 0.6 },
+      { name: 'focused-extended', x: 0.1, y: 0.1, w: 0.8, h: 0.8 },
+      { name: 'focused-full', x: 0, y: 0, w: 1, h: 1 }
+    ];
+    const focusedAngles = [0, 15, -15, 30, -30];
+
+    for (let i = 0; i < focusedRois.length; i++) {
+      if (shouldStop()) break;
+      const roi = focusedRois[i];
+      const roiCanvas = cropCanvasByRoi(focusedCanvas, roi);
+
+      for (const angle of focusedAngles) {
+        if (shouldStop()) break;
+        const rotatedCanvas = rotateCanvasByAngle(roiCanvas, angle);
+        const region = angle === 0 ? roi.name : `${roi.name}(rot${angle})`;
+
+        attempts += 1;
+        const [quaggaRes, zxingRes] = await Promise.all([
+          decodeQuaggaFromCanvas(rotatedCanvas),
+          decodeZXingFromCanvas(rotatedCanvas)
+        ]);
+
+        if (quaggaRes) {
+          tryAddResult(quaggaRes.text, quaggaRes.format, region, i + 1, 'focused', 'quagga', quaggaRes.confidence);
+        }
+        if (zxingRes) {
+          tryAddResult(zxingRes.text, zxingRes.format, region, i + 1, 'focused', 'zxing', zxingRes.confidence);
+        }
+      }
+    }
+
+    // 3. 然后执行精细扫描 (Small Target Sweep)，使用优化后的图片
     const smallTargetSources = [
       { name: 'small-full', x: 0, y: 0, w: 1, h: 1, hint: 'mid' as const },
       { name: 'small-right', x: 0.46, y: 0.1, w: 0.54, h: 0.82, hint: 'right' as const },
@@ -1207,10 +1248,11 @@ export async function readBarcode(base64Image: string): Promise<BarcodeResult[]>
       const source = smallTargetSources[i];
       try {
         const roiImage = source.name === 'small-full'
-          ? normalized
-          : await cropToRegion(normalized, source.x, source.y, source.w, source.h);
+          ? optimizedBase64
+          : await cropToRegion(optimizedBase64, source.x, source.y, source.w, source.h);
 
-        const upscaled = await upscaleIfNeeded(roiImage, 2600);
+        // 降低 upscale 分辨率 (2600 -> 1600) 以提升速度
+        const upscaled = await upscaleIfNeeded(roiImage, 1600);
         const contrast = await enhanceContrast(upscaled, 1.95);
         const sharpened = await sharpenImage(contrast, 0.85);
         const binary = await otsuBinarize(sharpened);
@@ -1253,42 +1295,6 @@ export async function readBarcode(base64Image: string): Promise<BarcodeResult[]>
       }
     }
 
-    const focusedImage = await loadImageFromBase64(normalized);
-    const focusedCanvas = await preprocessImageForFocusedSweep(focusedImage, 1200, 1.7);
-    const focusedRois = [
-      { name: 'focused-bottom-strip', x: 0.04, y: 0.56, w: 0.92, h: 0.22 },
-      { name: 'focused-bottom-wide', x: 0.02, y: 0.5, w: 0.96, h: 0.36 },
-      { name: 'focused-center', x: 0.2, y: 0.2, w: 0.6, h: 0.6 },
-      { name: 'focused-extended', x: 0.1, y: 0.1, w: 0.8, h: 0.8 },
-      { name: 'focused-full', x: 0, y: 0, w: 1, h: 1 }
-    ];
-    const focusedAngles = [0, 15, -15, 30, -30];
-
-    for (let i = 0; i < focusedRois.length; i++) {
-      if (shouldStop()) break;
-      const roi = focusedRois[i];
-      const roiCanvas = cropCanvasByRoi(focusedCanvas, roi);
-
-      for (const angle of focusedAngles) {
-        if (shouldStop()) break;
-        const rotatedCanvas = rotateCanvasByAngle(roiCanvas, angle);
-        const region = angle === 0 ? roi.name : `${roi.name}(rot${angle})`;
-
-        attempts += 1;
-        const [quaggaRes, zxingRes] = await Promise.all([
-          decodeQuaggaFromCanvas(rotatedCanvas),
-          decodeZXingFromCanvas(rotatedCanvas)
-        ]);
-
-        if (quaggaRes) {
-          tryAddResult(quaggaRes.text, quaggaRes.format, region, i + 1, 'focused', 'quagga', quaggaRes.confidence);
-        }
-        if (zxingRes) {
-          tryAddResult(zxingRes.text, zxingRes.format, region, i + 1, 'focused', 'zxing', zxingRes.confidence);
-        }
-      }
-    }
-
     const pnBottomRois = [
       { name: 'pn-bottom-1', x: 0.0, y: 0.54, w: 1.0, h: 0.36 },
       { name: 'pn-bottom-2', x: 0.04, y: 0.58, w: 0.92, h: 0.30 },
@@ -1300,7 +1306,7 @@ export async function readBarcode(base64Image: string): Promise<BarcodeResult[]>
 
       const roi = pnBottomRois[i];
       try {
-        const roiImage = await cropToRegion(normalized, roi.x, roi.y, roi.w, roi.h);
+        const roiImage = await cropToRegion(optimizedBase64, roi.x, roi.y, roi.w, roi.h);
         const upscaled = await upscaleIfNeeded(roiImage, 1700);
         const contrast = await enhanceContrast(upscaled, 1.75);
         const binary = await otsuBinarize(upscaled);
@@ -1354,7 +1360,7 @@ export async function readBarcode(base64Image: string): Promise<BarcodeResult[]>
 
       const roi = pnRightRois[i];
       try {
-        const roiImage = await cropToRegion(normalized, roi.x, roi.y, roi.w, roi.h);
+        const roiImage = await cropToRegion(optimizedBase64, roi.x, roi.y, roi.w, roi.h);
         const upscaled = await upscaleIfNeeded(roiImage, 1700);
         const contrast = await enhanceContrast(upscaled, 1.72);
         const binary = await otsuBinarize(upscaled);
@@ -1397,9 +1403,7 @@ export async function readBarcode(base64Image: string): Promise<BarcodeResult[]>
       }
     }
 
-    const optimized = await optimizeResolution(normalized, 1800);
-
-    const multiBoxes = await detectBarcodeBoxesFromImage(optimized);
+    const multiBoxes = await detectBarcodeBoxesFromImage(optimizedBase64);
     if (multiBoxes.length > 0) {
       for (let i = 0; i < multiBoxes.length; i++) {
         if (shouldStop()) break;
@@ -1451,7 +1455,7 @@ export async function readBarcode(base64Image: string): Promise<BarcodeResult[]>
     let imageHeight = 1;
 
     try {
-      const projection = await detectBarcodeBands(optimized, { minBandHeight: 40, densityFactor: 1.45 });
+      const projection = await detectBarcodeBands(optimizedBase64, { minBandHeight: 40, densityFactor: 1.45 });
       stripeBands = projection.bands;
       rowDensity = projection.rowDensity;
       imageHeight = projection.imageHeight;
@@ -1474,7 +1478,7 @@ export async function readBarcode(base64Image: string): Promise<BarcodeResult[]>
 
       for (const splitBand of splitBands) {
         try {
-          const bandImage = await cropBand(optimized, splitBand);
+          const bandImage = await cropBand(optimizedBase64, splitBand);
           const mid = (splitBand.top + splitBand.bottom) / 2;
           const ratio = mid / Math.max(1, imageHeight);
           const positionHint = ratio > 0.62 ? 'bottom' : ratio < 0.35 ? 'top' : 'mid';
@@ -1493,7 +1497,7 @@ export async function readBarcode(base64Image: string): Promise<BarcodeResult[]>
     }
 
     try {
-      const colProjection = await detectBarcodeColumns(optimized, { minBandWidth: 36, densityFactor: 1.32 });
+      const colProjection = await detectBarcodeColumns(optimizedBase64, { minBandWidth: 36, densityFactor: 1.32 });
       const sortedCols = colProjection.bands
         .filter((band) => ((band.left + band.right) / 2) / Math.max(1, colProjection.imageWidth) > 0.50)
         .sort((a, b) => b.score - a.score)
@@ -1503,7 +1507,7 @@ export async function readBarcode(base64Image: string): Promise<BarcodeResult[]>
       for (const col of sortedCols) {
         if (shouldStop()) break;
         try {
-          const colImage = await cropColumn(optimized, col);
+          const colImage = await cropColumn(optimizedBase64, col);
           const xMid = (col.left + col.right) / 2;
           const ratio = xMid / Math.max(1, colProjection.imageWidth);
           const positionHint: 'top' | 'mid' | 'bottom' | 'right' = ratio > 0.58 ? 'right' : 'mid';
@@ -1538,8 +1542,8 @@ export async function readBarcode(base64Image: string): Promise<BarcodeResult[]>
         try {
           const roi = roiDefs[i];
           const roiImage = roi.name === 'full'
-            ? optimized
-            : await cropToRegion(optimized, roi.x, roi.y, roi.w, roi.h);
+            ? optimizedBase64
+            : await cropToRegion(optimizedBase64, roi.x, roi.y, roi.w, roi.h);
           const positionHint = roi.name === 'lower-focus' ? 'bottom' : 'mid';
           dynamicSources.push({ name: roi.name, image: roiImage, index: i + 1, positionHint });
         } catch {
@@ -1618,13 +1622,7 @@ export async function readBarcode(base64Image: string): Promise<BarcodeResult[]>
     }
 
     if (candidateMap.size === 0) {
-      console.warn('⚠️ [readBarcode] 激进矩阵无结果，回退 legacy 识别链...');
-      const legacy = await legacyReadBarcode(normalized);
-      for (const item of legacy) {
-        const legacyRegion = item.region || 'legacy';
-        const legacyHint = legacyRegion.includes('bottom') ? 'bottom' : 'mid';
-        tryAddResult(item.value, item.format, legacyRegion, item.regionIndex || 0, 'raw', 'zxing', 0.72, legacyHint);
-      }
+      console.warn('⚠️ [readBarcode] 激进矩阵无结果，未启用 legacy 回退链路');
     }
 
     for (const aggregate of candidateMap.values()) {

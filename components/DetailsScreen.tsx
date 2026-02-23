@@ -199,7 +199,7 @@ const DetailsScreen: React.FC<DetailsScreenProps> = ({
   };
 
   const handleSaveEdit = () => {
-    if (!editSerial.trim()) {
+    if (!editSerial.trim() || !editPartNumber.trim()) {
       return;
     }
     const normalizedPart = editPartNumber.trim().toUpperCase();
@@ -277,7 +277,7 @@ const DetailsScreen: React.FC<DetailsScreenProps> = ({
               </div>
             </div>
             <div className="flex-shrink-0 flex flex-col">
-              <div className="text-xs font-bold text-blue-600 uppercase tracking-wider h-4 flex items-center">Part Number</div>
+              <div className="text-xs font-bold text-blue-600 uppercase tracking-wider h-4 flex items-center">Part Number <span className="text-red-400 ml-1">*</span></div>
               <div className="text-base font-black text-gray-700 tracking-wide uppercase whitespace-nowrap leading-tight">
                 {printer.partNumber || 'N/A'}
               </div>

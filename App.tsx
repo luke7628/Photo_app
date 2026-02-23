@@ -275,6 +275,14 @@ const App: React.FC = () => {
         window.removeEventListener('message', handleAuthMessage);
         delete (window as any).__authMessageHandler;
       }
+
+      if (event.data.type === 'microsoft_auth_error') {
+        console.error('❌ [handleAuthMessage] Auth error received:', event.data.error, event.data.errorDescription);
+        displayToast(`❌ 登录失败：${event.data.errorDescription || event.data.error || '未知错误'}`);
+        if (authWindow) authWindow.close();
+        window.removeEventListener('message', handleAuthMessage);
+        delete (window as any).__authMessageHandler;
+      }
     };
 
     // Bug Fix: 存储引用以便后续清理
@@ -667,12 +675,8 @@ const App: React.FC = () => {
 
             let normalized = raw.trim().toUpperCase();
 
-            normalized = normalized
-              .replace(/[“”"]/g, '4')
-              .replace(/[‘’']/g, '1')
-              .replace(/O/g, '0')
-              .replace(/[IL]/g, '1')
-              .replace(/S/g, '5');
+            // 移除针对 OCR 的模糊纠错逻辑 (S->5, O->0 等)，避免破坏精准的条码数据
+            // normalized = normalized.replace(...)
 
             normalized = normalized.replace(/[^A-Z0-9-]/g, '');
 
@@ -693,10 +697,7 @@ const App: React.FC = () => {
             return raw
               .trim()
               .toUpperCase()
-              .replace(/[^A-Z0-9]/g, '')
-              .replace(/O/g, '0')
-              .replace(/[IL]/g, '1')
-              .replace(/S/g, '5');
+              .replace(/[^A-Z0-9]/g, '');
           };
 
           const serialDecision = runRecognitionArbitration(candidates, 'serial', 0.68);
@@ -779,7 +780,7 @@ const App: React.FC = () => {
       if (sessionIndex === 0 && !isSingleRetake) {
         console.log('📸 [handleCapture] skipReview=true，sessionIndex=0， 开始分析...');
         setIsAnalyzing(true);
-        const cleanBase64 = base64.split(',')[1];
+        const cleanBase64 = base64.includes(',') ? base64.split(',')[1] : base64;
         console.log('📸 [handleCapture] 清理后Base64长度:', cleanBase64.length);
         analyzeWithBarcode(cleanBase64)
           .then(result => { 
@@ -833,7 +834,7 @@ const App: React.FC = () => {
       if (sessionIndex === 0 && !isSingleRetake) {
         console.log('📸 [handleCapture] 首次拍摄，开始分析...');
         setIsAnalyzing(true);
-        const cleanBase64 = base64.split(',')[1];
+        const cleanBase64 = base64.includes(',') ? base64.split(',')[1] : base64;
         analyzeWithBarcode(cleanBase64)
           .then(result => { 
             console.log('📸 [handleCapture] 分析成功，设置sessionData:', result);
@@ -951,11 +952,22 @@ const App: React.FC = () => {
       displayToast('❌ 序列号不能为空，请重新拍摄或手动输入');
       return;
     }
+
+    if (!data.partNumber || data.partNumber.trim().length === 0) {
+      displayToast('❌ 部件号不能为空，请重新拍摄或手动输入');
+      return;
+    }
     
     // 清理并验证序列号 - 移除特殊字符但保留必要的格式
     const cleanedSn = data.serialNumber.replace(/[^\w\-]/g, '');
+    const cleanedPn = data.partNumber.replace(/[^\w\-]/g, '').toUpperCase();
     if (cleanedSn.length === 0) {
       displayToast('❌ 序列号格式无效，请重新输入');
+      return;
+    }
+
+    if (cleanedPn.length === 0) {
+      displayToast('❌ 部件号格式无效，请重新输入');
       return;
     }
     
@@ -1001,7 +1013,7 @@ const App: React.FC = () => {
       setSessionIndex(prev => prev + 1);
       setCurrentScreen(AppScreen.CAMERA);
     } else {
-      finalizeSession(updatedSessionPhotos, { ...data, serialNumber: cleanedSn });
+      finalizeSession(updatedSessionPhotos, { ...data, serialNumber: cleanedSn, partNumber: cleanedPn });
     }
   }, [isSingleRetake, selectedPrinter, sessionIndex, sessionPhotos, lastScreen, finalizeSession, displayToast]);
 

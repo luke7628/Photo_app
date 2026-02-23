@@ -125,6 +125,14 @@ const GalleryScreen: React.FC<GalleryScreenProps> = ({
           </h1>
           
           <div className="flex items-center gap-2.5 flex-shrink-0">
+            <button
+              onClick={onSearch}
+              style={rotationStyle}
+              className={`ios-pressable ${isLandscape ? 'size-9' : 'size-11'} flex items-center justify-center rounded-xl border border-blue-200 bg-blue-50 text-blue-700 transition-all shadow-sm`}
+              title="Advanced search"
+            >
+              <span className="material-symbols-outlined text-[18px]">manage_search</span>
+            </button>
             {user && (
               <button
                 onClick={onManualSync}

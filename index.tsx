@@ -8,16 +8,19 @@ import ReactDOM from 'react-dom/client';
 import './styles/theme.css';
 import App from './App';
 
-// 暴露诊断工具到全局作用域
-import { diagnosticLibraries, testBasicBarcode } from './services/barcodeDiagnostics';
-(window as any).__barcodeDiagnostics = {
-  diagnostic: diagnosticLibraries,
-  test: testBasicBarcode
-};
+// 仅在开发环境暴露诊断工具，避免生产包体膨胀
+if (import.meta.env.DEV) {
+  import('./services/barcodeDiagnostics').then(({ diagnosticLibraries, testBasicBarcode }) => {
+    (window as any).__barcodeDiagnostics = {
+      diagnostic: diagnosticLibraries,
+      test: testBasicBarcode
+    };
 
-console.log('💡 [Tip] 在浏览器控制台运行诊断:');
-console.log('  1. 诊断库加载: window.__barcodeDiagnostics.diagnostic()');
-console.log('  2. 测试条码识别: window.__barcodeDiagnostics.test(base64Image)');
+    console.log('💡 [Tip] 在浏览器控制台运行诊断:');
+    console.log('  1. 诊断库加载: window.__barcodeDiagnostics.diagnostic()');
+    console.log('  2. 测试条码识别: window.__barcodeDiagnostics.test(base64Image)');
+  });
+}
 
 // Error boundary to catch and display React errors
 class ErrorBoundary extends React.Component<

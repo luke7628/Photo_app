@@ -33,13 +33,13 @@ export function isValidPartNumber(partNumber?: string): boolean {
  * 
  * 所需字段：
  * - serialNumber 必填（序列号）
- * - partNumber 可选（部件号）
+ * - partNumber 必填（部件号）
  * 
  * @param data 打印机数据对象
- * @returns 数据是否有效（至少需要序列号）
+ * @returns 数据是否有效（需要序列号与部件号）
  * 
  * @example
- * isPrinterDataValid({ serialNumber: 'SN123' }) // true (partNumber 可选)
+ * isPrinterDataValid({ serialNumber: 'SN123' }) // false (partNumber 缺失)
  * isPrinterDataValid({ serialNumber: 'SN123', partNumber: 'PN123' }) // true
  * isPrinterDataValid({}) // false
  */
@@ -50,6 +50,5 @@ export interface PrinterData {
 
 export function isPrinterDataValid(data?: PrinterData): boolean {
   if (!data) return false;
-  // 只要序列号有效即可，partNumber 可选
-  return isValidSerialNumber(data.serialNumber);
+  return isValidSerialNumber(data.serialNumber) && isValidPartNumber(data.partNumber);
 }

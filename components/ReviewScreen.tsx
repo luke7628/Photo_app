@@ -74,11 +74,10 @@ const ReviewScreen: React.FC<ReviewScreenProps> = ({ imageUrl, data, isAnalyzing
   };
 
   const handleSaveEdit = () => {
-    if (!editSerial || !editSerial.trim()) {
+    if (!editSerial || !editSerial.trim() || !editPartNumber || !editPartNumber.trim()) {
       setModalError(true);
       return;
     }
-    // partNumber is now optional - user can leave it empty
     const normalizedPart = editPartNumber.trim().toUpperCase();
     onUpdateData({ serialNumber: editSerial.toUpperCase(), partNumber: normalizedPart || '' });
     setShowEditModal(false);
@@ -406,7 +405,7 @@ const ReviewScreen: React.FC<ReviewScreenProps> = ({ imageUrl, data, isAnalyzing
                 </div>
                 
                 <div>
-                  <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest block mb-2">Part Number <span className="text-gray-300">(optional)</span></label>
+                  <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest block mb-2">Part Number <span className="text-red-400">*</span></label>
                   <input 
                     value={editPartNumber}
                     onChange={(e) => {
@@ -419,9 +418,9 @@ const ReviewScreen: React.FC<ReviewScreenProps> = ({ imageUrl, data, isAnalyzing
                 </div>
               </div>
 
-              {modalError && (!editSerial || !editSerial.trim()) && (
+              {modalError && (!editSerial || !editSerial.trim() || !editPartNumber || !editPartNumber.trim()) && (
                 <div className="mb-3 px-3 py-2 bg-red-50 border border-red-200 rounded-lg">
-                  <p className="text-xs font-bold text-red-600 text-center">Please enter Serial Number</p>
+                  <p className="text-xs font-bold text-red-600 text-center">Please enter Serial Number and Part Number</p>
                 </div>
               )}
 
