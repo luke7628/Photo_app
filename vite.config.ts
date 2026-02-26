@@ -1,6 +1,8 @@
 import path from 'path';
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
+import tailwindcss from 'tailwindcss';
+import autoprefixer from 'autoprefixer';
 
 export default defineConfig({
   base: '/Photo_app/',
@@ -29,5 +31,13 @@ export default defineConfig({
   },
   ssr: {
     noExternal: ['@ericblade/quagga2']
+  },
+  css: {
+    postcss: {
+      plugins: [
+        tailwindcss,
+        autoprefixer
+      ]
+    }
   }
 });

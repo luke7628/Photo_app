@@ -1,22 +1,21 @@
-
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { AppScreen, Printer, Project, PHOTO_LABELS, PhotoSetItem, UserPreferences, MicrosoftUser, ViewMode } from './types';
 import { MOCK_PRINTERS, MOCK_PROJECTS } from './constants';
 import { storageService } from './services/storageService';
 import { oneDriveService } from './services/oneDriveService';
 import { microsoftAuthService } from './services/microsoftAuthService';
-import { readBarcode } from './services/barcodeService';
+import { recognizeBarcodeWithAzureFallback } from './services/barcodeService';
+import { logger } from './services/logService';
 import { runRecognitionArbitration } from './services/recognitionPipeline';
-import eruda from 'eruda';
 import { hapticService } from './src/services/hapticService';
 
-// 初始化移动端调试工具（开发环境）
-if (typeof window !== 'undefined') {
-  if (import.meta.env.DEV || window.location.hostname === 'luke7628.github.io') {
-    eruda.init();
-    console.log('🔧 [Eruda] 移动端调试工具已启动');
-  }
-}
+// Remove the initialization of the Eruda debugging tool
+// if (typeof window !== 'undefined') {
+//   if (import.meta.env.DEV || window.location.hostname === 'luke7628.github.io') {
+//     console.log('🔧 [Eruda] 移动端调试工具已启动');
+//   }
+// }
+
 import SplashScreen from './components/SplashScreen';
 import GalleryScreen from './components/GalleryScreen';
 import SearchScreen from './components/SearchScreen';
@@ -84,7 +83,7 @@ const App: React.FC = () => {
 
   // Toast notification helper
   const displayToast = useCallback((message: string, duration = 3000) => {
-    console.log('📢 Toast:', message);
+    logger.log('📢 Toast:', message);
     setToastMessage(message);
     setShowToast(true);
     const timer = setTimeout(() => setShowToast(false), duration);
@@ -106,7 +105,7 @@ const App: React.FC = () => {
             setSettings(prev => ({ ...prev, cloudProvider: 'onedrive', autoUpload: true }));
           } else {
             // 用户信息获取失败，可能Token已过期，尝试刷新
-            console.warn('⚠️ [initMicrosoft] User info fetch failed, attempting token refresh...');
+            logger.warn('⚠️ [initMicrosoft] User info fetch failed, attempting token refresh...');
             const refreshed = await microsoftAuthService.refreshAccessToken(MICROSOFT_CLIENT_ID);
             if (refreshed) {
               const retryInfo = await microsoftAuthService.getUserInfo();
@@ -119,7 +118,7 @@ const App: React.FC = () => {
             }
           }
         } catch (e) {
-          console.error("Microsoft Init Error:", e);
+          logger.error("Microsoft Init Error:", e);
         }
       }
       // 总是标记为准备好（即使没有缓存 token，用户可以手动登录）
@@ -130,11 +129,11 @@ const App: React.FC = () => {
   }, []);
 
   const exchangeAuthCode = useCallback(async (code: string) => {
-    console.log('🔐 [exchangeAuthCode] Starting token exchange...');
+    logger.log('🔐 [exchangeAuthCode] Starting token exchange...');
     
     const codeVerifier = sessionStorage.getItem(MICROSOFT_PKCE_VERIFIER_KEY);
     if (!codeVerifier) {
-      console.error('❌ [exchangeAuthCode] Missing PKCE code verifier');
+      logger.error('❌ [exchangeAuthCode] Missing PKCE code verifier');
       return;
     }
 
@@ -147,18 +146,18 @@ const App: React.FC = () => {
         MICROSOFT_TENANT_ID
       );
 
-      console.log('🔐 [exchangeAuthCode] Token exchange result:', success);
+      logger.log('🔐 [exchangeAuthCode] Token exchange result:', success);
 
       if (success && microsoftAuthService.accessToken) {
-        console.log('🔐 [exchangeAuthCode] Access token obtained, setting OneDrive token');
+        logger.log('🔐 [exchangeAuthCode] Access token obtained, setting OneDrive token');
         oneDriveService.setToken(microsoftAuthService.accessToken);
 
-        console.log('🔐 [exchangeAuthCode] Fetching user info...');
+        logger.log('🔐 [exchangeAuthCode] Fetching user info...');
         const userInfo = await microsoftAuthService.getUserInfo();
-        console.log('🔐 [exchangeAuthCode] User info result:', userInfo);
+        logger.log('🔐 [exchangeAuthCode] User info result:', userInfo);
 
         if (userInfo) {
-          console.log('✅ [exchangeAuthCode] Setting user state:', userInfo);
+          logger.log('✅ [exchangeAuthCode] Setting user state:', userInfo);
           setUser(userInfo as any);
           storageService.saveUser(userInfo as any);
           // 🎯 自动启用云同步
@@ -168,17 +167,17 @@ const App: React.FC = () => {
             return newSettings;
           });
           displayToast(`✅ 已登陆 ${userInfo.email}，自动同步已启用`);
-          console.log('✅ [exchangeAuthCode] User successfully logged in, auto-upload enabled');
+          logger.log('✅ [exchangeAuthCode] User successfully logged in, auto-upload enabled');
         } else {
-          console.warn('⚠️ [exchangeAuthCode] Failed to get user info');
+          logger.warn('⚠️ [exchangeAuthCode] Failed to get user info');
           displayToast('⚠️ 登陆成功但无法获取用户信息');
         }
       } else {
-        console.error('❌ [exchangeAuthCode] Token exchange failed or no access token');
+        logger.error('❌ [exchangeAuthCode] Token exchange failed or no access token');
         displayToast('❌ 登陆失败，请重试');
       }
     } catch (error) {
-      console.error('❌ [exchangeAuthCode] Error:', error);
+      logger.error('❌ [exchangeAuthCode] Error:', error);
     }
   }, []);
 
@@ -187,18 +186,18 @@ const App: React.FC = () => {
     const timestamp = localStorage.getItem('microsoft_auth_timestamp');
     
     if (storedCode) {
-      console.log('🔐 [App] Found stored auth code in localStorage');
+      logger.log('🔐 [App] Found stored auth code in localStorage');
       
       // Check if code is still valid (within 5 minutes)
       const isValid = !timestamp || (Date.now() - parseInt(timestamp)) < 5 * 60 * 1000;
       
       if (isValid) {
-        console.log('✅ [App] Auth code is valid, exchanging...');
+        logger.log('✅ [App] Auth code is valid, exchanging...');
         localStorage.removeItem(MICROSOFT_AUTH_CODE_KEY);
         localStorage.removeItem('microsoft_auth_timestamp');
         exchangeAuthCode(storedCode);
       } else {
-        console.warn('⚠️ [App] Auth code expired, removing...');
+        logger.warn('⚠️ [App] Auth code expired, removing...');
         localStorage.removeItem(MICROSOFT_AUTH_CODE_KEY);
         localStorage.removeItem('microsoft_auth_timestamp');
       }
@@ -206,10 +205,10 @@ const App: React.FC = () => {
   }, [exchangeAuthCode]);
 
   const handleLogin = useCallback(async () => {
-    console.log('🔑 [handleLogin] Starting login process...');
+    logger.log('🔑 [handleLogin] Starting login process...');
     
     if (!MICROSOFT_CLIENT_ID) {
-      console.error('❌ [handleLogin] MICROSOFT_CLIENT_ID is not configured');
+      logger.error('❌ [handleLogin] MICROSOFT_CLIENT_ID is not configured');
       // Show a user-friendly message in the UI instead of an alert
       const message = "Microsoft Login is not configured.\n\n" +
         "To enable Microsoft OneDrive integration:\n" +
@@ -221,16 +220,16 @@ const App: React.FC = () => {
       
       if (confirm(message + "\n\nWould you like to see the setup guide?")) {
         // In a real app, this could open documentation
-        console.log("Setup guide: Check MICROSOFT_SETUP.md in the project root");
+        logger.log("Setup guide: Check MICROSOFT_SETUP.md in the project root");
       }
       return;
     }
 
-    console.log('🔑 [handleLogin] Creating PKCE pair...');
+    logger.log('🔑 [handleLogin] Creating PKCE pair...');
     const { verifier, challenge } = await microsoftAuthService.createPkcePair();
     sessionStorage.setItem(MICROSOFT_PKCE_VERIFIER_KEY, verifier);
     localStorage.removeItem(MICROSOFT_AUTH_CODE_KEY);
-    console.log('🔑 [handleLogin] PKCE pair created, generating login URL...');
+    logger.log('🔑 [handleLogin] PKCE pair created, generating login URL...');
     
     // Generate login URL and redirect
     const loginUrl = microsoftAuthService.getLoginUrl(
@@ -239,7 +238,7 @@ const App: React.FC = () => {
       MICROSOFT_TENANT_ID,
       challenge
     );
-    console.log('🔑 [handleLogin] Opening auth window...');
+    logger.log('🔑 [handleLogin] Opening auth window...');
     
     // 在新窗口打开登录页面（也可以直接重定向）
     // window.location.href = loginUrl;
@@ -247,7 +246,7 @@ const App: React.FC = () => {
     // 或者在新窗口打开，保持当前应用继续运行
     const authWindow = window.open(loginUrl, 'microsoft_auth', 'width=500,height=600');
     if (!authWindow) {
-      console.log('🔑 [handleLogin] Pop-up blocked, redirecting directly');
+      logger.log('🔑 [handleLogin] Pop-up blocked, redirecting directly');
       window.location.href = loginUrl;
       return;
     }
@@ -259,15 +258,15 @@ const App: React.FC = () => {
 
     // 监听来自回调页面的消息
     const handleAuthMessage = async (event: MessageEvent) => {
-      console.log('📨 [handleAuthMessage] Received message:', event.data);
+      logger.log('📨 [handleAuthMessage] Received message:', event.data);
       
       if (event.origin !== window.location.origin) {
-        console.warn('⚠️ [handleAuthMessage] Origin mismatch:', event.origin, '!==', window.location.origin);
+        logger.warn('⚠️ [handleAuthMessage] Origin mismatch:', event.origin, '!==', window.location.origin);
         return;
       }
       
       if (event.data.type === 'microsoft_auth_success') {
-        console.log('✅ [handleAuthMessage] Auth success received with code');
+        logger.log('✅ [handleAuthMessage] Auth success received with code');
         const { code } = event.data;
         await exchangeAuthCode(code);
 
@@ -277,7 +276,7 @@ const App: React.FC = () => {
       }
 
       if (event.data.type === 'microsoft_auth_error') {
-        console.error('❌ [handleAuthMessage] Auth error received:', event.data.error, event.data.errorDescription);
+        logger.error('❌ [handleAuthMessage] Auth error received:', event.data.error, event.data.errorDescription);
         displayToast(`❌ 登录失败：${event.data.errorDescription || event.data.error || '未知错误'}`);
         if (authWindow) authWindow.close();
         window.removeEventListener('message', handleAuthMessage);
@@ -288,7 +287,7 @@ const App: React.FC = () => {
     // Bug Fix: 存储引用以便后续清理
     (window as any).__authMessageHandler = handleAuthMessage;
     window.addEventListener('message', handleAuthMessage);
-    console.log('📡 [handleLogin] Message listener registered, waiting for callback...');
+    logger.log('📡 [handleLogin] Message listener registered, waiting for callback...');
   }, [exchangeAuthCode]);
 
 
@@ -639,7 +638,7 @@ const App: React.FC = () => {
           console.log('📊 [analyzeWithBarcode] Base64前100字符:', base64Image.substring(0, 100));
 
           console.log('🔍 [analyzeWithBarcode] 执行多引擎解码...');
-          const rawResults = await readBarcode(base64Image);
+          const rawResults = await recognizeBarcodeWithAzureFallback(base64Image);
           console.log('📊 [analyzeWithBarcode] 解码返回:', rawResults.length, '个候选');
 
           if (rawResults.length > 0) {
@@ -958,9 +957,9 @@ const App: React.FC = () => {
       return;
     }
     
-    // 清理并验证序列号 - 移除特殊字符但保留必要的格式
-    const cleanedSn = data.serialNumber.replace(/[^\w\-]/g, '');
-    const cleanedPn = data.partNumber.replace(/[^\w\-]/g, '').toUpperCase();
+    // 不修改条码原始值，仅做两端空白清理（保留原始条码字符）
+    const cleanedSn = data.serialNumber.trim();
+    const cleanedPn = data.partNumber.trim();
     if (cleanedSn.length === 0) {
       displayToast('❌ 序列号格式无效，请重新输入');
       return;
@@ -1033,7 +1032,10 @@ const App: React.FC = () => {
         {currentScreen === AppScreen.CAMERA && <CameraScreen sessionIndex={sessionIndex} isSingleRetake={isSingleRetake} initialFlash={settings.defaultFlash} onClose={() => { if (sessionPhotos.length > 0 && sessionData) finalizeSession(sessionPhotos, sessionData); else { setCurrentScreen(isSingleRetake ? lastScreen : AppScreen.GALLERY); setIsSingleRetake(false); } }} onCapture={handleCapture} />}
         {currentScreen === AppScreen.REVIEW && <ReviewScreen imageUrl={capturedImage!} data={sessionData!} isAnalyzing={isAnalyzing} sessionIndex={sessionIndex} isSingleRetake={isSingleRetake} photoRotation={parseInt(sessionStorage.getItem('lastCaptureRotation') || '0', 10)} onRetake={() => setCurrentScreen(AppScreen.CAMERA)} onUpdateData={(newData) => { setSessionData(newData); if (sessionIndex === 0 && !isSingleRetake) { setBaseSerialNumber(newData.serialNumber); setBasePartNumber(newData.partNumber || ''); } }} onConfirm={() => processConfirmation(capturedImage!, sessionData || { serialNumber: 'Manual_SN', partNumber: '' })} onBack={handleReviewBack} />}
         {currentScreen === AppScreen.DETAILS && <DetailsScreen printer={selectedPrinter!} viewMode={detailsViewMode} setViewMode={setDetailsViewMode} onBack={() => setCurrentScreen(AppScreen.GALLERY)} onAddPhoto={(idx) => { setSessionIndex(idx); setIsSingleRetake(true); setSessionData({ serialNumber: selectedPrinter!.serialNumber, partNumber: selectedPrinter!.partNumber }); setLastScreen(AppScreen.DETAILS); setCurrentScreen(AppScreen.CAMERA); }} onPreviewImage={(photos, index) => { setPreviewPhotos(photos); setPreviewIndex(index); setLastScreen(AppScreen.DETAILS); setCurrentScreen(AppScreen.PREVIEW); }} onManualSync={performSyncCycle} onUpdatePrinter={updatePrinter} onAllPhotosComplete={() => { setSessionIndex(0); setSessionPhotos([]); setSessionData(null); setBaseSerialNumber(''); }} isSyncing={selectedPrinter?.isSyncing} user={user} pendingSyncCount={pendingSyncCount} onOpenSettings={() => setCurrentScreen(AppScreen.SETTINGS)} />}
-        {currentScreen === AppScreen.PREVIEW && <ImagePreviewScreen photos={previewPhotos} initialIndex={previewIndex} onBack={() => setCurrentScreen(lastScreen)} onRetake={(idx) => { setSessionIndex(idx); setIsSingleRetake(true); if (selectedPrinter) setSessionData({ serialNumber: selectedPrinter.serialNumber, partNumber: selectedPrinter.partNumber }); setCurrentScreen(AppScreen.CAMERA); }} onReplace={(idx, b64) => { if (!selectedPrinter) return; const currentPhotos = selectedPrinter.photos || []; const updatedPhotos = [...currentPhotos]; updatedPhotos[idx] = { ...updatedPhotos[idx], url: b64, isSynced: false, rotation: 0 }; const updatedPrinter = { ...selectedPrinter, photos: updatedPhotos, imageUrl: idx === 0 ? b64 : selectedPrinter.imageUrl, syncedCount: updatedPhotos.filter(p => p.isSynced).length }; setPrinters(prev => prev.map(p => p.id === selectedPrinter.id ? updatedPrinter : p)); setSelectedPrinter(updatedPrinter); setPreviewPhotos(updatedPhotos); }} />}
+        {currentScreen === AppScreen.PREVIEW && <ImagePreviewScreen photos={previewPhotos} initialIndex={previewIndex} onBack={() => setCurrentScreen(lastScreen)} onRetake={(idx) => { setSessionIndex(idx); setIsSingleRetake(true); if (selectedPrinter) setSessionData({ serialNumber: selectedPrinter.serialNumber, partNumber: selectedPrinter.partNumber }); setCurrentScreen(AppScreen.CAMERA); }} onReplace={(idx, b64) => { if (!selectedPrinter) return; const currentPhotos = selectedPrinter.photos || []; const updatedPhotos = [...currentPhotos]; updatedPhotos[idx] = { ...updatedPhotos[idx], url: b64, isSynced: false, rotation: 0 }; const updatedPrinter = { ...selectedPrinter, photos: updatedPhotos, imageUrl: idx === 0 ? b64 : selectedPrinter.imageUrl, syncedCount: updatedPhotos.filter(p => p.isSynced).length }; setPrinters(prev => prev.map(p => p.id === selectedPrinter.id ? updatedPrinter : p));
+      setSelectedPrinter(updatedPrinter);
+      setPreviewPhotos(updatedPhotos);
+    }} />}
         {currentScreen === AppScreen.SETTINGS && <SettingsScreen settings={settings} onUpdate={setSettings} activeProject={activeProject} user={user} pendingSyncCount={pendingSyncCount} onLogin={handleLogin} onLogout={handleLogout} onBack={() => setCurrentScreen(activeProjectId ? AppScreen.GALLERY : AppScreen.PROJECT_LIST)} />}
         {currentScreen === AppScreen.SEARCH && <SearchScreen printers={printers} onBack={() => setCurrentScreen(AppScreen.GALLERY)} onPreviewImage={(url) => { setPreviewPhotos([{url, label: 'Search', filename: 's.jpg'}]); setPreviewIndex(0); setLastScreen(AppScreen.SEARCH); setCurrentScreen(AppScreen.PREVIEW); }} />}
       </div>

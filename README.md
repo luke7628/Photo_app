@@ -50,6 +50,17 @@ Use Microsoft OneDrive (or choose local-only storage).
 - Set `VITE_MICROSOFT_TENANT_ID` (default: "common")
 - Set `VITE_MICROSOFT_REDIRECT_URI` (defaults to current origin)
 
+**For Azure Computer Vision (barcode fallback):**
+- Create a Cognitive Services (or Computer Vision) resource in the Azure Portal.
+- In your project root create `.env.local` (do NOT commit it) and set:
+
+```text
+VITE_AZURE_ENDPOINT=https://<your-resource>.cognitiveservices.azure.com
+VITE_AZURE_KEY=<your-subscription-key>
+```
+
+- Note: Browser requests to Azure require the resource to allow CORS from your dev origin, or you should proxy requests through a small server. See the Azure docs for "CORS" and "Computer Vision".
+
 ### 3. Run Development Server
 
 ```bash

@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { Printer, PHOTO_LABELS, PhotoSetItem, MicrosoftUser, ViewMode } from '../types';
 import { useSwipeToDismiss } from '../src/hooks/useSwipeToDismiss';
@@ -66,7 +65,7 @@ const DetailsScreen: React.FC<DetailsScreenProps> = ({
           <div className="flex flex-col">
             {photos.map((photo, index) => (
               <div 
-                key={index} 
+                key={`${photo.filename}-${index}`} 
                 className="flex items-center gap-2 py-2 px-1.5 border-b border-gray-50 active:bg-gray-50 transition-colors cursor-pointer group"
                 onClick={() => photo.url ? onPreviewImage(photos, index) : onAddPhoto(index)}
               >
@@ -101,7 +100,7 @@ const DetailsScreen: React.FC<DetailsScreenProps> = ({
         return (
           <div className="flex flex-col gap-5 px-2">
             {photos.map((photo, index) => (
-              <div key={index} className="flex flex-col gap-2 group cursor-pointer" onClick={() => photo.url ? onPreviewImage(photos, index) : onAddPhoto(index)}>
+              <div key={`${photo.filename}-${index}`} className="flex flex-col gap-2 group cursor-pointer" onClick={() => photo.url ? onPreviewImage(photos, index) : onAddPhoto(index)}>
                 <div className={`relative aspect-video rounded-xl overflow-hidden flex items-center justify-center border-2 transition-all ${photo.url ? 'bg-slate-100 border-white shadow-md' : 'bg-gray-50 border-dashed border-gray-200'}`}>
                   {photo.url ? (
                     <>
@@ -144,7 +143,7 @@ const DetailsScreen: React.FC<DetailsScreenProps> = ({
           <div className="grid grid-cols-3 gap-1.5 px-2">
             {photos.map((photo, index) => (
               <button 
-                key={index} 
+                key={`${photo.filename}-${index}`} 
                 className="flex flex-col gap-1 group cursor-pointer active:scale-95 transition-transform duration-200"
                 onClick={() => photo.url ? onPreviewImage(photos, index) : onAddPhoto(index)}
               >

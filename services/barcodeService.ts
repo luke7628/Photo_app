@@ -1,3 +1,4 @@
+
 /**
  * 优化的条码识别服务 - 专业轻量化方案
  * 
@@ -25,6 +26,8 @@
 import Quagga from '@ericblade/quagga2';
 import { BrowserMultiFormatReader as ZXingBrowserReader } from '@zxing/browser';
 import { BrowserMultiFormatReader, BarcodeFormat, DecodeHintType } from '@zxing/library';
+import { logger } from './logService';
+import { detectBarcodeAzure } from './azureBarcodeService';
 
 interface BarcodeResult {
   type: 'barcode' | 'qrcode';
@@ -99,24 +102,24 @@ function loadImageFromBase64(base64Image: string): Promise<HTMLImageElement> {
       reject(new Error('Image load timeout (10s)'));
     }, 10000);
 
-    img.onload = () => {
+      img.onload = () => {
       if (isResolved) return;
       isResolved = true;
       clearTimeout(timeout);
       img.onload = null;
       img.onerror = null;
-      console.log(`✅ [loadImage] ${img.width}x${img.height} pixels loaded`);
+      logger.log(`✅ [loadImage] ${img.width}x${img.height} pixels loaded`);
       resolve(img);
     };
 
-    img.onerror = (error) => {
+      img.onerror = (error) => {
       if (isResolved) return;
       isResolved = true;
       clearTimeout(timeout);
       img.onload = null;
       img.onerror = null;
       img.src = ''; // 清理src
-      console.error(`❌ [loadImage] 加载失败:`, error);
+      logger.error(`❌ [loadImage] 加载失败:`, error);
       reject(new Error('Failed to load image'));
     };
 
@@ -1676,4 +1679,35 @@ export async function readBarcode(base64Image: string): Promise<BarcodeResult[]>
 export function resetBarcodeReader() {
   // Quagga 不需要显式清理
   preprocessedImageCache = null;
+}
+
+/**
+ * 高级条码识别入口（本地 readBarcode + Azure 兜底）
+ */
+export async function recognizeBarcodeWithAzureFallback(base64Image: string) {
+  // 1. 本地激进识别
+  try {
+    const local = await readBarcode(base64Image);
+    if (local && local.length > 0) return local;
+  } catch (e) {
+    console.warn('Local readBarcode failed:', e);
+  }
+
+  // 2. Azure 兜底
+  try {
+    const azure = await detectBarcodeAzure(base64Image);
+    return azure.map(value => ({
+      type: 'barcode' as const,
+      value,
+      format: undefined,
+      region: 'azure',
+      regionIndex: 0,
+      variant: 'raw' as const,
+      engine: 'azure' as any,
+      engineConfidence: 0.98
+    }));
+  } catch (e) {
+    console.warn('Azure fallback failed:', e);
+    return [] as BarcodeResult[];
+  }
 }

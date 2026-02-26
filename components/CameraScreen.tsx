@@ -1,4 +1,3 @@
-
 import React, { useRef, useState, useEffect, useCallback, useMemo } from 'react';
 import { PHOTO_LABELS } from '../types';
 import { useDeviceOrientation } from '../src/hooks/useDeviceOrientation';
@@ -145,7 +144,11 @@ const CameraScreen: React.FC<CameraScreenProps> = ({
             console.log(`Successfully got stream with constraints ${i + 1}`);
             break;
           } catch (err) {
-            console.warn(`Constraints ${i + 1} failed:`, err);
+            if (err.name === 'OverconstrainedError') {
+              console.error(`OverconstrainedError: ${err.constraint} constraint is not supported by the device.`);
+            } else {
+              console.warn(`Constraints ${i + 1} failed:`, err);
+            }
             if (i === constraintsList.length - 1) {
               throw err;
             }

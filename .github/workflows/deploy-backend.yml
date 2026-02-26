@@ -1,0 +1,30 @@
+name: Deploy backend
+
+on:
+  push:
+    branches: [ main ]
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Azure Login
+        uses: azure/login@v1
+        with:
+          creds: ${{ secrets.AZURE_CREDENTIALS }}
+
+      - name: Set App Service app settings
+        run: |
+          az webapp config appsettings set \
+            --resource-group ${{ secrets.AZURE_RG }} \
+            --name ${{ secrets.AZURE_WEBAPP }} \
+            --settings AZURE_ENDPOINT="${{ secrets.AZURE_ENDPOINT }}" AZURE_KEY="${{ secrets.AZURE_KEY }}"
+
+      - name: Deploy backend to App Service
+        uses: Azure/webapps-deploy@v2
+        with:
+          app-name: ${{ secrets.AZURE_WEBAPP }}
+          package: ./server

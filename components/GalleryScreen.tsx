@@ -1,4 +1,3 @@
-
 import React, { useState, useMemo, memo, useEffect } from 'react';
 import { Printer, MicrosoftUser, Project } from '../types';
 import { useDeviceOrientation } from '../src/hooks/useDeviceOrientation';
@@ -225,7 +224,13 @@ const GalleryScreen: React.FC<GalleryScreenProps> = ({
       >
         <div className={`grid gap-3 transition-all ${isLandscape ? 'grid-cols-2 md:grid-cols-3' : 'grid-cols-1'}`}>
           {filteredPrinters.map((printer, idx) => (
-            <PrinterItem key={printer.id} printer={printer} onSelect={onSelectPrinter} isLandscape={isLandscape} index={idx} />
+            <PrinterItem
+              key={`${printer.id}-${idx}`}
+              printer={printer}
+              onSelect={onSelectPrinter}
+              isLandscape={isLandscape}
+              index={idx}
+            />
           ))}
         </div>
         {filteredPrinters.length === 0 && (

@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { PhotoSetItem } from '../types';
 
@@ -757,9 +756,9 @@ const ImagePreviewScreen: React.FC<ImagePreviewScreenProps> = ({
               (event.currentTarget as HTMLDivElement).releasePointerCapture(event.pointerId);
             }}
           >
-            {photos.map((_, idx) => (
+            {photos.map((photo, idx) => (
               <button
-                key={`dot-${idx}`}
+                key={`dot-${photo.url}-${idx}`}
                 onClick={() => animateToIndex(idx)}
                 className={`rounded-full transition-all duration-300 ${idx === currentIndex ? 'w-2.5 h-2.5 bg-white opacity-100' : 'w-1.5 h-1.5 bg-white/45 opacity-70'}`}
                 aria-label={`Go to photo ${idx + 1}`}
@@ -776,7 +775,7 @@ const ImagePreviewScreen: React.FC<ImagePreviewScreenProps> = ({
             <div className="flex items-center gap-2 w-max min-w-full justify-center">
               {photos.map((photo, idx) => (
                 <button
-                  key={idx}
+                  key={`${photo.url}-${idx}`}
                   onClick={() => animateToIndex(idx)}
                   className={`relative shrink-0 w-14 h-14 rounded-xl overflow-hidden border transition-all duration-200 ${idx === currentIndex ? 'border-white/95 ring-2 ring-white/40 scale-105' : 'border-white/25 opacity-80 hover:opacity-100'}`}
                   aria-label={`Go to photo ${idx + 1}`}
